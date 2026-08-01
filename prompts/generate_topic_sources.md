@@ -44,8 +44,14 @@ user's OPML).
    counterparty, UKRI GtR, DESNZ energy trends). Only sources that actually exist.
 8. **Queries.** 3–5 Exa query formulations. If a registry is marked, query[0] MUST be a
    compact noun phrase usable as a registry term (not a question).
-9. **No hallucination.** Verify uncertain domains with web_search (max ~10 searches).
-   Mark `confidence`: high/medium/low. Never invent a domain.
+9. **No hallucination; search for DISCOVERY, not existence.** Domain EXISTENCE
+   is verified mechanically by the pipeline (DNS gate) — never search to
+   confirm a domain resolves; that wastes the budget. Use `web_search` to
+   (a) DISCOVER sources you are unsure exist or that may be missing from your
+   knowledge, and (b) confirm a source's content focus when genuinely unsure.
+   Batch several domains into ONE query where possible. HARD budget: 10
+   searches total — spend them on discovery, not verification. Mark
+   `confidence`: high/medium/low. Never invent a domain.
 10. **Feeds matter.** Prefer sources with RSS/Atom feeds — the engine crawls feeds.
 11. **Crawl endpoints.** For bot-protected academic journals (Elsevier/Nature),
     point the crawler at RSS/API endpoints (e.g. OpenAlex `api.openalex.org`),

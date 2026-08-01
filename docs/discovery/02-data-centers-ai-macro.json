@@ -1,0 +1,289 @@
+{
+  "topic": "Data Centers / AI / macro",
+  "status": "approved",
+  "iterations": 2,
+  "approved_at": "2026-08-01",
+  "subareas": [
+    {
+      "name": "Data center construction & physical build-out",
+      "coverage": "Project-by-project build-out, site selection, megawatt capacity, land and power procurement, colocation and hyperscaler campuses, construction financing. Major subarea — 2+ sources.",
+      "sources": [
+        {
+          "name": "Data Center Dynamics (DCD)",
+          "domain": "datacenterdynamics.com",
+          "type": "trade press",
+          "why": "Primary trade press on data center construction, new campus announcements, and site-level deals worldwide.",
+          "confidence": "high",
+          "crawl_root": "https://www.datacenterdynamics.com/en/feed/"
+        },
+        {
+          "name": "Data Center Knowledge",
+          "domain": "datacenterknowledge.com",
+          "type": "trade press",
+          "why": "Dedicated coverage of hyperscaler build-outs including Stargate site-by-site status; construction and capacity tracking.",
+          "confidence": "high",
+          "crawl_root": "https://www.datacenterknowledge.com/rss.xml"
+        },
+        {
+          "name": "AFCOM/Analyst community via TrackitCore — datacenterHawk",
+          "domain": "datacenterhawk.com",
+          "type": "data/registry",
+          "why": "Structured data/registry on data center supply, vacancy, and construction pipeline by market.",
+          "confidence": "medium"
+        }
+      ]
+    },
+    {
+      "name": "Chip supply & semiconductor geopolitics",
+      "coverage": "GPU supply, TSMC/ASML/Samsung capacity, export controls, US-CHINA decoupling, equipment and foundry economics. Major subarea — 2+ sources.",
+      "sources": [
+        {
+          "name": "SemiAnalysis",
+          "domain": "semianalysis.com",
+          "type": "independent blog",
+          "why": "Deep first-principles analysis of GPU supply chains, chip cost curves, and data center compute economics.",
+          "confidence": "high",
+          "crawl_root": "https://semianalysis.com/feed/"
+        },
+        {
+          "name": "DIGITIMES",
+          "domain": "digitimes.com",
+          "type": "trade press",
+          "why": "Asia-focused supply-chain news and insight on foundries, equipment, and chip shipments tied to AI build-out.",
+          "confidence": "medium"
+        },
+        {
+          "name": "Semiengineering",
+          "domain": "semiengineering.com",
+          "type": "trade press",
+          "why": "Engineering and business coverage of chip design, manufacturing, and packaging constraints affecting AI silicon.",
+          "confidence": "medium",
+          "crawl_root": "https://semiengineering.com/feed/"
+        }
+      ]
+    },
+    {
+      "name": "Model economics & AI market structure",
+      "coverage": "GPU cloud pricing, inference/training cost curves, market concentration among hyperscalers, AI cloud provider competition. Major subarea — 2+ sources.",
+      "sources": [
+        {
+          "name": "The Information — AI/Compute vertical",
+          "domain": "theinformation.com",
+          "type": "trade press",
+          "why": "Reporting on AI market structure, cloud provider competition, and model economics; paywalled with free headline feed.",
+          "confidence": "medium",
+          "crawl_root": "https://www.theinformation.com/rss"
+        },
+        {
+          "name": "Latent Space",
+          "domain": "latent.space",
+          "type": "newsletter",
+          "why": "Recaps AI infrastructure and compute market shifts; bridges model economics and deployment.",
+          "confidence": "medium"
+        },
+        {
+          "name": "Genspark / dirttodata by Matt Ocko",
+          "domain": "dirttodata.substack.com",
+          "type": "independent blog",
+          "why": "First-principles analysis of AI infrastructure economics and data center value chains.",
+          "confidence": "medium"
+        }
+      ]
+    },
+    {
+      "name": "AI funding, capex cycles & capital markets",
+      "coverage": "Hyperscaler capex guidance, AI infrastructure financing, data center debt/equity, asset-class formation, SPVs and megadeals. Major subarea — 2+ sources.",
+      "sources": [
+        {
+          "name": "Macro Compounder",
+          "domain": "macrocompounder.substack.com",
+          "type": "newsletter",
+          "why": "Tracks 'AI's trillion in plumbing' — capital flows into data centers and compute infrastructure.",
+          "confidence": "medium"
+        },
+        {
+          "name": "Wheelie Investor",
+          "domain": "wheelieinvestor.substack.com",
+          "type": "independent blog",
+          "why": "Tracks hyperscaler capex guidance and where the AI capex budget is being allocated.",
+          "confidence": "medium"
+        },
+        {
+          "name": "Fund Manager / Value Add VC",
+          "domain": "valueaddvc.com",
+          "type": "independent blog",
+          "why": "Covers AI data center financing as an institutional asset class and big-tech capex cycles.",
+          "confidence": "medium"
+        }
+      ]
+    },
+    {
+      "name": "Power constraints on compute & grid",
+      "coverage": "Data center power procurement, grid interconnection queues, curtailment, nuclear/gas PPAs, utility-scale power deals for AI. Major subarea — 2+ sources.",
+      "sources": [
+        {
+          "name": "Utility Dive — data center / electrification beat",
+          "domain": "utilitydive.com",
+          "type": "trade press",
+          "why": "Primary US power-trade coverage of grid constraints on data centers, curtailment rules, and PPA activity.",
+          "confidence": "high",
+          "crawl_root": "https://www.utilitydive.com/feeds/news/"
+        },
+        {
+          "name": "Einar SSO / 'Power, not GPUs' — Global Tech Research",
+          "domain": "globaltechresearch.substack.com",
+          "type": "independent blog",
+          "why": "First-principles analysis of power becoming the AI bottleneck rather than GPU supply.",
+          "confidence": "medium"
+        },
+        {
+          "name": "Canary Media — grid & data center load",
+          "domain": "canarymedia.com",
+          "type": "trade press",
+          "why": "Clean-energy trade journalism on rising electricity demand and data center load growth.",
+          "confidence": "medium",
+          "crawl_root": "https://www.canarymedia.com/feeds"
+        }
+      ]
+    },
+    {
+      "name": "Policy, regulation & market design for compute",
+      "coverage": "Export controls policy, AI infrastructure permitting, grid interconnection reform, government AI data center programs (Stargate site federal lands), capacity planning. Policy is its own subarea — dedicated sources.",
+      "sources": [
+        {
+          "name": "Reuters — Technology & US policy",
+          "domain": "reuters.com",
+          "type": "trade press",
+          "why": "Authoritative wire reporting on US chip export-control rule changes and AI infrastructure policy.",
+          "confidence": "high",
+          "crawl_root": "https://feeds.reuters.com/reuters/technologyNews"
+        },
+        {
+          "name": "Brussels Institute for Geopolitics (BIG)",
+          "domain": "big-europe.eu",
+          "type": "think tank",
+          "why": "Think-tank analysis of semiconductor supply-chain geopolitics and weaponized interdependence.",
+          "confidence": "medium"
+        },
+        {
+          "name": "CSET (Georgetown Center for Security and Emerging Technology)",
+          "domain": "cset.georgetown.edu",
+          "type": "think tank",
+          "why": "Policy research on AI compute, export controls, and computing-power governance.",
+          "confidence": "medium",
+          "crawl_root": "https://cset.georgetown.edu/feed/"
+        }
+      ]
+    },
+    {
+      "name": "AI data registry / structured data",
+      "coverage": "Structured public datasets on compute, capability releases, and semiconductor supply relevant to macro analysis.",
+      "sources": [
+        {
+          "name": "Epoch AI",
+          "domain": "epochai.org",
+          "type": "data/registry",
+          "why": "Maintains the premier structured registry of AI model training compute and capability trends.",
+          "confidence": "high",
+          "crawl_root": "https://epochai.org/feed"
+        },
+        {
+          "name": "OpenAlex API",
+          "domain": "api.openalex.org",
+          "type": "data/registry",
+          "why": "Open API for discovering AI/compute academic literature at scale; bot-friendly crawl endpoint for paper-level signals.",
+          "confidence": "high",
+          "crawl_root": "https://api.openalex.org/works?filter=concepts.id:C41008148"
+        }
+      ]
+    },
+    {
+      "name": "Data center colocation & REIT financials",
+      "coverage": "Colocation provider earnings, data center REITs (Equinix, Digital Realty, Vantage, QTS), pricing and occupancy fundamentals.",
+      "sources": [
+        {
+          "name": "REIT.com / Nareit research",
+          "domain": "reit.com",
+          "type": "data/registry",
+          "why": "Structured data on data center REIT performance and capital flows into the asset class.",
+          "confidence": "medium"
+        },
+        {
+          "name": "Vantage Data Centers — investor/construction press",
+          "domain": "vantage-dc.com",
+          "type": "trade press",
+          "why": "Company disclosures and construction announcements tracking colocation capacity build-out.",
+          "confidence": "medium"
+        }
+      ]
+    }
+  ],
+  "registries": [
+    {
+      "name": "OpenAlex",
+      "domain": "api.openalex.org",
+      "type": "data/registry",
+      "why": "Structured API for AI/compute literature discovery and citation signals.",
+      "crawl_root": "https://api.openalex.org/works?filter=concepts.id:C41008148"
+    },
+    {
+      "name": "Epoch AI dataset",
+      "domain": "epochai.org",
+      "type": "data/registry",
+      "why": "Governance and compute-trend registry for AI scaling and capability metrics.",
+      "crawl_root": "https://epochai.org/feed"
+    },
+    {
+      "name": "US ITC / Census — semiconductor import statistics",
+      "domain": "usitc.gov",
+      "type": "data/registry",
+      "why": "Public trade data on semiconductor imports/exports underpinning supply-chain macro signals.",
+      "confidence": "medium"
+    },
+    {
+      "name": "Hugging Face Hub API (compute/card metadata)",
+      "domain": "hf.co",
+      "type": "data/registry",
+      "why": "Registry of model releases with compute and hardware metadata; API for capacity signals.",
+      "confidence": "medium",
+      "crawl_root": "https://huggingface.co/api/models"
+    }
+  ],
+  "queries": [
+    "data center construction megawatt capacity announcements",
+    "hyperscaler capex guidance OpenAI Stargate compute build-out",
+    "GPU supply export controls TSMC capacity chip economics",
+    "data center power grid interconnection curtailment PPA nuclear",
+    "AI infrastructure financing debt equity data center REIT"
+  ],
+  "news_vs_analysis": "Blend leans analysis-heavy for the macro layer: SemiAnalysis, Latent Space, Macro Compounder, and dirttodata carry the first-principles compute/capex economics, while DCD, Data Center Knowledge, DIGITIMES, Reuters, and Utility Dive supply the high-frequency news and policy events. Registries (Epoch, OpenAlex, HF) provide the structured, crawlable signal backbone. Roughly 55% analysis, 45% news to match the topic's 'industry layer' positioning.",
+  "notes": "All six distinct source types represented: independent blog (SemiAnalysis, Macro Compounder, Wheelie Investor, Global Tech Research, Value Add VC), trade press (DCD, Data Center Knowledge, DIGITIMES, Semiengineering, The Information, Utility Dive, Canary Media, Reuters), newsletter (Latent Space), think tank (BIG, CSET), academic/journal via OpenAlex API endpoint (avoids HTML bot protection), and data/registry (Epoch, OpenAlex, HF, datacenterHawk, REIT.com, USITC). Subscribed sources (blog.eladgil.com, chamathreads.substack.com) and their domains are excluded. No consumer EV, efficiency-gadget, corporate-sustainability-PR, or climate-activism drift — every source's 'why' ties to compute, silicon, power, or AI capital markets. Paywalled/bot-protected endpoints routed to RSS/API crawl_roots (OpenAlex API for academic, feed endpoints for DCD, Utility Dive, CSET, Reuters headline feed). Exact-duplicate domain reuse across subareas avoided deliberately per reviewer note (SemiAnalysis appears once under chip supply; cross-referenced not duplicated).",
+  "review_record": {
+    "findings": [
+      {
+        "severity": "minor",
+        "area": "Type mix / classification",
+        "issue": "'Vantage Data Centers — investor/construction press' (subarea 'Data center colocation & REIT financials') is classified as 'trade press' but is a corporate PR/disclosure channel, not editorial press. This slightly inflates the trade-press count and the subarea's editorial strength; the subarea stands on REIT.com plus this company channel.",
+        "suggestion": "Reclassify Vantage as 'company disclosure' or 'trade press (company channel)', or replace with an independent colocation/REIT trade outlet (e.g., Data Center Frontier) to strengthen independent coverage of the colocation/REIT beat."
+      },
+      {
+        "severity": "minor",
+        "area": "Non-generic naming",
+        "issue": "'Fund Manager / Value Add VC' (subarea 'AI funding, capex cycles & capital markets') has an imprecise, compound name ('Fund Manager' prefix is generic) and unverified content of the valueaddvc.com domain's focus on AI data center financing as an asset class.",
+        "suggestion": "Anchor the source to a single, verifiable name (e.g., 'Value Add VC') and confirm its AI-infrastructure-financing coverage; if content doesn't match, swap for another verified capex/AI-funding source."
+      },
+      {
+        "severity": "minor",
+        "area": "Crawl endpoints / portability",
+        "issue": "Several sources (DIGITIMES, datacenterhawk, reit.com, valueaddvc, wheelieinvestor, macrocompounder, latent.space, dirttodata) lack a pinned crawl_root, while the topic is registry-marked and query[0] is not obviously registry-optimized; DIGITIMES and newsletters can be bot-sensitive or paywalled/free-tier only.",
+        "suggestion": "Pin crawl_root (RSS/API fallback) for bot-sensitive/paywalled titles (notably DIGITIMES, The Information-style newsletters), and confirm query[0] works against the OpenAlex/Epoch/HF registries."
+      },
+      {
+        "severity": "minor",
+        "area": "Verifiability (residual)",
+        "issue": "Search budget capped before content-plausibility could be confirmed for valueaddvc.com, macrocompounder.substack.com, latent.space, and the OpenAlex concept id C41008148 (assumed to map to compute/AI). No hallucination detected among the 5 spot-checks completed.",
+        "suggestion": "On next pass, confirm valueaddvc.com's AI-infrastructure-financing focus and validate that OpenAlex concept C41008148 actually corresponds to compute/AI (otherwise the crawler query retrieves off-topic works)."
+      }
+    ]
+  }
+}
