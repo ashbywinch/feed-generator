@@ -99,6 +99,27 @@ def test_parse_json_falls_back_to_braces() -> None:
     assert _parse_json('prefix {"a": 1} suffix') == {"a": 1}
 
 
+def test_parse_json_invalid_braces_raises_agent_error() -> None:
+    import pytest
+
+    from signalflow.source_lists import AgentError
+
+    with pytest.raises(AgentError):
+        _parse_json("I think {this is not json}")
+
+
+def test_gates_tolerate_malformed_shapes() -> None:
+    listing = {"topic": "T", "queries": ["q"], "subareas": None}
+    assert gate_schema(listing)  # schema flags it
+    assert gate_dns(listing) == []  # dependent gates must not crash
+    assert gate_collision(listing, known_domains=set()) == []
+    assert gate_crawlability(listing, fetcher=lambda url: _FakeResp(url=url)) == []
+
+    listing = {"topic": "T", "queries": ["q"], "subareas": [{"name": "S", "sources": [42]}]}
+    assert gate_dns(listing) == []
+    assert gate_crawlability(listing, fetcher=lambda url: _FakeResp(url=url)) == []
+
+
 def test_render_markdown_contains_sections() -> None:
     record = {
         "topic": "T",

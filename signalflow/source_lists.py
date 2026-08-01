@@ -150,7 +150,10 @@ def _parse_json(content: str) -> dict[str, Any]:
         m = re.search(r"\{.*\}", content, re.S)
         if not m:
             raise AgentError(f"non-JSON agent output: {content[:200]}") from None
-        out = json.loads(m.group(0))
+        try:
+            out = json.loads(m.group(0))
+        except json.JSONDecodeError:
+            raise AgentError(f"non-JSON agent output: {content[:200]}") from None
     if not isinstance(out, dict):
         raise AgentError("agent output is not a JSON object")
     return out
@@ -211,7 +214,11 @@ def gate_dns(listing: dict[str, Any], resolver: Callable[[str], bool] | None = N
     out: list[dict[str, str]] = []
     seen: dict[str, str] = {}
     for sa in listing.get("subareas", []):
+        if not isinstance(sa, dict):
+            continue  # malformed LLM output — gate_schema owns the finding
         for s in sa.get("sources", []):
+            if not isinstance(s, dict):
+                continue
             domain = normalize_domain(s.get("domain", ""))
             if not domain:
                 continue
@@ -437,7 +444,11 @@ def gate_crawlability(listing: dict[str, Any], fetcher: Callable[[str], Any] | N
     fetch = fetcher or _http_get
     out: list[dict[str, str]] = []
     for sa in listing.get("subareas", []):
+        if not isinstance(sa, dict):
+            continue
         for s in sa.get("sources", []):
+            if not isinstance(s, dict):
+                continue
             domain = normalize_domain(s.get("domain", ""))
             if not domain:
                 continue
@@ -453,7 +464,11 @@ def gate_crawlability(listing: dict[str, Any], fetcher: Callable[[str], Any] | N
 def gate_collision(listing: dict[str, Any], known_domains: set[str]) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
     for sa in listing.get("subareas", []):
+        if not isinstance(sa, dict):
+            continue
         for s in sa.get("sources", []):
+            if not isinstance(s, dict):
+                continue
             domain = normalize_domain(s.get("domain", ""))
             if domain and domain in known_domains:
                 out.append(
