@@ -121,8 +121,12 @@ class Engine:
 
 def main(argv: list[str] | None = None) -> int:
     args = argv if argv is not None else sys.argv[1:]
-    engine = Engine()
     command = args[0] if args else "run"
+    if command == "sources":
+        from .source_lists import main as sources_main  # lazy: no Engine needed
+
+        return sources_main(args[1:])
+    engine = Engine()
     if command == "smoke":
         return engine.smoke()
     if command == "topics":
@@ -141,5 +145,5 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if command == "run":
         return engine.run()
-    print("usage: python -m signalflow [run|smoke|topics|prune]  (default: run)")
+    print("usage: python -m signalflow [run|smoke|topics|topics-doc|reseed|prune|sources <topic>]  (default: run)")
     return 2

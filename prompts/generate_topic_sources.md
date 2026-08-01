@@ -24,7 +24,8 @@ user's OPML).
      services/frequency markets, interconnectors, demand-side flexibility, electrification
      demand growth (incl. data-center/AI load), hydrogen for power, carbon markets/ETS,
      storage beyond lithium-ion (CAES, thermal, gravity, flow), offshore wind,
-     distribution vs transmission.
+     distribution vs transmission, nuclear new-build economics (RAB funding,
+     Sizewell C/Hinkley CfDs, SMR programmes).
    - **Breadth test:** a top podcast covering this field (e.g. Modo Energy's podcast for
      energy) spans roughly this many distinct angles. Match that breadth. Every subarea
      needs ≥1 strong source; major subareas need 2+.
@@ -43,12 +44,23 @@ user's OPML).
    counterparty, UKRI GtR, DESNZ energy trends). Only sources that actually exist.
 8. **Queries.** 3–5 Exa query formulations. If a registry is marked, query[0] MUST be a
    compact noun phrase usable as a registry term (not a question).
-9. **No hallucination.** Verify uncertain domains with web_search (max ~10 searches).
-   Mark `confidence`: high/medium/low. Never invent a domain.
+9. **No hallucination; search for DISCOVERY, not existence.** Domain EXISTENCE
+   is verified mechanically by the pipeline (DNS gate) — never search to
+   confirm a domain resolves; that wastes the budget. Use `web_search` to
+   (a) DISCOVER sources you are unsure exist or that may be missing from your
+   knowledge, and (b) confirm a source's content focus when genuinely unsure.
+   Batch several domains into ONE query where possible. HARD budget: 10
+   searches total — spend them on discovery, not verification. Mark
+   `confidence`: high/medium/low. Never invent a domain.
 10. **Feeds matter.** Prefer sources with RSS/Atom feeds — the engine crawls feeds.
+11. **Crawl endpoints.** For bot-protected academic journals (Elsevier/Nature),
+    point the crawler at RSS/API endpoints (e.g. OpenAlex `api.openalex.org`),
+    not HTML article pages. For paywalled trade press, note free headline-feed
+    fallbacks. Record the endpoint in `crawl_root`.
 
 ## Output
 
 Strict JSON per the provided schema: `topic`, `subareas[{name, coverage,
-sources[{name, domain, type, why, confidence}]}]`, `registries[]`, `queries[]`,
-`news_vs_analysis`, `notes`.
+sources[{name, domain, type, why, confidence, crawl_root?}]}]`, `registries[]`,
+`queries[]`, `news_vs_analysis`, `notes`. `crawl_root` is required for portal,
+paywalled, or bot-protected domains.

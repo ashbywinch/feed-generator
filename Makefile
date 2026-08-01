@@ -1,5 +1,5 @@
 # Makefile for feed-generator (SignalFlow)
-.PHONY: help setup run smoke topics spike spike-bg spike-logs spike-stop lint lint-github typecheck test coverage format clean
+.PHONY: help setup run smoke topics spike spike-bg spike-logs spike-stop topic-sources lint lint-github typecheck test coverage format clean
 
 PYTHON := .venv/bin/python
 UV := $(shell command -v uv 2>/dev/null || echo $(HOME)/.local/bin/uv)
@@ -17,6 +17,7 @@ help:
 	@echo "  ${GREEN}make run${NC}          Daily engine run (FR-8)"
 	@echo "  ${GREEN}make smoke${NC}        Engine self-check (opml+memory+embeddings+chat)"
 	@echo "  ${GREEN}make topics${NC}       Show the seeded topic table"
+	@echo "  ${GREEN}make topic-sources${NC} Generate a topic's source list (TOPIC=\"name\")"
 	@echo "  ${GREEN}make spike${NC}        Run topic-elicitation spike (foreground)"
 	@echo "  ${GREEN}make spike-bg${NC}     Run spike in background; log to spikes/state/run.log"
 	@echo "  ${GREEN}make spike-logs${NC}   Tail the background spike log"
@@ -43,6 +44,9 @@ smoke: setup
 topics: setup
 	@$(UV) run --env-file .env python -m signalflow topics
 
+topic-sources: setup
+	@$(UV) run --env-file .env python -m signalflow sources "$(TOPIC)"
+
 spike: setup
 	@$(UV) run --env-file .env python spikes/topic_elicitation_resumable.py
 
@@ -66,7 +70,7 @@ lint-github: setup
 	@$(RUFF) check signalflow tests --output-format=github
 
 typecheck: setup
-	@$(BASEDPYRIGHT) --level error   # warnings are advisory; errors gate the suite
+	@$(BASEDPYRIGHT) --outputjson | $(PYTHON) -c "import json,sys; d=json.load(sys.stdin); sys.exit(1 if d['summary']['errorCount'] else 0)"
 
 test: setup lint typecheck
 	@$(PYTHON) -m pytest

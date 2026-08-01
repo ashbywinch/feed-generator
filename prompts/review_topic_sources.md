@@ -23,13 +23,18 @@ blocker or major finding remains.
 3. **Boundaries.** No `out` content; check `why` lines for drift.
 4. **Non-generic.** No vague aggregators; specific domains; every source justified by a
    subarea.
-5. **Verifiability.** Domains real and plausible; spot-check up to 5 uncertain ones via
-   web_search. Hallucinated domains are blockers.
+5. **Verifiability.** Domains real and plausible. DNS existence is checked
+   mechanically by the pipeline — do NOT re-verify it. Spot-check at most 5
+   content-plausibility claims via web_search, batching domains into single
+   queries. Hallucinated domains are blockers.
 6. **Type mix.** ≥4 distinct source types.
 7. **Outside-subscription.** No source that is subscribed (topic `sources` /
    `exclude_domains`).
 8. **Engine-actionable.** 3–5 queries present; registry-marked topics have a compact
-   registry-safe query[0]; registries are real public sources.
+   registry-safe query[0]; registries are real public sources. Crawl endpoints
+   sensible: bot-protected journals point at RSS/API (OpenAlex) not HTML;
+   paywalled titles carry free headline-feed fallbacks; portal domains have a
+   pinned `crawl_root`.
 
 ## Output
 

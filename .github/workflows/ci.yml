@@ -23,7 +23,7 @@ jobs:
           filename: coverage.xml
           badge: true
           fail_below_min: true
-          thresholds: '65 80'   # floor 65 (current 71% — engine/topics/env untested), goal 80
+          thresholds: '80 90'   # greenfield standard; coverage debt is closed by tests, not lowered floors
           format: markdown
           output: both
       - name: Post coverage comment

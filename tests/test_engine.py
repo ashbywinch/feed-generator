@@ -1,0 +1,207 @@
+"""FR-8 orchestration: run() sequences the stages in order and stays idempotent."""
+
+from __future__ import annotations
+
+import sys
+from types import SimpleNamespace
+from typing import Any, cast
+
+from signalflow import engine as engine_mod
+from signalflow.engine import Engine
+
+
+class FakeMemory:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self._topics: list[dict[str, Any]] = []
+
+    def topics(self) -> list[dict[str, Any]]:
+        return self._topics
+
+    def seed_topics(self, assignment: dict[str, Any]) -> int:
+        return len(assignment["topics"])
+
+    def clear_topics(self) -> None:
+        self._topics = []
+
+    def set_topics(self, topics: list[dict[str, Any]]) -> None:
+        self._topics = topics
+
+    def prune(self) -> int:
+        return 2
+
+    def has_url(self, url: str) -> bool:
+        return False
+
+
+class FakeDiscovery:
+    def __init__(self, cfg: Any) -> None:
+        pass
+
+    def discover(self, topics: list[dict[str, Any]]) -> list[Any]:
+        return []
+
+
+class FakePipeline:
+    def __init__(self, cfg: Any, known_domains: set[str], memory: Any, llm: Any, embedder: Any) -> None:
+        pass
+
+    def process(self, candidates: list[Any]) -> list[Any]:
+        return []
+
+
+def _engine(
+    monkeypatch: Any,
+    cfg: Any,
+    memory_cls: type = FakeMemory,
+    discovery_cls: type = FakeDiscovery,
+    pipeline_cls: type = FakePipeline,
+) -> Engine:
+    monkeypatch.setattr(engine_mod, "Memory", memory_cls)
+    monkeypatch.setattr(engine_mod, "Discovery", discovery_cls)
+    monkeypatch.setattr(engine_mod, "DedupPipeline", pipeline_cls)
+    monkeypatch.setattr(engine_mod.Config, "from_env", classmethod(lambda cls: cfg))
+    return Engine()
+
+
+def test_run_sequences_stages_and_publishes(monkeypatch: Any, cfg: Any) -> None:
+    order: list[str] = []
+    monkeypatch.setattr(
+        engine_mod,
+        "parse_opml",
+        lambda path: ({"sub.com"}, [{"folder": "F", "title": "T", "url": "https://sub.com/f"}]),
+    )
+
+    class D(FakeDiscovery):
+        def discover(self, topics: list[dict[str, Any]]) -> list[Any]:
+            order.append("discover")
+            return [{"title": "c"}]
+
+    class P(FakePipeline):
+        def process(self, candidates: list[Any]) -> list[Any]:
+            order.append("dedup")
+            return [object()]  # one event -> digest + publish path
+
+    monkeypatch.setattr(engine_mod, "build_digest", lambda cfg, events, path: order.append("digest"))
+    monkeypatch.setattr(engine_mod, "publish", lambda cfg, path: order.append("publish"))
+
+    engine = _engine(monkeypatch, cfg, discovery_cls=D, pipeline_cls=P)
+    cast(Any, engine._memory).set_topics(
+        [{"name": "T", "status": "adequate", "feed_count": 3, "strategy": {"queries": ["q"]}}]
+    )
+    assert engine.run() == 0
+    assert order == ["discover", "dedup", "digest", "publish"]
+
+
+def test_run_no_events_keeps_previous_digest(monkeypatch: Any, cfg: Any) -> None:
+    monkeypatch.setattr(engine_mod, "parse_opml", lambda path: (set(), []))
+    called: list[str] = []
+    monkeypatch.setattr(engine_mod, "build_digest", lambda *a: called.append("build"))
+    monkeypatch.setattr(engine_mod, "publish", lambda *a: called.append("publish"))
+    engine = _engine(monkeypatch, cfg)
+    cast(Any, engine._memory).set_topics([{"name": "T"}])
+    assert engine.run() == 0
+    assert called == []  # no events: previous digest is kept, nothing published
+
+
+def test_seed_from_curated_marks_gaps(monkeypatch: Any, cfg: Any) -> None:
+    seen: dict[str, Any] = {}
+
+    class M(FakeMemory):
+        def seed_topics(self, assignment: dict[str, Any]) -> int:
+            seen["assignment"] = assignment
+            return len(assignment["topics"])
+
+    monkeypatch.setattr(engine_mod, "Memory", M)
+    engine = _engine(monkeypatch, cfg, memory_cls=M)
+    assert engine._seed_from_curated() == 13
+    topics = seen["assignment"]["topics"]
+    assert topics["Agriculture"]["gap"] is True  # 1 source < MIN_FEEDS_PER_TOPIC
+    assert topics["Leadership / Management"]["gap"] is False  # 8 sources
+
+
+def test_seed_topics_if_empty_seeds_curated(monkeypatch: Any, cfg: Any) -> None:
+    engine = _engine(monkeypatch, cfg)
+    engine._seed_topics_if_empty()  # empty table -> seeds from topics.json
+    assert len(cast(Any, engine._memory)._topics) == 0  # FakeMemory records nothing; path must not crash
+
+
+def test_reseed_clears_then_seeds(monkeypatch: Any, cfg: Any) -> None:
+    engine = _engine(monkeypatch, cfg)
+    assert engine.reseed_topics() == 13
+
+
+def test_smoke_offline(monkeypatch: Any, cfg: Any) -> None:
+    monkeypatch.setattr(
+        engine_mod,
+        "parse_opml",
+        lambda path: ({"sub.com"}, [{"folder": "F", "title": "T", "url": "https://sub.com/f"}]),
+    )
+
+    class FakeLLM:
+        def __init__(self, cfg: Any) -> None:
+            pass
+
+        def chat_json(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+            return {"ok": True}
+
+    class FakeEmbedder:
+        def __init__(self, cfg: Any) -> None:
+            pass
+
+        def embed(self, texts: list[str]) -> list[list[float]]:
+            return [[0.1, 0.2] for _ in texts]
+
+    monkeypatch.setattr(engine_mod, "LLM", FakeLLM)
+    monkeypatch.setattr(engine_mod, "Embedder", FakeEmbedder)
+    engine = _engine(monkeypatch, cfg)
+    assert engine.smoke() == 0
+
+
+def test_show_topics(monkeypatch: Any, cfg: Any) -> None:
+    engine = _engine(monkeypatch, cfg)
+    cast(Any, engine._memory).set_topics(
+        [{"name": "T", "status": "adequate", "feed_count": 3, "strategy": {"registries": ["ukri gtr"]}}]
+    )
+    assert engine.show_topics() == 0
+
+
+class FakeEngine:
+    def __init__(self) -> None:
+        pass
+
+    def run(self) -> int:
+        return 0
+
+    def smoke(self) -> int:
+        return 0
+
+    def show_topics(self) -> int:
+        return 0
+
+    def reseed_topics(self) -> int:
+        return 0
+
+    class _Mem:
+        def prune(self) -> int:
+            return 3
+
+    _memory = _Mem()
+
+
+def test_main_sources_dispatches_without_engine(monkeypatch: Any) -> None:
+    fake = SimpleNamespace(main=lambda args: 7)
+    monkeypatch.setitem(sys.modules, "signalflow.source_lists", fake)
+    assert engine_mod.main(["sources", "Grid & Net Zero economics"]) == 7
+
+
+def test_main_command_dispatch(monkeypatch: Any, cfg: Any) -> None:
+    monkeypatch.setattr(engine_mod, "Engine", FakeEngine)
+    monkeypatch.setattr(engine_mod, "write_doc", lambda topics: "docs/topics.md")
+    assert engine_mod.main([]) == 0  # default: run
+    assert engine_mod.main(["run"]) == 0
+    assert engine_mod.main(["smoke"]) == 0
+    assert engine_mod.main(["topics"]) == 0
+    assert engine_mod.main(["topics-doc"]) == 0
+    assert engine_mod.main(["reseed"]) == 0
+    assert engine_mod.main(["prune"]) == 0
+    assert engine_mod.main(["bogus"]) == 2
