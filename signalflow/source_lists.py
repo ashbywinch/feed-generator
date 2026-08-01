@@ -19,7 +19,8 @@ import re
 import socket
 import sys
 from collections.abc import Callable
-from datetime import date
+from datetime import date, datetime
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -168,6 +169,7 @@ def normalize_domain(domain: str) -> str:
     d = d.split("/")[0]
     if d.startswith("www."):
         d = d[4:]
+    d = d.split(":")[0]  # strip port (redirects like host:443)
     return d
 
 
@@ -233,6 +235,215 @@ def gate_dns(listing: dict[str, Any], resolver: Callable[[str], bool] | None = N
                         "fix the spelling or remove the source",
                     )
                 )
+    return out
+
+
+FEED_PATHS = ("/feed", "/feed/", "/rss", "/rss.xml", "/atom.xml", "/index.xml")
+STALE_DAYS = 90
+NON_FEED_TYPES = {"data/registry", "data/analytics", "data", "regulator", "system operator"}
+# The engine crawls with a browser-like UA (default python-requests UA is
+# 403/406-blocked by most publishers — verified on renews.biz).
+CRAWL_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/126.0.0.0 Safari/537.36 SignalFlow/0.1"
+    )
+}
+
+
+def _http_get(url: str) -> Any:
+    return requests.get(url, timeout=15, headers=CRAWL_HEADERS)
+
+
+def _is_feed(resp: Any) -> bool:
+    ct = str(resp.headers.get("content-type", "")).lower()
+    body = (resp.text or "")[:4000]
+    if "rss" in ct or "atom" in ct:
+        return True
+    return ("<rss" in body or "<feed" in body or "<rdf" in body) and "xml" in ct
+
+
+def _feed_date(resp: Any) -> date | None:
+    body = (resp.text or "")[:6000]
+    for tag in ("lastBuildDate", "pubDate"):
+        m = re.search(rf"<{tag}>([^<]+)</{tag}>", body, re.I)
+        if m:
+            try:
+                return parsedate_to_datetime(m.group(1)).date()
+            except (TypeError, ValueError):
+                continue
+    m = re.search(r"<updated>([^<]+)</updated>", body)
+    if m:
+        try:
+            return datetime.fromisoformat(m.group(1).replace("Z", "+00:00")).date()
+        except ValueError:
+            return None
+    return None
+
+
+def _feed_link_in_html(resp: Any) -> str | None:
+    m = re.search(
+        r'<link[^>]+rel=["\']alternate["\'][^>]+type=["\']application/(?:rss|atom)\+xml["\'][^>]+href=["\']([^"\']+)["\']',
+        resp.text or "",
+        re.I,
+    )
+    return m.group(1) if m else None
+
+
+def _probe_homepage(domain: str, fetcher: Callable[[str], Any]) -> dict[str, str] | None:
+    """Data/registry sources are API endpoints, not feeds: require the site reachable."""
+    url = f"https://{domain}/"
+    try:
+        resp = fetcher(url)
+    except requests.RequestException:
+        return _finding(
+            "blocker", "crawlability", f"site {domain} unreachable", "remove the source or check the domain"
+        )
+    if resp.status_code >= 400:
+        return _finding(
+            "blocker",
+            "crawlability",
+            f"site {domain} returns HTTP {resp.status_code}",
+            "remove the source or check the domain",
+        )
+    final_host = normalize_domain(urlparse(resp.url or url).netloc)
+    if final_host and final_host != domain:
+        return _finding(
+            "major",
+            "crawlability",
+            f"'{domain}' redirects to {final_host}",
+            f"replace the domain with {final_host}",
+        )
+    return None
+
+
+def _probe_source(
+    domain: str, crawl_root: str, fetcher: Callable[[str], Any], _depth: int = 0
+) -> dict[str, str] | None:
+    """Probe a source's feed; return a finding or None if crawlable.
+
+    A redirect to another domain is not a knockback: if the redirect target
+    serves a working feed, the finding tells the generator to swap in the
+    actual domain. Only a dead redirect target is a blocker.
+    """
+    if _depth > 2:
+        return _finding("blocker", "crawlability", f"redirect chain too deep for {domain}", "remove the source")
+    base = f"https://{domain}"
+    candidates = [crawl_root] if crawl_root and crawl_root.startswith("http") else []
+    candidates += [f"{base}{p}" for p in FEED_PATHS]
+    for url in candidates:
+        try:
+            resp = fetcher(url)
+        except requests.RequestException:
+            continue
+        if resp.status_code >= 400:
+            continue
+        final_host = normalize_domain(urlparse(resp.url or url).netloc)
+        if final_host and final_host != domain:
+            # domain repurposed/redirected: judge the redirect target, not the claim
+            if _is_feed(resp):
+                return _finding(
+                    "major",
+                    "crawlability",
+                    f"'{domain}' redirects to {final_host}, which serves a working feed",
+                    f"replace the domain with {final_host}",
+                )
+            link = _feed_link_in_html(resp)
+            if link:
+                return _finding(
+                    "major",
+                    "crawlability",
+                    f"'{domain}' redirects to {final_host}; its homepage advertises feed {link}",
+                    f"set the domain to {final_host} and crawl_root to {link}",
+                )
+            target = _probe_source(final_host, "", fetcher, _depth + 1)
+            if target is None:
+                return _finding(
+                    "major",
+                    "crawlability",
+                    f"'{domain}' redirects to {final_host}, which has a working feed",
+                    f"replace the domain with {final_host}",
+                )
+            return _finding(
+                "blocker",
+                "crawlability",
+                f"'{domain}' redirects to {final_host}, which has no crawlable feed",
+                "remove the source or find the real domain",
+            )
+        if _is_feed(resp):
+            feed_date = _feed_date(resp)
+            if feed_date and (date.today() - feed_date).days > STALE_DAYS:
+                return _finding(
+                    "major",
+                    "crawlability",
+                    f"feed at {url} stale since {feed_date} (> {STALE_DAYS} days)",
+                    "replace with a fresher source or remove",
+                )
+            if crawl_root and url.rstrip("/") != crawl_root.rstrip("/"):
+                return _finding(
+                    "minor",
+                    "crawlability",
+                    f"crawl_root {crawl_root} is wrong — working feed is {url}",
+                    f"set crawl_root to {url}",
+                )
+            return None
+        link = _feed_link_in_html(resp)
+        if link:
+            return _finding(
+                "major",
+                "crawlability",
+                f"no standard feed path for {domain}; homepage advertises {link}",
+                f"set crawl_root to {link}",
+            )
+        return _finding(
+            "major",
+            "crawlability",
+            f"no feed found at {domain} (homepage returned HTML without a feed link)",
+            "set crawl_root to the real feed URL or remove",
+        )
+    # all feed-path candidates failed — the homepage may advertise the real feed
+    try:
+        resp = fetcher(f"https://{domain}/")
+    except requests.RequestException:
+        resp = None
+    if resp is not None and resp.status_code < 400:
+        if _is_feed(resp):
+            return None
+        link = _feed_link_in_html(resp)
+        if link:
+            return _finding(
+                "major",
+                "crawlability",
+                f"no standard feed path for {domain}; homepage advertises {link}",
+                f"set crawl_root to {link}",
+            )
+    return _finding(
+        "blocker",
+        "crawlability",
+        f"no reachable feed for {domain} — every probe failed (bot-blocked or missing)",
+        "remove the source or provide a working crawl_root",
+    )
+
+
+def gate_crawlability(listing: dict[str, Any], fetcher: Callable[[str], Any] | None = None) -> list[dict[str, str]]:
+    """Probe every source's feed with the same HTTP client the engine crawls with.
+
+    Catches what DNS cannot: domains repurposed/redirected, bot-blocks (403/406),
+    missing feeds, wrong crawl_roots, stale feeds.
+    """
+    fetch = fetcher or _http_get
+    out: list[dict[str, str]] = []
+    for sa in listing.get("subareas", []):
+        for s in sa.get("sources", []):
+            domain = normalize_domain(s.get("domain", ""))
+            if not domain:
+                continue
+            if str(s.get("type", "")).lower() in NON_FEED_TYPES:
+                finding = _probe_homepage(domain, fetch)
+            else:
+                finding = _probe_source(domain, str(s.get("crawl_root", "")), fetch)
+            if finding:
+                out.append(finding)
     return out
 
 
@@ -315,7 +526,12 @@ def generate_topic_sources(
         searches_used += n
         listing = _parse_json(content)
 
-        gate_findings = gate_schema(listing) + gate_dns(listing) + gate_collision(listing, known_domains)
+        gate_findings = (
+            gate_schema(listing)
+            + gate_dns(listing)
+            + gate_collision(listing, known_domains)
+            + gate_crawlability(listing)
+        )
         if gate_findings:
             findings = gate_findings
             log.warning("iteration %d: %d mechanical gate findings — reviewer skipped", iteration, len(findings))

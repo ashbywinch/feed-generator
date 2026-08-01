@@ -4,12 +4,14 @@ The agent tool-loop itself needs router + Exa keys; it is exercised by the
 manual `make topic-sources` run, not the unit suite.
 """
 
+from datetime import date, timedelta
 from typing import Any
 
 from signalflow.source_lists import (
     _parse_json,
     exclude_domains,
     gate_collision,
+    gate_crawlability,
     gate_dns,
     gate_schema,
     normalize_domain,
@@ -121,3 +123,113 @@ def test_render_markdown_contains_sections() -> None:
     md = render_markdown(record)
     assert "## Subareas" in md and "## Registries" in md and "## Queries" in md
     assert "[minor] x: y" in md
+
+
+# -- crawlability gate -------------------------------------------------------
+
+
+class _FakeResp:
+    def __init__(self, url: str, content_type: str = "", text: str = "", status: int = 200) -> None:
+        self.status_code = status
+        self.url = url
+        self.headers = {"content-type": content_type}
+        self.text = text
+
+
+def _feed_html(when: str) -> str:
+    return f"<rss><channel><lastBuildDate>{when}</lastBuildDate></channel></rss>"
+
+
+def _when(days_ago: int) -> str:
+    return (date.today() - timedelta(days=days_ago)).strftime("%a, %d %b %Y %H:%M:%S +0000")
+
+
+def _crawl_listing(domain: str = "example.com", crawl_root: str = "") -> dict[str, Any]:
+    return {
+        "topic": "T",
+        "subareas": [
+            {
+                "name": "S",
+                "sources": [{"name": "X", "domain": domain, "type": "blog", "crawl_root": crawl_root}],
+            }
+        ],
+        "queries": ["q"],
+    }
+
+
+def test_crawlability_accepts_working_feed() -> None:
+    def fetcher(url: str) -> _FakeResp:
+        return _FakeResp(url=url, content_type="application/rss+xml", text=_feed_html(_when(5)))
+
+    assert gate_crawlability(_crawl_listing(), fetcher=fetcher) == []
+
+
+def test_crawlability_redirect_to_working_target_is_major_domain_swap() -> None:
+    def fetcher(url: str) -> _FakeResp:
+        if "newexample.com" in url:
+            return _FakeResp(url=url, content_type="application/rss+xml", text=_feed_html(_when(5)))
+        return _FakeResp(
+            url="https://newexample.com/feed", content_type="application/rss+xml", text=_feed_html(_when(5))
+        )
+
+    findings = gate_crawlability(_crawl_listing(), fetcher=fetcher)
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "major"
+    assert "redirects to newexample.com" in findings[0]["issue"]
+    assert "replace the domain with newexample.com" in findings[0]["suggestion"]
+
+
+def test_crawlability_redirect_to_dead_target_is_blocker() -> None:
+    def fetcher(url: str) -> _FakeResp:
+        return _FakeResp(
+            url="https://dead.example.net/", content_type="text/html", text="<html><body>gone</body></html>"
+        )
+
+    findings = gate_crawlability(_crawl_listing(), fetcher=fetcher)
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "blocker"
+    assert "redirects to dead.example.net" in findings[0]["issue"]
+
+
+def test_crawlability_bot_block_is_blocker() -> None:
+    def fetcher(url: str) -> _FakeResp:
+        return _FakeResp(url=url, status=403)
+
+    findings = gate_crawlability(_crawl_listing(), fetcher=fetcher)
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "blocker"
+
+
+def test_crawlability_stale_feed_is_major() -> None:
+    def fetcher(url: str) -> _FakeResp:
+        return _FakeResp(url=url, content_type="application/rss+xml", text=_feed_html(_when(200)))
+
+    findings = gate_crawlability(_crawl_listing(), fetcher=fetcher)
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "major"
+    assert "stale" in findings[0]["issue"]
+
+
+def test_crawlability_wrong_crawl_root_is_minor_with_correction() -> None:
+    def fetcher(url: str) -> _FakeResp:
+        if url.endswith("/feed"):
+            return _FakeResp(url=url, content_type="application/rss+xml", text=_feed_html(_when(5)))
+        return _FakeResp(url=url, status=404)
+
+    listing = _crawl_listing(crawl_root="https://example.com/rss")
+    findings = gate_crawlability(listing, fetcher=fetcher)
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "minor"
+    assert "https://example.com/feed" in findings[0]["suggestion"]
+
+
+def test_crawlability_homepage_feed_link_is_major() -> None:
+    html = '<html><head><link rel="alternate" type="application/rss+xml" href="/en/rss/"></head></html>'
+
+    def fetcher(url: str) -> _FakeResp:
+        return _FakeResp(url="https://example.com/", content_type="text/html", text=html)
+
+    findings = gate_crawlability(_crawl_listing(), fetcher=fetcher)
+    assert len(findings) == 1
+    assert findings[0]["severity"] == "major"
+    assert "/en/rss/" in findings[0]["suggestion"]
