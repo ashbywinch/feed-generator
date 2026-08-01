@@ -42,6 +42,59 @@ MAX_ITER = 6
 MAX_TOOL_ROUNDS = 30
 MAX_SEARCHES = 10  # free Exa tier (~$10/mo credits); existence is DNS-checked mechanically
 
+CHECK_URL_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "check_url",
+        "description": (
+            "Cheaply verify a candidate domain: DNS + feed probe (no search budget). "
+            "Returns whether it resolves, serves a feed (and where), or redirects. "
+            "Call before adding or replacing a source."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {"domain": {"type": "string"}},
+            "required": ["domain"],
+        },
+    },
+}
+
+
+def _check_domain(domain: str, fetcher: Callable[[str], Any] | None = None) -> dict[str, Any]:
+    """check_url implementation: cheap verification, reuses the crawlability machinery."""
+    d = normalize_domain(domain)
+    if not d:
+        return {
+            "domain": domain,
+            "resolves": False,
+            "has_feed": False,
+            "feed_url": None,
+            "ok": False,
+            "issue": "invalid domain",
+        }
+    if not _resolve(d):
+        return {
+            "domain": d,
+            "resolves": False,
+            "has_feed": False,
+            "feed_url": None,
+            "ok": False,
+            "issue": "DNS failure",
+        }
+    finding, correction = _probe_source(d, "", fetcher or _http_get)
+    feed_url = (correction or {}).get("crawl_root")
+    if finding is None:
+        return {"domain": d, "resolves": True, "has_feed": True, "feed_url": feed_url, "ok": True, "issue": None}
+    return {
+        "domain": d,
+        "resolves": True,
+        "has_feed": bool(feed_url),
+        "feed_url": feed_url,
+        "ok": False,
+        "issue": finding["issue"],
+    }
+
+
 WEB_SEARCH_TOOL = {
     "type": "function",
     "function": {
@@ -97,19 +150,23 @@ def _agent_chat(
     max_searches: int = MAX_SEARCHES,
     parse: Callable[[str], Any] | None = None,
     retries: int = 2,
-) -> tuple[str, int]:
-    """Tool-use loop: the model may call web_search; returns (final_text, searches).
+) -> tuple[str, int, set[str]]:
+    """Tool-use loop: web_search (Exa) + check_url (cheap probe); returns
+    (final_text, searches, grounded_domains).
 
-    Searches are hard-capped at `max_searches`; once the budget is spent the
+    `grounded_domains` are every domain the model saw real evidence for this
+    round (search-result URLs + check_url verdicts) — the driver enforces that
+    replacements come from this set. Searches are hard-capped; once spent the
     model gets budget-exhausted tool results and must finalize. If `parse` is
-    given, a non-parsing final answer gets a nudge to re-emit as strict JSON
-    (same conversation, no search budget consumed) up to `retries` times.
+    given, a non-parsing final answer gets a nudge to re-emit as strict JSON.
     """
     messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
     searches = 0
+    checks = 0
+    grounded: set[str] = set()
     retry_left = retries
     for _ in range(max_rounds):
-        msg = llm.chat_tools(messages, [WEB_SEARCH_TOOL], max_tokens=12000)
+        msg = llm.chat_tools(messages, [WEB_SEARCH_TOOL, CHECK_URL_TOOL], max_tokens=12000)
         if msg.get("tool_calls"):
             messages.append(msg)
             for tc in msg["tool_calls"]:
@@ -130,6 +187,13 @@ def _agent_chat(
                         result = [{"error": f"search failed: {str(exc)[:200]}"}]
                     except AgentError as exc:
                         result = [{"error": str(exc)}]
+                    else:
+                        grounded.update(normalize_domain(urlparse(r.get("url", "")).netloc) for r in result)
+                elif name == "check_url" and query and checks < 40:
+                    checks += 1
+                    log.info("agent check_url (%d/40): %r", checks, query)
+                    result = _check_domain(query)
+                    grounded.add(normalize_domain(query))
                 else:
                     result = [{"error": "search budget exhausted or invalid call — finalize your answer now"}]
                 messages.append(
@@ -159,7 +223,7 @@ def _agent_chat(
                     }
                 )
                 continue
-        return content, searches
+        return content, searches, grounded
     raise AgentError("tool loop did not terminate")
 
 
@@ -482,12 +546,30 @@ def gate_collision(listing: dict[str, Any], known_domains: set[str]) -> list[dic
     return out
 
 
-def _apply_revision(listing: dict[str, Any], delta: dict[str, Any]) -> dict[str, Any]:
+def _apply_revision(listing: dict[str, Any], delta: dict[str, Any], grounded: set[str] | None = None) -> dict[str, Any]:
     """Apply a generator DELTA (remove/replace/add by domain) to the current list.
 
     The generator never re-emits unaffected sources; it only describes changes.
+    Grounded enforcement: replacement/add domains must be evidence-backed — in the
+    current list, returned by web_search this round, or confirmed via check_url.
+    Ungrounded substitutions are rejected (the whole-list hallucinations the gates
+    kept catching).
     """
     subareas = listing.setdefault("subareas", [])
+    known = {
+        normalize_domain(s.get("domain", ""))
+        for sa in subareas
+        if isinstance(sa, dict)
+        for s in (sa.get("sources") or [])
+        if isinstance(s, dict)
+    }
+    if grounded is None:
+        grounded = set()
+    allowed = known | grounded
+
+    def grounded_source(src: Any) -> bool:
+        return isinstance(src, dict) and normalize_domain(src.get("domain", "")) in allowed
+
     remove_domains = {normalize_domain(d) for d in delta.get("remove") or []}
     for sa in subareas:
         if not isinstance(sa, dict):
@@ -496,6 +578,9 @@ def _apply_revision(listing: dict[str, Any], delta: dict[str, Any]) -> dict[str,
         srcs = [s for s in srcs if normalize_domain(s.get("domain", "")) not in remove_domains]
         for dom, new_src in (delta.get("replace") or {}).items():
             if not isinstance(new_src, dict):
+                continue
+            if not grounded_source(new_src):
+                log.warning("rejected ungrounded replacement for %s", dom)
                 continue
             for i, s in enumerate(srcs):
                 if normalize_domain(s.get("domain", "")) == normalize_domain(str(dom)):
@@ -506,7 +591,7 @@ def _apply_revision(listing: dict[str, Any], delta: dict[str, Any]) -> dict[str,
         if sa is None:
             sa = {"name": sa_name, "sources": []}
             subareas.append(sa)
-        sa.setdefault("sources", []).extend(s for s in new_srcs if isinstance(s, dict))
+        sa.setdefault("sources", []).extend(s for s in new_srcs if grounded_source(s))
     return listing
 
 
@@ -559,6 +644,8 @@ def generate_topic_sources(
     listing: dict[str, Any] = {}
     searches_used = 0
     best: tuple[int, list[dict[str, Any]], dict[str, Any]] | None = None
+    prev_findings: int | None = None
+    previous: dict[str, Any] | None = None
     for iteration in range(1, max_iter + 1):
         log.info("topic sources iteration %d: generate (%d prior findings)", iteration, len(findings))
         feedback = (
@@ -567,15 +654,28 @@ def generate_topic_sources(
             if findings
             else ""
         )
-        content, n = _agent_chat(
+        base_prompt = gen_prompt + "\n\n## TOPIC\n" + json.dumps(topic_in, indent=2)
+        if listing:
+            # revision mode: generator returns a DELTA over the current list
+            base_prompt += "\n\n## CURRENT LIST (revision mode)\n" + json.dumps(listing, indent=2) + feedback
+        else:
+            base_prompt += feedback
+        content, n, grounded = _agent_chat(
             llm,
             cfg,
-            gen_prompt + "\n\n## TOPIC\n" + json.dumps(topic_in, indent=2) + feedback,
+            base_prompt,
             max_searches=10,
             parse=_parse_json,
         )
         searches_used += n
-        listing = _parse_json(content)
+        if listing:
+            previous = listing
+            listing = _apply_revision(listing, _parse_json(content), grounded)
+            if not listing.get("subareas") and previous.get("subareas"):
+                log.warning("destructive delta rejected — keeping previous list")
+                listing = previous
+        else:
+            listing = _parse_json(content)
         gate_findings = (
             gate_schema(listing)
             + gate_dns(listing)
@@ -583,14 +683,23 @@ def generate_topic_sources(
             + gate_crawlability(listing)
         )
         if gate_findings:
+            if prev_findings is not None and len(gate_findings) > prev_findings and previous is not None:
+                # EIR > ECR: this revision made things worse — revert and keep the old findings
+                log.warning(
+                    "revision regressed (%d -> %d findings) — reverting to previous list",
+                    prev_findings,
+                    len(gate_findings),
+                )
+                listing = previous
             findings = gate_findings
             if best is None or len(findings) < len(best[1]):
                 best = (iteration, list(findings), listing)
             log.warning("iteration %d: %d mechanical gate findings — reviewer skipped", iteration, len(findings))
+            prev_findings = len(gate_findings)
             continue
 
         log.info("iteration %d: review", iteration)
-        content, n = _agent_chat(
+        content, n, _grounded = _agent_chat(
             llm,
             cfg,
             rev_prompt

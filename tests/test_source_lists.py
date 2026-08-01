@@ -114,11 +114,67 @@ def test_apply_revision_remove_replace_add() -> None:
         "replace": {"b.com": {"name": "B2", "domain": "b.com", "type": "trade press"}},
         "add": {"Markets": [{"name": "C", "domain": "c.com", "type": "blog"}]},
     }
-    out = _apply_revision(listing, delta)
+    grounded = {"c.com"}  # C came from a web_search result; B2 is already in the list
+    out = _apply_revision(listing, delta, grounded)
     markets = out["subareas"][0]["sources"]
     storage = out["subareas"][1]["sources"]
-    assert [s["domain"] for s in markets] == ["c.com"]  # a.com removed, C added
+    assert [s["domain"] for s in markets] == ["c.com"]  # a.com removed, grounded C added
     assert storage == [{"name": "B2", "domain": "b.com", "type": "trade press"}]  # replaced in place
+
+
+def test_apply_revision_rejects_ungrounded_substitutions() -> None:
+    from signalflow.source_lists import _apply_revision
+
+    listing = {
+        "topic": "T",
+        "subareas": [
+            {"name": "Markets", "sources": [{"name": "A", "domain": "a.com", "type": "blog"}]},
+        ],
+    }
+    delta = {
+        "replace": {"a.com": {"name": "A2", "domain": "hallucinated.net", "type": "blog"}},
+        "add": {"Markets": [{"name": "Z", "domain": "unverified.org", "type": "blog"}]},
+    }
+    out = _apply_revision(listing, delta, grounded=set())
+    assert out["subareas"][0]["sources"] == [{"name": "A", "domain": "a.com", "type": "blog"}]  # untouched
+
+
+def test_agent_chat_check_url_tool(cfg, monkeypatch) -> None:
+    import signalflow.source_lists as sl_mod
+    from signalflow.llm import LLM
+
+    calls = []
+
+    class StubLLM(LLM):
+        def __init__(self) -> None:
+            super().__init__(cfg)
+
+        def chat_tools(self, messages, tools, *, max_tokens=4096):
+            calls.append((tools, max_tokens))
+            if len(calls) == 1:
+                return {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "t1",
+                            "type": "function",
+                            "function": {"name": "check_url", "arguments": '{"domain": "example.com"}'},
+                        }
+                    ],
+                }
+            return {"role": "assistant", "content": '{"ok": true}'}
+
+    monkeypatch.setattr(
+        sl_mod,
+        "_http_get",
+        lambda url: _FakeResp(url=url, content_type="application/rss+xml", text=_feed_html(_when(5))),
+    )
+    text, searches, grounded = sl_mod._agent_chat(StubLLM(), cfg, "verify example.com")
+    assert text == '{"ok": true}'
+    assert searches == 0  # check_url is free, no Exa spend
+    assert grounded == {"example.com"}
+    assert len(calls) == 2
+    assert len(calls[0][0]) == 2  # both tools offered
 
 
 def test_apply_revision_creates_missing_subarea() -> None:
