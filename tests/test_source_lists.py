@@ -197,7 +197,7 @@ def test_crawlability_cross_host_crawl_root_is_not_redirect() -> None:
     assert gate_crawlability(listing, fetcher=fetcher) == []
 
 
-def test_crawlability_redirect_to_working_target_is_major_domain_swap() -> None:
+def test_crawlability_redirect_to_working_target_swaps_domain() -> None:
     def fetcher(url: str) -> _FakeResp:
         if "newexample.com" in url:
             return _FakeResp(url=url, content_type="application/rss+xml", text=_feed_html(_when(5)))
@@ -205,11 +205,10 @@ def test_crawlability_redirect_to_working_target_is_major_domain_swap() -> None:
             url="https://newexample.com/feed", content_type="application/rss+xml", text=_feed_html(_when(5))
         )
 
-    findings = gate_crawlability(_crawl_listing(), fetcher=fetcher)
-    assert len(findings) == 1
-    assert findings[0]["severity"] == "major"
-    assert "redirects to newexample.com" in findings[0]["issue"]
-    assert "replace the domain with newexample.com" in findings[0]["suggestion"]
+    listing = _crawl_listing()
+    assert gate_crawlability(listing, fetcher=fetcher) == []
+    src = listing["subareas"][0]["sources"][0]
+    assert src["domain"] == "newexample.com"  # mechanically corrected, no LLM round-trip
 
 
 def test_crawlability_redirect_to_dead_target_is_blocker() -> None:
@@ -243,26 +242,23 @@ def test_crawlability_stale_feed_is_major() -> None:
     assert "stale" in findings[0]["issue"]
 
 
-def test_crawlability_wrong_crawl_root_is_minor_with_correction() -> None:
+def test_crawlability_corrects_wrong_crawl_root() -> None:
     def fetcher(url: str) -> _FakeResp:
         if url.endswith("/feed"):
             return _FakeResp(url=url, content_type="application/rss+xml", text=_feed_html(_when(5)))
         return _FakeResp(url=url, status=404)
 
     listing = _crawl_listing(crawl_root="https://example.com/rss")
-    findings = gate_crawlability(listing, fetcher=fetcher)
-    assert len(findings) == 1
-    assert findings[0]["severity"] == "minor"
-    assert "https://example.com/feed" in findings[0]["suggestion"]
+    assert gate_crawlability(listing, fetcher=fetcher) == []
+    assert listing["subareas"][0]["sources"][0]["crawl_root"] == "https://example.com/feed"
 
 
-def test_crawlability_homepage_feed_link_is_major() -> None:
+def test_crawlability_homepage_feed_link_sets_crawl_root() -> None:
     html = '<html><head><link rel="alternate" type="application/rss+xml" href="/en/rss/"></head></html>'
 
     def fetcher(url: str) -> _FakeResp:
         return _FakeResp(url="https://example.com/", content_type="text/html", text=html)
 
-    findings = gate_crawlability(_crawl_listing(), fetcher=fetcher)
-    assert len(findings) == 1
-    assert findings[0]["severity"] == "major"
-    assert "/en/rss/" in findings[0]["suggestion"]
+    listing = _crawl_listing()
+    assert gate_crawlability(listing, fetcher=fetcher) == []
+    assert listing["subareas"][0]["sources"][0]["crawl_root"] == "https://example.com/en/rss/"

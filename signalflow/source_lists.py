@@ -38,7 +38,7 @@ log = logging.getLogger(__name__)
 PROMPTS_DIR = PROJECT_ROOT / "prompts"
 DISCOVERY_DIR = PROJECT_ROOT / "docs" / "discovery"
 EXA_URL = "https://api.exa.ai/search"
-MAX_ITER = 4
+MAX_ITER = 6
 MAX_TOOL_ROUNDS = 30
 MAX_SEARCHES = 10  # free Exa tier (~$10/mo credits); existence is DNS-checked mechanically
 
@@ -95,15 +95,19 @@ def _agent_chat(
     *,
     max_rounds: int = MAX_TOOL_ROUNDS,
     max_searches: int = MAX_SEARCHES,
+    parse: Callable[[str], Any] | None = None,
+    retries: int = 2,
 ) -> tuple[str, int]:
-    """Tool-use loop: the model may call web_search; returns its final text.
+    """Tool-use loop: the model may call web_search; returns (final_text, searches).
 
     Searches are hard-capped at `max_searches`; once the budget is spent the
-    model gets budget-exhausted tool results and must finalize. Without the
-    cap the model keeps verifying and never terminates.
+    model gets budget-exhausted tool results and must finalize. If `parse` is
+    given, a non-parsing final answer gets a nudge to re-emit as strict JSON
+    (same conversation, no search budget consumed) up to `retries` times.
     """
     messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
     searches = 0
+    retry_left = retries
     for _ in range(max_rounds):
         msg = llm.chat_tools(messages, [WEB_SEARCH_TOOL], max_tokens=12000)
         if msg.get("tool_calls"):
@@ -137,9 +141,25 @@ def _agent_chat(
                 )
             continue
         content = (msg.get("content") or "").strip()
-        if content:
-            return content, searches
-        raise AgentError("model returned an empty final message")
+        if not content:
+            raise AgentError("model returned an empty final message")
+        if parse is not None:
+            try:
+                parse(content)
+            except AgentError:
+                if retry_left <= 0:
+                    raise
+                retry_left -= 1
+                log.warning("agent returned non-JSON — nudging to re-emit as strict JSON")
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": "Your previous response was not valid JSON. "
+                        "Respond again with STRICT JSON only — nothing else.",
+                    }
+                )
+                continue
+        return content, searches
     raise AgentError("tool loop did not terminate")
 
 
@@ -213,10 +233,10 @@ def gate_dns(listing: dict[str, Any], resolver: Callable[[str], bool] | None = N
     resolve = resolver or _resolve
     out: list[dict[str, str]] = []
     seen: dict[str, str] = {}
-    for sa in listing.get("subareas", []):
+    for sa in listing.get("subareas") or []:
         if not isinstance(sa, dict):
             continue  # malformed LLM output — gate_schema owns the finding
-        for s in sa.get("sources", []):
+        for s in sa.get("sources") or []:
             if not isinstance(s, dict):
                 continue
             domain = normalize_domain(s.get("domain", ""))
@@ -324,9 +344,15 @@ def _probe_homepage(domain: str, fetcher: Callable[[str], Any]) -> dict[str, str
     return None
 
 
+def _absolute(href: str, host: str) -> str:
+    if href.startswith("http"):
+        return href
+    return f"https://{host}{href if href.startswith('/') else '/' + href}"
+
+
 def _probe_source(
     domain: str, crawl_root: str, fetcher: Callable[[str], Any], _depth: int = 0
-) -> dict[str, str] | None:
+) -> tuple[dict[str, str] | None, dict[str, str] | None]:
     """Probe a source's feed; return a finding or None if crawlable.
 
     A redirect to another domain is not a knockback: if the redirect target
@@ -334,7 +360,7 @@ def _probe_source(
     actual domain. Only a dead redirect target is a blocker.
     """
     if _depth > 2:
-        return _finding("blocker", "crawlability", f"redirect chain too deep for {domain}", "remove the source")
+        return _finding("blocker", "crawlability", f"redirect chain too deep for {domain}", "remove the source"), None
     base = f"https://{domain}"
     candidates = [crawl_root] if crawl_root and crawl_root.startswith("http") else []
     candidates += [f"{base}{p}" for p in FEED_PATHS]
@@ -352,65 +378,39 @@ def _probe_source(
             # A crawl_root that INTENTIONALLY points at a feed host (feeds.reuters.com,
             # simplecast, art19) is not a repurposing redirect — it falls through.
             if _is_feed(resp):
-                return _finding(
-                    "major",
-                    "crawlability",
-                    f"'{domain}' redirects to {final_host}, which serves a working feed",
-                    f"replace the domain with {final_host}",
-                )
+                return None, {"domain": final_host, "crawl_root": resp.url or url}
             link = _feed_link_in_html(resp)
             if link:
-                return _finding(
-                    "major",
-                    "crawlability",
-                    f"'{domain}' redirects to {final_host}; its homepage advertises feed {link}",
-                    f"set the domain to {final_host} and crawl_root to {link}",
-                )
-            target = _probe_source(final_host, "", fetcher, _depth + 1)
-            if target is None:
-                return _finding(
-                    "major",
-                    "crawlability",
-                    f"'{domain}' redirects to {final_host}, which has a working feed",
-                    f"replace the domain with {final_host}",
-                )
+                return None, {"domain": final_host, "crawl_root": _absolute(link, final_host)}
+            target_finding, target_correction = _probe_source(final_host, "", fetcher, _depth + 1)
+            if target_finding is None:
+                return None, {"domain": final_host, "crawl_root": (target_correction or {}).get("crawl_root") or url}
             return _finding(
                 "blocker",
                 "crawlability",
                 f"'{domain}' redirects to {final_host}, which has no crawlable feed",
                 "remove the source or find the real domain",
-            )
+            ), None
         if _is_feed(resp):
             feed_date = _feed_date(resp)
+            correction = {"crawl_root": url} if url.rstrip("/") != crawl_root.rstrip("/") else None
             if feed_date and (date.today() - feed_date).days > STALE_DAYS:
                 return _finding(
                     "major",
                     "crawlability",
                     f"feed at {url} stale since {feed_date} (> {STALE_DAYS} days)",
                     "replace with a fresher source or remove",
-                )
-            if crawl_root and url.rstrip("/") != crawl_root.rstrip("/"):
-                return _finding(
-                    "minor",
-                    "crawlability",
-                    f"crawl_root {crawl_root} is wrong — working feed is {url}",
-                    f"set crawl_root to {url}",
-                )
-            return None
+                ), correction
+            return None, correction
         link = _feed_link_in_html(resp)
         if link:
-            return _finding(
-                "major",
-                "crawlability",
-                f"no standard feed path for {domain}; homepage advertises {link}",
-                f"set crawl_root to {link}",
-            )
+            return None, {"crawl_root": _absolute(link, domain)}
         return _finding(
             "major",
             "crawlability",
             f"no feed found at {domain} (homepage returned HTML without a feed link)",
             "set crawl_root to the real feed URL or remove",
-        )
+        ), None
     # all feed-path candidates failed — the homepage may advertise the real feed
     try:
         resp = fetcher(f"https://{domain}/")
@@ -418,21 +418,16 @@ def _probe_source(
         resp = None
     if resp is not None and resp.status_code < 400:
         if _is_feed(resp):
-            return None
+            return None, {"crawl_root": f"https://{domain}/"}
         link = _feed_link_in_html(resp)
         if link:
-            return _finding(
-                "major",
-                "crawlability",
-                f"no standard feed path for {domain}; homepage advertises {link}",
-                f"set crawl_root to {link}",
-            )
+            return None, {"crawl_root": _absolute(link, domain)}
     return _finding(
         "blocker",
         "crawlability",
         f"no reachable feed for {domain} — every probe failed (bot-blocked or missing)",
         "remove the source or provide a working crawl_root",
-    )
+    ), None
 
 
 def gate_crawlability(listing: dict[str, Any], fetcher: Callable[[str], Any] | None = None) -> list[dict[str, str]]:
@@ -443,10 +438,10 @@ def gate_crawlability(listing: dict[str, Any], fetcher: Callable[[str], Any] | N
     """
     fetch = fetcher or _http_get
     out: list[dict[str, str]] = []
-    for sa in listing.get("subareas", []):
+    for sa in listing.get("subareas") or []:
         if not isinstance(sa, dict):
             continue
-        for s in sa.get("sources", []):
+        for s in sa.get("sources") or []:
             if not isinstance(s, dict):
                 continue
             domain = normalize_domain(s.get("domain", ""))
@@ -454,8 +449,11 @@ def gate_crawlability(listing: dict[str, Any], fetcher: Callable[[str], Any] | N
                 continue
             if str(s.get("type", "")).lower() in NON_FEED_TYPES:
                 finding = _probe_homepage(domain, fetch)
+                correction = None
             else:
-                finding = _probe_source(domain, str(s.get("crawl_root", "")), fetch)
+                finding, correction = _probe_source(domain, str(s.get("crawl_root", "")), fetch)
+            if correction:
+                s.update({k: v for k, v in correction.items() if v})
             if finding:
                 out.append(finding)
     return out
@@ -463,10 +461,10 @@ def gate_crawlability(listing: dict[str, Any], fetcher: Callable[[str], Any] | N
 
 def gate_collision(listing: dict[str, Any], known_domains: set[str]) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
-    for sa in listing.get("subareas", []):
+    for sa in listing.get("subareas") or []:
         if not isinstance(sa, dict):
             continue
-        for s in sa.get("sources", []):
+        for s in sa.get("sources") or []:
             if not isinstance(s, dict):
                 continue
             domain = normalize_domain(s.get("domain", ""))
@@ -539,11 +537,14 @@ def generate_topic_sources(
             else ""
         )
         content, n = _agent_chat(
-            llm, cfg, gen_prompt + "\n\n## TOPIC\n" + json.dumps(topic_in, indent=2) + feedback, max_searches=10
+            llm,
+            cfg,
+            gen_prompt + "\n\n## TOPIC\n" + json.dumps(topic_in, indent=2) + feedback,
+            max_searches=10,
+            parse=_parse_json,
         )
         searches_used += n
         listing = _parse_json(content)
-
         gate_findings = (
             gate_schema(listing)
             + gate_dns(listing)
@@ -565,6 +566,7 @@ def generate_topic_sources(
             + "\n\n## GENERATED LIST\n"
             + json.dumps(listing, indent=2),
             max_searches=5,
+            parse=_parse_json,
         )
         searches_used += n
         verdict = _parse_json(content)
@@ -600,7 +602,7 @@ def render_markdown(record: dict[str, Any]) -> str:
         if sa.get("coverage"):
             lines.extend(["", sa["coverage"]])
         lines.append("")
-        for s in sa.get("sources", []):
+        for s in sa.get("sources") or []:
             conf = s.get("confidence", "")
             cr = f" · crawl: {s['crawl_root']}" if s.get("crawl_root") else ""
             lines.append(f"- **{s['name']}** (`{s['domain']}`) — {s['type']} — {conf}{cr}")
