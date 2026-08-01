@@ -558,6 +558,7 @@ def generate_topic_sources(
     findings: list[dict[str, Any]] = []
     listing: dict[str, Any] = {}
     searches_used = 0
+    best: tuple[int, list[dict[str, Any]], dict[str, Any]] | None = None
     for iteration in range(1, max_iter + 1):
         log.info("topic sources iteration %d: generate (%d prior findings)", iteration, len(findings))
         feedback = (
@@ -583,6 +584,8 @@ def generate_topic_sources(
         )
         if gate_findings:
             findings = gate_findings
+            if best is None or len(findings) < len(best[1]):
+                best = (iteration, list(findings), listing)
             log.warning("iteration %d: %d mechanical gate findings — reviewer skipped", iteration, len(findings))
             continue
 
@@ -605,7 +608,14 @@ def generate_topic_sources(
             log.info("APPROVED at iteration %d", iteration)
             return listing, verdict, iteration, searches_used
 
-    raise AgentError(f"no approval in {max_iter} iterations — last findings: {json.dumps(findings)[:400]}")
+    best = best or (0, [], listing)
+    log.warning(
+        "no approval in %d iterations — persisting best-effort list (iteration %d, %d findings)",
+        max_iter,
+        best[0],
+        len(best[1]),
+    )
+    return best[2], {"approved": False, "findings": best[1]}, best[0], searches_used
 
 
 # -- persistence ------------------------------------------------------------
@@ -718,4 +728,4 @@ def main(argv: list[str] | None = None) -> int:
     print(f"approved={verdict.get('approved')} iterations={iterations} exa_searches={searches}")
     print(f"wrote {json_path}")
     print(f"wrote {md_path}")
-    return 0
+    return 0 if verdict.get("approved") is True else 1
