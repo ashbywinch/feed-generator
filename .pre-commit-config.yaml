@@ -1,0 +1,18 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.1
+    hooks:
+      - id: ruff
+        exclude: ^spikes/   # scratch — not gated (see Makefile lint scope)
+      - id: ruff-format
+        exclude: ^spikes/
+  - repo: https://github.com/DetachHead/basedpyright-prek-mirror
+    rev: 1.39.9
+    hooks:
+      - id: basedpyright
+        exclude: ^spikes/
+        args: ["--level", "error"]   # warnings are advisory; errors block
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks

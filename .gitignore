@@ -1,0 +1,41 @@
+# Secrets — never commit
+.env
+.env.local
+*.keystore
+
+# Personal data — subscription list, semantic memory, digest
+feedly.opml
+*.opml
+history_memory.db
+signalflow_digest.xml
+
+# Spike checkpoint cache + run logs + scratch output (regenerable)
+spikes/state/
+spikes/output/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.sisyphus/
+.opencode/
+.code-review-graph/
+.logs/
+.coverage
+htmlcov/
+coverage.xml
+
+# OS/IDE
+.DS_Store
+.idea/
+.vscode/
+*.log

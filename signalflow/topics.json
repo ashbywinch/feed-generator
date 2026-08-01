@@ -1,0 +1,95 @@
+{
+  "topics": [
+    {
+      "name": "Grid & Net Zero economics",
+      "description": "Energy generation, storage, transmission and grid balancing, and the economics and policy of the net-zero transition.",
+      "in": "Grid-scale batteries, solar/wind/pumped-hydro projects, CfD auctions, energy markets and pricing, grid data analytics (Modo Energy-style), climate-economics data.",
+      "out": "Consumer EVs, energy-efficiency gadgets, corporate sustainability PR, climate activism.",
+      "sources": ["solarpowerportal", "By the Numbers", "Theory of Change", "Carbon Brief"]
+    },
+    {
+      "name": "Data Centers / AI / macro",
+      "description": "The AI industry layer: compute build-out, data centers, chips and silicon, model economics and AI capital markets.",
+      "in": "Data center construction, chip supply and geopolitics, AI market structure, funding and capex cycles, power constraints on compute.",
+      "out": "AI tools for development/business (own topic), model benchmarks and product reviews, AI research papers.",
+      "sources": ["Elad Blog", "Chamath Palihapitiya"]
+    },
+    {
+      "name": "Applied Life Sciences & Health",
+      "description": "Therapeutic platforms, biotech scaling, and the etiology of complex chronic illness. Particular interest: ME/CFS and long COVID, multiple sclerosis and Alzheimer's, and new genetic, AI and longevity-related discoveries — but not at the expense of other health-tech innovation.",
+      "in": "Drug development and clinical research, biotech platforms and scaling, novel therapeutics, ME/CFS and long COVID research, multiple sclerosis and Alzheimer's, genetic/AI/longevity discoveries.",
+      "out": "Wellness content, NHS operational politics, hospital anecdotes.",
+      "sources": ["Elad Blog"]
+    },
+    {
+      "name": "Geopolitics & Military Strategy",
+      "description": "Doctrine, defense industrial capacity, great-power competition, and strategic/military analysis.",
+      "in": "Force structure and doctrine shifts, unmanned/autonomous systems, industrial base capacity, strategic analysis including military history.",
+      "out": "Partisan politics, current-events punditry without strategic analysis.",
+      "sources": ["Palladium", "Comment is Freed", "A Collection of Unmitigated Pedantry"]
+    },
+    {
+      "name": "History (systems-thinking standpoint)",
+      "description": "History analyzed through systems: logistics, incentives, physical constraints and technology adoption. Particular interest: how geography affects history, and the history of politics and economics.",
+      "in": "Innovation history (Age of Invention), quantitative/logistical history, how systems and constraints shaped outcomes, geography's role in history, history of politics and economics.",
+      "out": "Narrative or political history without systems analysis, local nostalgia pieces.",
+      "sources": ["Age of Invention, by Anton Howes", "Living London History", "Spitalfields Life"]
+    },
+    {
+      "name": "Agriculture",
+      "description": "Farming and food production as systems: net-zero agriculture, agronomy research, and the systems history of agriculture.",
+      "in": "Land use and agronomy research, agricultural policy, historical food systems, farm-environment interaction.",
+      "out": "Home cooking, restaurant reviews, food science for chefs.",
+      "sources": ["The Allerton Project"]
+    },
+    {
+      "name": "Infrastructure & Policy (built environment)",
+      "description": "Physical infrastructure and the built environment: construction costs, engineering structures, buildings and civil works, and their policy.",
+      "in": "Construction economics (Construction Physics), project delivery, engineering structures, urban form, infrastructure policy.",
+      "out": "Transport operations and transit (own topic), energy generation (own topic).",
+      "sources": ["Construction Physics", "Bad British Architecture", "Notes on Growth"]
+    },
+    {
+      "name": "Transit",
+      "description": "Public transit, roads and self-driving vehicles, and transport policy.",
+      "in": "Rail/bus/freight operations and investment, AV regulation and rollout, congestion pricing, transport innovation (London Reconnections-style).",
+      "out": "Vehicle tech reviews, driving culture, EV consumer content.",
+      "sources": ["London Reconnections", "Self Driving Insights", "The Freewheeling Podcast"]
+    },
+    {
+      "name": "Industry, Manufacturing & Policy",
+      "description": "Industrial production and manufacturing capability, supply chains, and industrial policy.",
+      "in": "High-mix manufacturing, reshoring and industrial base, energy-intensive industry, SMRs and heavy industry, defense industrial capacity (overlaps Geopolitics).",
+      "out": "Consumer products, software, services.",
+      "sources": ["TOOL or DIE", "HydraRaptor"]
+    },
+    {
+      "name": "Business, Risk & Finance",
+      "description": "Markets, corporate strategy, risk and macro-finance.",
+      "in": "Capital allocation, market structure, economic analysis (Freakonomics-style), strategy (Rumelt), macro-finance.",
+      "out": "Personal finance advice, stock tips, career advice.",
+      "sources": ["Freakonomics", "Chamath Palihapitiya", "The Rumelt Perspectives"]
+    },
+    {
+      "name": "Leadership / Management",
+      "description": "Leading teams and organizations: management practice, organizational design, and product/engineering leadership.",
+      "in": "Coaching and management practice, org design, scaling engineering and product teams, leadership thinking.",
+      "out": "HR compliance, generic career-advice columns.",
+      "sources": ["The Coaching Inn", "Oren Ellenbogen's Thoughts, stories and ideas", "Dark Matter and Trojan Horses", "Sudo Make Me a CTO", "Several People Are Coding", "A Smart Bear", "Community Building", "Ravi Mehta | Product Leadership", "QAspire Consulting – by Tanmay Vora"]
+    },
+    {
+      "name": "Innovation in Government",
+      "description": "Public-sector digital transformation: government service design, platforms, and policy innovation.",
+      "in": "Government as a Platform, Policy Lab, user research in government, DWP/HMRC digital teams, gov design systems.",
+      "out": "Party politics, general public-services commentary.",
+      "sources": ["Government as a Platform", "Policy Lab", "User research in government", "Design in government", "DWP Digital", "Home Office Digital", "Life at HMRC"]
+    },
+    {
+      "name": "AI Tooling for Development & Business",
+      "description": "AI tools applied to software development and business workflows — the application layer, not the industry. Particular interest: open-source tools and open-weights models, plus frontier developments.",
+      "in": "AI coding assistants, AI agents for business, tool landscape and practical adoption, open-source tools and open-weights models, frontier AI tooling.",
+      "out": "AI industry economics and capex (own topic), model research, benchmarks.",
+      "sources": ["Geoffrey Huntley", "Signals in 5 Minutes ⏱️"]
+    }
+  ]
+}

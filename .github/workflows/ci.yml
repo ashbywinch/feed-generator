@@ -1,0 +1,34 @@
+name: CI
+on:
+  push:
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+  pull-requests: write   # coverage comment step needs it; drop both if unused
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make setup
+      - run: make lint-github
+      - run: make test
+      - run: make coverage
+      - name: Coverage summary
+        uses: irongut/CodeCoverageSummary@v1.3.0
+        with:
+          filename: coverage.xml
+          badge: true
+          fail_below_min: true
+          thresholds: '65 80'   # floor 65 (current 71% — engine/topics/env untested), goal 80
+          format: markdown
+          output: both
+      - name: Post coverage comment
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: github.event_name == 'pull_request'
+        with:
+          recreate: true
+          path: code-coverage-results.md

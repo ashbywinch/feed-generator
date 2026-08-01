@@ -1,0 +1,19 @@
+name: AI Code Review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+jobs:
+  pr-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: the-pr-agent/pr-agent@latest
+        id: pr-agent
+        env:
+          OPENAI_KEY: ${{ secrets.FEED_GENERATOR_API_KEY }}
+          OPENAI_BASE_URL: https://opencode.ai/zen/go/v1
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
