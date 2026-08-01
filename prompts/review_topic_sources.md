@@ -29,7 +29,10 @@ blocker or major finding remains.
 7. **Outside-subscription.** No source that is subscribed (topic `sources` /
    `exclude_domains`).
 8. **Engine-actionable.** 3–5 queries present; registry-marked topics have a compact
-   registry-safe query[0]; registries are real public sources.
+   registry-safe query[0]; registries are real public sources. Crawl endpoints
+   sensible: bot-protected journals point at RSS/API (OpenAlex) not HTML;
+   paywalled titles carry free headline-feed fallbacks; portal domains have a
+   pinned `crawl_root`.
 
 ## Output
 
