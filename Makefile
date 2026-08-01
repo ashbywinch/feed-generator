@@ -70,7 +70,7 @@ lint-github: setup
 	@$(RUFF) check signalflow tests --output-format=github
 
 typecheck: setup
-	@$(BASEDPYRIGHT) --level=error
+	@$(BASEDPYRIGHT) --outputjson | $(PYTHON) -c "import json,sys; d=json.load(sys.stdin); sys.exit(1 if d['summary']['errorCount'] else 0)"
 
 test: setup lint typecheck
 	@$(PYTHON) -m pytest
