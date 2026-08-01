@@ -70,7 +70,7 @@ lint-github: setup
 	@$(RUFF) check signalflow tests --output-format=github
 
 typecheck: setup
-	@$(BASEDPYRIGHT) --level error   # warnings are advisory; errors gate the suite
+	@$(BASEDPYRIGHT) --level=error
 
 test: setup lint typecheck
 	@$(PYTHON) -m pytest
