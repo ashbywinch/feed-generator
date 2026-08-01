@@ -1,5 +1,5 @@
 # Makefile for feed-generator (SignalFlow)
-.PHONY: help setup run smoke topics spike spike-bg spike-logs spike-stop topic-sources lint lint-github typecheck test coverage format clean
+.PHONY: help setup run smoke topics spike spike-bg spike-logs spike-stop topic-sources topic-sources-bg topic-sources-logs topic-sources-stop lint lint-github typecheck test coverage format clean
 
 PYTHON := .venv/bin/python
 UV := $(shell command -v uv 2>/dev/null || echo $(HOME)/.local/bin/uv)
@@ -46,6 +46,19 @@ topics: setup
 
 topic-sources: setup
 	@$(UV) run --env-file .env python -m signalflow sources "$(TOPIC)"
+
+topic-sources-bg: setup
+	mkdir -p spikes/state
+	@nohup $(UV) run --env-file .env python -u -m signalflow sources "$(TOPIC)" >> spikes/state/topic-sources.log 2>&1 & echo $$! > spikes/state/topic-sources.pid
+	@echo "topic-sources running in background (pid $$(cat spikes/state/topic-sources.pid))"
+	@echo "  monitor: make topic-sources-logs"
+	@echo "  stop:    make topic-sources-stop"
+
+topic-sources-logs:
+	tail -f spikes/state/topic-sources.log
+
+topic-sources-stop:
+	@if [ -f spikes/state/topic-sources.pid ]; then kill $$(cat spikes/state/topic-sources.pid) 2>/dev/null && rm spikes/state/topic-sources.pid && echo "topic-sources stopped"; else echo "no pid file — not running?"; fi
 
 spike: setup
 	@$(UV) run --env-file .env python spikes/topic_elicitation_resumable.py

@@ -38,9 +38,62 @@ log = logging.getLogger(__name__)
 PROMPTS_DIR = PROJECT_ROOT / "prompts"
 DISCOVERY_DIR = PROJECT_ROOT / "docs" / "discovery"
 EXA_URL = "https://api.exa.ai/search"
-MAX_ITER = 4
+MAX_ITER = 6
 MAX_TOOL_ROUNDS = 30
 MAX_SEARCHES = 10  # free Exa tier (~$10/mo credits); existence is DNS-checked mechanically
+
+CHECK_URL_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "check_url",
+        "description": (
+            "Cheaply verify a candidate domain: DNS + feed probe (no search budget). "
+            "Returns whether it resolves, serves a feed (and where), or redirects. "
+            "Call before adding or replacing a source."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {"domain": {"type": "string"}},
+            "required": ["domain"],
+        },
+    },
+}
+
+
+def _check_domain(domain: str, fetcher: Callable[[str], Any] | None = None) -> dict[str, Any]:
+    """check_url implementation: cheap verification, reuses the crawlability machinery."""
+    d = normalize_domain(domain)
+    if not d:
+        return {
+            "domain": domain,
+            "resolves": False,
+            "has_feed": False,
+            "feed_url": None,
+            "ok": False,
+            "issue": "invalid domain",
+        }
+    if not _resolve(d):
+        return {
+            "domain": d,
+            "resolves": False,
+            "has_feed": False,
+            "feed_url": None,
+            "ok": False,
+            "issue": "DNS failure",
+        }
+    finding, correction = _probe_source(d, "", fetcher or _http_get)
+    feed_url = (correction or {}).get("crawl_root")
+    if finding is None:
+        return {"domain": d, "resolves": True, "has_feed": True, "feed_url": feed_url, "ok": True, "issue": None}
+    return {
+        "domain": d,
+        "resolves": True,
+        "has_feed": bool(feed_url),
+        "feed_url": feed_url,
+        "ok": False,
+        "issue": finding["issue"],
+    }
+
 
 WEB_SEARCH_TOOL = {
     "type": "function",
@@ -95,17 +148,25 @@ def _agent_chat(
     *,
     max_rounds: int = MAX_TOOL_ROUNDS,
     max_searches: int = MAX_SEARCHES,
-) -> tuple[str, int]:
-    """Tool-use loop: the model may call web_search; returns its final text.
+    parse: Callable[[str], Any] | None = None,
+    retries: int = 2,
+) -> tuple[str, int, set[str]]:
+    """Tool-use loop: web_search (Exa) + check_url (cheap probe); returns
+    (final_text, searches, grounded_domains).
 
-    Searches are hard-capped at `max_searches`; once the budget is spent the
-    model gets budget-exhausted tool results and must finalize. Without the
-    cap the model keeps verifying and never terminates.
+    `grounded_domains` are every domain the model saw real evidence for this
+    round (search-result URLs + check_url verdicts) — the driver enforces that
+    replacements come from this set. Searches are hard-capped; once spent the
+    model gets budget-exhausted tool results and must finalize. If `parse` is
+    given, a non-parsing final answer gets a nudge to re-emit as strict JSON.
     """
     messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
     searches = 0
+    checks = 0
+    grounded: set[str] = set()
+    retry_left = retries
     for _ in range(max_rounds):
-        msg = llm.chat_tools(messages, [WEB_SEARCH_TOOL], max_tokens=12000)
+        msg = llm.chat_tools(messages, [WEB_SEARCH_TOOL, CHECK_URL_TOOL], max_tokens=12000)
         if msg.get("tool_calls"):
             messages.append(msg)
             for tc in msg["tool_calls"]:
@@ -114,7 +175,7 @@ def _agent_chat(
                 raw_args = fn.get("arguments", "{}")
                 try:
                     args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
-                    query = str(args.get("query", "")) if isinstance(args, dict) else ""
+                    query = str(args.get("query") or args.get("domain") or "") if isinstance(args, dict) else ""
                 except json.JSONDecodeError:
                     query = ""
                 if name == "web_search" and query and searches < max_searches:
@@ -126,6 +187,13 @@ def _agent_chat(
                         result = [{"error": f"search failed: {str(exc)[:200]}"}]
                     except AgentError as exc:
                         result = [{"error": str(exc)}]
+                    else:
+                        grounded.update(normalize_domain(urlparse(r.get("url", "")).netloc) for r in result)
+                elif name == "check_url" and query and checks < 40:
+                    checks += 1
+                    log.info("agent check_url (%d/40): %r", checks, query)
+                    result = _check_domain(query)
+                    grounded.add(normalize_domain(query))
                 else:
                     result = [{"error": "search budget exhausted or invalid call — finalize your answer now"}]
                 messages.append(
@@ -137,9 +205,25 @@ def _agent_chat(
                 )
             continue
         content = (msg.get("content") or "").strip()
-        if content:
-            return content, searches
-        raise AgentError("model returned an empty final message")
+        if not content:
+            raise AgentError("model returned an empty final message")
+        if parse is not None:
+            try:
+                parse(content)
+            except AgentError:
+                if retry_left <= 0:
+                    raise
+                retry_left -= 1
+                log.warning("agent returned non-JSON — nudging to re-emit as strict JSON")
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": "Your previous response was not valid JSON. "
+                        "Respond again with STRICT JSON only — nothing else.",
+                    }
+                )
+                continue
+        return content, searches, grounded
     raise AgentError("tool loop did not terminate")
 
 
@@ -150,7 +234,10 @@ def _parse_json(content: str) -> dict[str, Any]:
         m = re.search(r"\{.*\}", content, re.S)
         if not m:
             raise AgentError(f"non-JSON agent output: {content[:200]}") from None
-        out = json.loads(m.group(0))
+        try:
+            out = json.loads(m.group(0))
+        except json.JSONDecodeError:
+            raise AgentError(f"non-JSON agent output: {content[:200]}") from None
     if not isinstance(out, dict):
         raise AgentError("agent output is not a JSON object")
     return out
@@ -195,6 +282,11 @@ def gate_schema(listing: dict[str, Any]) -> list[dict[str, str]]:
                     out.append(_finding("major", "schema", f"{sa['name']}: {s.get('name')} missing type"))
     if not isinstance(listing.get("queries"), list) or not listing.get("queries"):
         out.append(_finding("major", "schema", "no queries"))
+    elif any(not isinstance(q, str) for q in listing["queries"]):
+        out.append(_finding("major", "schema", "queries contain non-string entries"))
+    for field in ("news_vs_analysis", "notes"):
+        if field in listing and not isinstance(listing[field], str):
+            out.append(_finding("major", "schema", f"{field} is not a string"))
     return out
 
 
@@ -210,8 +302,12 @@ def gate_dns(listing: dict[str, Any], resolver: Callable[[str], bool] | None = N
     resolve = resolver or _resolve
     out: list[dict[str, str]] = []
     seen: dict[str, str] = {}
-    for sa in listing.get("subareas", []):
-        for s in sa.get("sources", []):
+    for sa in listing.get("subareas") or []:
+        if not isinstance(sa, dict):
+            continue  # malformed LLM output — gate_schema owns the finding
+        for s in sa.get("sources") or []:
+            if not isinstance(s, dict):
+                continue
             domain = normalize_domain(s.get("domain", ""))
             if not domain:
                 continue
@@ -317,9 +413,15 @@ def _probe_homepage(domain: str, fetcher: Callable[[str], Any]) -> dict[str, str
     return None
 
 
+def _absolute(href: str, host: str) -> str:
+    if href.startswith("http"):
+        return href
+    return f"https://{host}{href if href.startswith('/') else '/' + href}"
+
+
 def _probe_source(
     domain: str, crawl_root: str, fetcher: Callable[[str], Any], _depth: int = 0
-) -> dict[str, str] | None:
+) -> tuple[dict[str, str] | None, dict[str, Any] | None]:
     """Probe a source's feed; return a finding or None if crawlable.
 
     A redirect to another domain is not a knockback: if the redirect target
@@ -327,7 +429,7 @@ def _probe_source(
     actual domain. Only a dead redirect target is a blocker.
     """
     if _depth > 2:
-        return _finding("blocker", "crawlability", f"redirect chain too deep for {domain}", "remove the source")
+        return _finding("blocker", "crawlability", f"redirect chain too deep for {domain}", "remove the source"), None
     base = f"https://{domain}"
     candidates = [crawl_root] if crawl_root and crawl_root.startswith("http") else []
     candidates += [f"{base}{p}" for p in FEED_PATHS]
@@ -345,65 +447,35 @@ def _probe_source(
             # A crawl_root that INTENTIONALLY points at a feed host (feeds.reuters.com,
             # simplecast, art19) is not a repurposing redirect — it falls through.
             if _is_feed(resp):
-                return _finding(
-                    "major",
-                    "crawlability",
-                    f"'{domain}' redirects to {final_host}, which serves a working feed",
-                    f"replace the domain with {final_host}",
-                )
+                return None, {"domain": final_host, "crawl_root": resp.url or url}
             link = _feed_link_in_html(resp)
             if link:
-                return _finding(
-                    "major",
-                    "crawlability",
-                    f"'{domain}' redirects to {final_host}; its homepage advertises feed {link}",
-                    f"set the domain to {final_host} and crawl_root to {link}",
-                )
-            target = _probe_source(final_host, "", fetcher, _depth + 1)
-            if target is None:
-                return _finding(
-                    "major",
-                    "crawlability",
-                    f"'{domain}' redirects to {final_host}, which has a working feed",
-                    f"replace the domain with {final_host}",
-                )
-            return _finding(
-                "blocker",
-                "crawlability",
-                f"'{domain}' redirects to {final_host}, which has no crawlable feed",
-                "remove the source or find the real domain",
-            )
+                return None, {"domain": final_host, "crawl_root": _absolute(link, final_host)}
+            target_finding, target_correction = _probe_source(final_host, "", fetcher, _depth + 1)
+            if target_finding is None:
+                return None, {"domain": final_host, "crawl_root": (target_correction or {}).get("crawl_root") or url}
+            # dead redirect: handled mechanically (drop), never bounced to the LLM
+            return None, {"_remove": True}
         if _is_feed(resp):
             feed_date = _feed_date(resp)
+            correction = {"crawl_root": url} if url.rstrip("/") != crawl_root.rstrip("/") else None
             if feed_date and (date.today() - feed_date).days > STALE_DAYS:
                 return _finding(
                     "major",
                     "crawlability",
                     f"feed at {url} stale since {feed_date} (> {STALE_DAYS} days)",
                     "replace with a fresher source or remove",
-                )
-            if crawl_root and url.rstrip("/") != crawl_root.rstrip("/"):
-                return _finding(
-                    "minor",
-                    "crawlability",
-                    f"crawl_root {crawl_root} is wrong — working feed is {url}",
-                    f"set crawl_root to {url}",
-                )
-            return None
+                ), correction
+            return None, correction
         link = _feed_link_in_html(resp)
         if link:
-            return _finding(
-                "major",
-                "crawlability",
-                f"no standard feed path for {domain}; homepage advertises {link}",
-                f"set crawl_root to {link}",
-            )
+            return None, {"crawl_root": _absolute(link, domain)}
         return _finding(
             "major",
             "crawlability",
             f"no feed found at {domain} (homepage returned HTML without a feed link)",
             "set crawl_root to the real feed URL or remove",
-        )
+        ), None
     # all feed-path candidates failed — the homepage may advertise the real feed
     try:
         resp = fetcher(f"https://{domain}/")
@@ -411,21 +483,16 @@ def _probe_source(
         resp = None
     if resp is not None and resp.status_code < 400:
         if _is_feed(resp):
-            return None
+            return None, {"crawl_root": f"https://{domain}/"}
         link = _feed_link_in_html(resp)
         if link:
-            return _finding(
-                "major",
-                "crawlability",
-                f"no standard feed path for {domain}; homepage advertises {link}",
-                f"set crawl_root to {link}",
-            )
+            return None, {"crawl_root": _absolute(link, domain)}
     return _finding(
         "blocker",
         "crawlability",
         f"no reachable feed for {domain} — every probe failed (bot-blocked or missing)",
         "remove the source or provide a working crawl_root",
-    )
+    ), None
 
 
 def gate_crawlability(listing: dict[str, Any], fetcher: Callable[[str], Any] | None = None) -> list[dict[str, str]]:
@@ -436,24 +503,41 @@ def gate_crawlability(listing: dict[str, Any], fetcher: Callable[[str], Any] | N
     """
     fetch = fetcher or _http_get
     out: list[dict[str, str]] = []
-    for sa in listing.get("subareas", []):
-        for s in sa.get("sources", []):
+    for sa in listing.get("subareas") or []:
+        if not isinstance(sa, dict):
+            continue
+        kept: list[dict[str, Any]] = []
+        for s in sa.get("sources") or []:
+            if not isinstance(s, dict):
+                continue
             domain = normalize_domain(s.get("domain", ""))
             if not domain:
+                kept.append(s)
                 continue
             if str(s.get("type", "")).lower() in NON_FEED_TYPES:
                 finding = _probe_homepage(domain, fetch)
+                correction = None
             else:
-                finding = _probe_source(domain, str(s.get("crawl_root", "")), fetch)
+                finding, correction = _probe_source(domain, str(s.get("crawl_root", "")), fetch)
+            if correction and correction.get("_remove"):
+                continue  # dead redirect: dropped mechanically, never bounced to the LLM
+            if correction:
+                s.update({k: v for k, v in correction.items() if v})
             if finding:
                 out.append(finding)
+            kept.append(s)
+        sa["sources"] = kept
     return out
 
 
 def gate_collision(listing: dict[str, Any], known_domains: set[str]) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
-    for sa in listing.get("subareas", []):
-        for s in sa.get("sources", []):
+    for sa in listing.get("subareas") or []:
+        if not isinstance(sa, dict):
+            continue
+        for s in sa.get("sources") or []:
+            if not isinstance(s, dict):
+                continue
             domain = normalize_domain(s.get("domain", ""))
             if domain and domain in known_domains:
                 out.append(
@@ -465,6 +549,55 @@ def gate_collision(listing: dict[str, Any], known_domains: set[str]) -> list[dic
                     )
                 )
     return out
+
+
+def _apply_revision(listing: dict[str, Any], delta: dict[str, Any], grounded: set[str] | None = None) -> dict[str, Any]:
+    """Apply a generator DELTA (remove/replace/add by domain) to the current list.
+
+    The generator never re-emits unaffected sources; it only describes changes.
+    Grounded enforcement: replacement/add domains must be evidence-backed — in the
+    current list, returned by web_search this round, or confirmed via check_url.
+    Ungrounded substitutions are rejected (the whole-list hallucinations the gates
+    kept catching).
+    """
+    subareas = listing.setdefault("subareas", [])
+    known = {
+        normalize_domain(s.get("domain", ""))
+        for sa in subareas
+        if isinstance(sa, dict)
+        for s in (sa.get("sources") or [])
+        if isinstance(s, dict)
+    }
+    if grounded is None:
+        grounded = set()
+    allowed = known | grounded
+
+    def grounded_source(src: Any) -> bool:
+        return isinstance(src, dict) and normalize_domain(src.get("domain", "")) in allowed
+
+    remove_domains = {normalize_domain(d) for d in delta.get("remove") or []}
+    for sa in subareas:
+        if not isinstance(sa, dict):
+            continue
+        srcs = [s for s in sa.get("sources") or [] if isinstance(s, dict)]
+        srcs = [s for s in srcs if normalize_domain(s.get("domain", "")) not in remove_domains]
+        for dom, new_src in (delta.get("replace") or {}).items():
+            if not isinstance(new_src, dict):
+                continue
+            if not grounded_source(new_src):
+                log.warning("rejected ungrounded replacement for %s", dom)
+                continue
+            for i, s in enumerate(srcs):
+                if normalize_domain(s.get("domain", "")) == normalize_domain(str(dom)):
+                    srcs[i] = new_src
+        sa["sources"] = srcs
+    for sa_name, new_srcs in (delta.get("add") or {}).items():
+        sa = next((x for x in subareas if isinstance(x, dict) and x.get("name") == sa_name), None)
+        if sa is None:
+            sa = {"name": sa_name, "sources": []}
+            subareas.append(sa)
+        sa.setdefault("sources", []).extend(s for s in new_srcs if grounded_source(s))
+    return listing
 
 
 def exclude_domains(feeds: list[dict[str, Any]], topic: dict[str, Any]) -> list[str]:
@@ -515,6 +648,9 @@ def generate_topic_sources(
     findings: list[dict[str, Any]] = []
     listing: dict[str, Any] = {}
     searches_used = 0
+    best: tuple[int, list[dict[str, Any]], dict[str, Any]] | None = None
+    prev_findings: int | None = None
+    previous: dict[str, Any] | None = None
     for iteration in range(1, max_iter + 1):
         log.info("topic sources iteration %d: generate (%d prior findings)", iteration, len(findings))
         feedback = (
@@ -523,12 +659,28 @@ def generate_topic_sources(
             if findings
             else ""
         )
-        content, n = _agent_chat(
-            llm, cfg, gen_prompt + "\n\n## TOPIC\n" + json.dumps(topic_in, indent=2) + feedback, max_searches=10
+        base_prompt = gen_prompt + "\n\n## TOPIC\n" + json.dumps(topic_in, indent=2)
+        if listing:
+            # revision mode: generator returns a DELTA over the current list
+            base_prompt += "\n\n## CURRENT LIST (revision mode)\n" + json.dumps(listing, indent=2) + feedback
+        else:
+            base_prompt += feedback
+        content, n, grounded = _agent_chat(
+            llm,
+            cfg,
+            base_prompt,
+            max_searches=10,
+            parse=_parse_json,
         )
         searches_used += n
-        listing = _parse_json(content)
-
+        if listing:
+            previous = listing
+            listing = _apply_revision(listing, _parse_json(content), grounded)
+            if not listing.get("subareas") and previous.get("subareas"):
+                log.warning("destructive delta rejected — keeping previous list")
+                listing = previous
+        else:
+            listing = _parse_json(content)
         gate_findings = (
             gate_schema(listing)
             + gate_dns(listing)
@@ -536,12 +688,23 @@ def generate_topic_sources(
             + gate_crawlability(listing)
         )
         if gate_findings:
+            if prev_findings is not None and len(gate_findings) > prev_findings and previous is not None:
+                # EIR > ECR: this revision made things worse — revert and keep the old findings
+                log.warning(
+                    "revision regressed (%d -> %d findings) — reverting to previous list",
+                    prev_findings,
+                    len(gate_findings),
+                )
+                listing = previous
             findings = gate_findings
+            if best is None or len(findings) < len(best[1]):
+                best = (iteration, list(findings), listing)
             log.warning("iteration %d: %d mechanical gate findings — reviewer skipped", iteration, len(findings))
+            prev_findings = len(gate_findings)
             continue
 
         log.info("iteration %d: review", iteration)
-        content, n = _agent_chat(
+        content, n, _grounded = _agent_chat(
             llm,
             cfg,
             rev_prompt
@@ -550,6 +713,7 @@ def generate_topic_sources(
             + "\n\n## GENERATED LIST\n"
             + json.dumps(listing, indent=2),
             max_searches=5,
+            parse=_parse_json,
         )
         searches_used += n
         verdict = _parse_json(content)
@@ -558,7 +722,14 @@ def generate_topic_sources(
             log.info("APPROVED at iteration %d", iteration)
             return listing, verdict, iteration, searches_used
 
-    raise AgentError(f"no approval in {max_iter} iterations — last findings: {json.dumps(findings)[:400]}")
+    best = best or (0, [], listing)
+    log.warning(
+        "no approval in %d iterations — persisting best-effort list (iteration %d, %d findings)",
+        max_iter,
+        best[0],
+        len(best[1]),
+    )
+    return best[2], {"approved": False, "findings": best[1]}, best[0], searches_used
 
 
 # -- persistence ------------------------------------------------------------
@@ -583,9 +754,9 @@ def render_markdown(record: dict[str, Any]) -> str:
     for i, sa in enumerate(record["subareas"], 1):
         lines.append(f"### {i}. {sa['name']}")
         if sa.get("coverage"):
-            lines.extend(["", sa["coverage"]])
+            lines.extend(["", str(sa["coverage"])])
         lines.append("")
-        for s in sa.get("sources", []):
+        for s in sa.get("sources") or []:
             conf = s.get("confidence", "")
             cr = f" · crawl: {s['crawl_root']}" if s.get("crawl_root") else ""
             lines.append(f"- **{s['name']}** (`{s['domain']}`) — {s['type']} — {conf}{cr}")
@@ -607,10 +778,10 @@ def render_markdown(record: dict[str, Any]) -> str:
         lines.append(f"{i}. {q}")
     lines.append("")
     lines.append("## News vs analysis")
-    lines.append(record.get("news_vs_analysis", ""))
+    lines.append(str(record.get("news_vs_analysis", "")))
     lines.append("")
     lines.append("## Notes")
-    lines.append(record.get("notes", ""))
+    lines.append(str(record.get("notes", "")))
     lines.append("")
     lines.append("## Review record")
     for f in record.get("review_record", {}).get("findings", []):
@@ -671,4 +842,4 @@ def main(argv: list[str] | None = None) -> int:
     print(f"approved={verdict.get('approved')} iterations={iterations} exa_searches={searches}")
     print(f"wrote {json_path}")
     print(f"wrote {md_path}")
-    return 0
+    return 0 if verdict.get("approved") is True else 1

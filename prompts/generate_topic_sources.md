@@ -52,11 +52,39 @@ user's OPML).
    Batch several domains into ONE query where possible. HARD budget: 10
    searches total — spend them on discovery, not verification. Mark
    `confidence`: high/medium/low. Never invent a domain.
+10. **check_url is free — use it before adding a source.** The `check_url` tool
+    (DNS + feed probe, no search budget) tells you if a candidate domain
+    resolves, serves a feed, or redirects. Verify candidates with it so your
+    list passes the mechanical gates on the first pass. The pipeline rejects
+    replacements that are not grounded in your `web_search` results or
+    `check_url` verdicts.
 10. **Feeds matter.** Prefer sources with RSS/Atom feeds — the engine crawls feeds.
 11. **Crawl endpoints.** For bot-protected academic journals (Elsevier/Nature),
     point the crawler at RSS/API endpoints (e.g. OpenAlex `api.openalex.org`),
     not HTML article pages. For paywalled trade press, note free headline-feed
     fallbacks. Record the endpoint in `crawl_root`.
+
+## Revision mode (findings from a previous round)
+
+When you are given a CURRENT LIST, do NOT re-emit sources that are already in it and
+unaffected by the findings. Return a DELTA only, strict JSON:
+
+```json
+{"remove": ["<domain>", "..."], "replace": {"<domain>": {full source object}},
+ "add": {"<subarea name>": [source objects]}}
+```
+
+- `remove`: domains to drop entirely (dead, off-topic, unreachable).
+- `replace`: swap a blocked/unsuitable source for a DIFFERENT one — a new domain that is
+  NOT already in the current list (you can see the list; go find something different).
+  The new domain MUST be grounded: either in the current list, returned by your
+  `web_search` results, or verified with `check_url`. Ungrounded replacements are
+  rejected mechanically.
+- `add`: new sources for a subarea when a removal leaves it thin or empty (same
+  grounding rule).
+
+Only `add` may introduce a domain that is not a replacement for a removed one. The
+pipeline applies the delta mechanically; unaffected sources are untouched.
 
 ## Output
 

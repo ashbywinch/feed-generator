@@ -43,6 +43,32 @@ def test_normalize_domain_strips_scheme_www_slash() -> None:
     assert normalize_domain("example.com") == "example.com"
 
 
+def test_schema_gate_flags_non_string_contract_fields() -> None:
+    listing = _listing()
+    listing["news_vs_analysis"] = {"news": "x"}
+    listing["queries"] = [{"q": "not a string"}]
+    findings = gate_schema(listing)
+    assert any("news_vs_analysis is not a string" in f["issue"] for f in findings)
+    assert any("non-string entries" in f["issue"] for f in findings)
+
+
+def test_render_markdown_tolerates_dict_news_vs_analysis() -> None:
+    record = {
+        "topic": "T",
+        "status": "needs-human",
+        "iterations": 1,
+        "approved_at": "2026-08-01",
+        "subareas": [{"name": "S", "sources": [{"name": "A", "domain": "a.com", "type": "blog"}]}],
+        "registries": [],
+        "queries": ["q"],
+        "news_vs_analysis": {"news": "x", "analysis": "y"},
+        "notes": "n",
+        "review_record": {"findings": []},
+    }
+    md = render_markdown(record)  # must not raise
+    assert "news" in md
+
+
 def test_schema_gate_flags_missing_domain_and_queries() -> None:
     bad = _listing()
     bad["subareas"][0]["sources"][0]["domain"] = ""  # type: ignore[index]
@@ -97,6 +123,114 @@ def test_slug_for_orders_by_topics_index() -> None:
 
 def test_parse_json_falls_back_to_braces() -> None:
     assert _parse_json('prefix {"a": 1} suffix') == {"a": 1}
+
+
+def test_apply_revision_remove_replace_add() -> None:
+    from signalflow.source_lists import _apply_revision
+
+    listing = {
+        "topic": "T",
+        "subareas": [
+            {"name": "Markets", "sources": [{"name": "A", "domain": "a.com", "type": "blog"}]},
+            {"name": "Storage", "sources": [{"name": "B", "domain": "b.com", "type": "blog"}]},
+        ],
+    }
+    delta = {
+        "remove": ["a.com"],
+        "replace": {"b.com": {"name": "B2", "domain": "b.com", "type": "trade press"}},
+        "add": {"Markets": [{"name": "C", "domain": "c.com", "type": "blog"}]},
+    }
+    grounded = {"c.com"}  # C came from a web_search result; B2 is already in the list
+    out = _apply_revision(listing, delta, grounded)
+    markets = out["subareas"][0]["sources"]
+    storage = out["subareas"][1]["sources"]
+    assert [s["domain"] for s in markets] == ["c.com"]  # a.com removed, grounded C added
+    assert storage == [{"name": "B2", "domain": "b.com", "type": "trade press"}]  # replaced in place
+
+
+def test_apply_revision_rejects_ungrounded_substitutions() -> None:
+    from signalflow.source_lists import _apply_revision
+
+    listing = {
+        "topic": "T",
+        "subareas": [
+            {"name": "Markets", "sources": [{"name": "A", "domain": "a.com", "type": "blog"}]},
+        ],
+    }
+    delta = {
+        "replace": {"a.com": {"name": "A2", "domain": "hallucinated.net", "type": "blog"}},
+        "add": {"Markets": [{"name": "Z", "domain": "unverified.org", "type": "blog"}]},
+    }
+    out = _apply_revision(listing, delta, grounded=set())
+    assert out["subareas"][0]["sources"] == [{"name": "A", "domain": "a.com", "type": "blog"}]  # untouched
+
+
+def test_agent_chat_check_url_tool(cfg, monkeypatch) -> None:
+    import signalflow.source_lists as sl_mod
+    from signalflow.llm import LLM
+
+    calls = []
+
+    class StubLLM(LLM):
+        def __init__(self) -> None:
+            super().__init__(cfg)
+
+        def chat_tools(self, messages, tools, *, max_tokens=4096):
+            calls.append((tools, max_tokens))
+            if len(calls) == 1:
+                return {
+                    "role": "assistant",
+                    "tool_calls": [
+                        {
+                            "id": "t1",
+                            "type": "function",
+                            "function": {"name": "check_url", "arguments": '{"domain": "example.com"}'},
+                        }
+                    ],
+                }
+            return {"role": "assistant", "content": '{"ok": true}'}
+
+    monkeypatch.setattr(
+        sl_mod,
+        "_http_get",
+        lambda url: _FakeResp(url=url, content_type="application/rss+xml", text=_feed_html(_when(5))),
+    )
+    text, searches, grounded = sl_mod._agent_chat(StubLLM(), cfg, "verify example.com")
+    assert text == '{"ok": true}'
+    assert searches == 0  # check_url is free, no Exa spend
+    assert grounded == {"example.com"}
+    assert len(calls) == 2
+    assert len(calls[0][0]) == 2  # both tools offered
+
+
+def test_apply_revision_creates_missing_subarea() -> None:
+    from signalflow.source_lists import _apply_revision
+
+    listing = {"topic": "T", "subareas": []}
+    out = _apply_revision(listing, {"add": {"New": [{"name": "X", "domain": "x.com", "type": "blog"}]}}, {"x.com"})
+    assert out["subareas"][0]["name"] == "New"
+    assert out["subareas"][0]["sources"][0]["domain"] == "x.com"
+
+
+def test_parse_json_invalid_braces_raises_agent_error() -> None:
+    import pytest
+
+    from signalflow.source_lists import AgentError
+
+    with pytest.raises(AgentError):
+        _parse_json("I think {this is not json}")
+
+
+def test_gates_tolerate_malformed_shapes() -> None:
+    listing = {"topic": "T", "queries": ["q"], "subareas": None}
+    assert gate_schema(listing)  # schema flags it
+    assert gate_dns(listing) == []  # dependent gates must not crash
+    assert gate_collision(listing, known_domains=set()) == []
+    assert gate_crawlability(listing, fetcher=lambda url: _FakeResp(url=url)) == []
+
+    listing = {"topic": "T", "queries": ["q"], "subareas": [{"name": "S", "sources": [42]}]}
+    assert gate_dns(listing) == []
+    assert gate_crawlability(listing, fetcher=lambda url: _FakeResp(url=url)) == []
 
 
 def test_render_markdown_contains_sections() -> None:
@@ -176,7 +310,7 @@ def test_crawlability_cross_host_crawl_root_is_not_redirect() -> None:
     assert gate_crawlability(listing, fetcher=fetcher) == []
 
 
-def test_crawlability_redirect_to_working_target_is_major_domain_swap() -> None:
+def test_crawlability_redirect_to_working_target_swaps_domain() -> None:
     def fetcher(url: str) -> _FakeResp:
         if "newexample.com" in url:
             return _FakeResp(url=url, content_type="application/rss+xml", text=_feed_html(_when(5)))
@@ -184,23 +318,21 @@ def test_crawlability_redirect_to_working_target_is_major_domain_swap() -> None:
             url="https://newexample.com/feed", content_type="application/rss+xml", text=_feed_html(_when(5))
         )
 
-    findings = gate_crawlability(_crawl_listing(), fetcher=fetcher)
-    assert len(findings) == 1
-    assert findings[0]["severity"] == "major"
-    assert "redirects to newexample.com" in findings[0]["issue"]
-    assert "replace the domain with newexample.com" in findings[0]["suggestion"]
+    listing = _crawl_listing()
+    assert gate_crawlability(listing, fetcher=fetcher) == []
+    src = listing["subareas"][0]["sources"][0]
+    assert src["domain"] == "newexample.com"  # mechanically corrected, no LLM round-trip
 
 
-def test_crawlability_redirect_to_dead_target_is_blocker() -> None:
+def test_crawlability_redirect_to_dead_target_removes_source() -> None:
     def fetcher(url: str) -> _FakeResp:
         return _FakeResp(
             url="https://dead.example.net/", content_type="text/html", text="<html><body>gone</body></html>"
         )
 
-    findings = gate_crawlability(_crawl_listing(), fetcher=fetcher)
-    assert len(findings) == 1
-    assert findings[0]["severity"] == "blocker"
-    assert "redirects to dead.example.net" in findings[0]["issue"]
+    listing = _crawl_listing()
+    assert gate_crawlability(listing, fetcher=fetcher) == []  # handled mechanically, never bounced
+    assert listing["subareas"][0]["sources"] == []  # dead-redirect source dropped
 
 
 def test_crawlability_bot_block_is_blocker() -> None:
@@ -222,26 +354,23 @@ def test_crawlability_stale_feed_is_major() -> None:
     assert "stale" in findings[0]["issue"]
 
 
-def test_crawlability_wrong_crawl_root_is_minor_with_correction() -> None:
+def test_crawlability_corrects_wrong_crawl_root() -> None:
     def fetcher(url: str) -> _FakeResp:
         if url.endswith("/feed"):
             return _FakeResp(url=url, content_type="application/rss+xml", text=_feed_html(_when(5)))
         return _FakeResp(url=url, status=404)
 
     listing = _crawl_listing(crawl_root="https://example.com/rss")
-    findings = gate_crawlability(listing, fetcher=fetcher)
-    assert len(findings) == 1
-    assert findings[0]["severity"] == "minor"
-    assert "https://example.com/feed" in findings[0]["suggestion"]
+    assert gate_crawlability(listing, fetcher=fetcher) == []
+    assert listing["subareas"][0]["sources"][0]["crawl_root"] == "https://example.com/feed"
 
 
-def test_crawlability_homepage_feed_link_is_major() -> None:
+def test_crawlability_homepage_feed_link_sets_crawl_root() -> None:
     html = '<html><head><link rel="alternate" type="application/rss+xml" href="/en/rss/"></head></html>'
 
     def fetcher(url: str) -> _FakeResp:
         return _FakeResp(url="https://example.com/", content_type="text/html", text=html)
 
-    findings = gate_crawlability(_crawl_listing(), fetcher=fetcher)
-    assert len(findings) == 1
-    assert findings[0]["severity"] == "major"
-    assert "/en/rss/" in findings[0]["suggestion"]
+    listing = _crawl_listing()
+    assert gate_crawlability(listing, fetcher=fetcher) == []
+    assert listing["subareas"][0]["sources"][0]["crawl_root"] == "https://example.com/en/rss/"
