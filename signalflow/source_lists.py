@@ -338,9 +338,12 @@ def _probe_source(
             continue
         if resp.status_code >= 400:
             continue
+        requested_host = normalize_domain(urlparse(url).netloc)
         final_host = normalize_domain(urlparse(resp.url or url).netloc)
-        if final_host and final_host != domain:
-            # domain repurposed/redirected: judge the redirect target, not the claim
+        if final_host and final_host != domain and requested_host == domain:
+            # actual redirect away from the source domain: judge the target, not the claim.
+            # A crawl_root that INTENTIONALLY points at a feed host (feeds.reuters.com,
+            # simplecast, art19) is not a repurposing redirect — it falls through.
             if _is_feed(resp):
                 return _finding(
                     "major",
@@ -591,7 +594,13 @@ def render_markdown(record: dict[str, Any]) -> str:
         lines.append("")
     lines.append("## Registries")
     for r in record.get("registries", []):
-        lines.append(f"- {r}")
+        if isinstance(r, dict):
+            name = r.get("name", "")
+            domain = r.get("domain", "")
+            why = f" — {r['why']}" if r.get("why") else ""
+            lines.append(f"- **{name}** (`{domain}`){why}" if name else f"- {domain}{why}")
+        else:
+            lines.append(f"- {r}")
     lines.append("")
     lines.append("## Queries")
     for i, q in enumerate(record.get("queries", []), 1):

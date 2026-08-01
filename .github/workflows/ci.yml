@@ -16,7 +16,6 @@ jobs:
       - run: make setup
       - run: make lint-github
       - run: make test
-      - run: make test
       - run: make coverage
       - name: Coverage summary
         uses: irongut/CodeCoverageSummary@v1.3.0

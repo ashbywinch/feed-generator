@@ -93,6 +93,15 @@ def test_chat_tools_redacts_keys_on_error(cfg, monkeypatch):
     assert cfg.llm_key not in str(ei.value)
 
 
+def test_chat_tools_malformed_response_is_llm_error(cfg, monkeypatch):
+    def post(url, headers=None, json=None, timeout=None):
+        return _post_raw({"error": "boom"})  # 200 but no choices[0]
+
+    monkeypatch.setattr("signalflow.llm.requests.post", post)
+    with pytest.raises(LLMError):
+        LLM(cfg).chat_tools([], [])
+
+
 def test_keys_never_leak_into_errors(cfg, monkeypatch):
     monkeypatch.setattr("signalflow.llm.requests.post", lambda *a, **k: _post(content="garbage"))
     with pytest.raises(LLMError) as ei:

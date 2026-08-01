@@ -41,7 +41,7 @@ run: setup
 smoke: setup
 	@$(UV) run --env-file .env python -m signalflow smoke
 
-	topics: setup
+topics: setup
 	@$(UV) run --env-file .env python -m signalflow topics
 
 topic-sources: setup

@@ -114,7 +114,7 @@ def test_render_markdown_contains_sections() -> None:
                 ],
             }
         ],
-        "registries": ["ofgem.gov.uk"],
+        "registries": ["ofgem.gov.uk", {"name": "OpenAlex", "domain": "api.openalex.org", "why": "lit data"}],
         "queries": ["q1"],
         "news_vs_analysis": "analysis",
         "notes": "n",
@@ -123,6 +123,8 @@ def test_render_markdown_contains_sections() -> None:
     md = render_markdown(record)
     assert "## Subareas" in md and "## Registries" in md and "## Queries" in md
     assert "[minor] x: y" in md
+    assert "- ofgem.gov.uk" in md
+    assert "**OpenAlex** (`api.openalex.org`) — lit data" in md
 
 
 # -- crawlability gate -------------------------------------------------------
@@ -162,6 +164,16 @@ def test_crawlability_accepts_working_feed() -> None:
         return _FakeResp(url=url, content_type="application/rss+xml", text=_feed_html(_when(5)))
 
     assert gate_crawlability(_crawl_listing(), fetcher=fetcher) == []
+
+
+def test_crawlability_cross_host_crawl_root_is_not_redirect() -> None:
+    # crawl_root intentionally on a feed host (feeds.reuters.com-style): must pass,
+    # not trip the "domain repurposed" finding.
+    def fetcher(url: str) -> _FakeResp:
+        return _FakeResp(url=url, content_type="application/rss+xml", text=_feed_html(_when(5)))
+
+    listing = _crawl_listing(crawl_root="https://feeds.example.net/feed")
+    assert gate_crawlability(listing, fetcher=fetcher) == []
 
 
 def test_crawlability_redirect_to_working_target_is_major_domain_swap() -> None:

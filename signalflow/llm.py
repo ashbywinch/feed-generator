@@ -78,7 +78,10 @@ class LLM:
             resp.raise_for_status()
         except requests.RequestException as exc:
             raise LLMError(self._redact(str(exc))) from exc
-        return resp.json()["choices"][0]["message"]
+        try:
+            return resp.json()["choices"][0]["message"]
+        except (KeyError, IndexError, ValueError) as exc:
+            raise LLMError(f"malformed router response: {self._redact(str(exc))}") from exc
 
     def _redact(self, message: str) -> str:
         for secret in (self._cfg.llm_key, self._cfg.google_key):
