@@ -1,113 +1,126 @@
 # Data Centers / AI / macro — Discovery Source List
 
-Status: approved by reviewer loop (iteration 2). 8 subareas, 22 sources, 5 queries. Generated 2026-08-01.
+Status: needs-human by reviewer loop (iteration 1). 10 subareas, 27 sources, 5 queries. Generated 2026-08-01.
 
 ## Subareas
-### 1. Data center construction & physical build-out
+### 1. Data center construction & buildout
 
-Project-by-project build-out, site selection, megawatt capacity, land and power procurement, colocation and hyperscaler campuses, construction financing. Major subarea — 2+ sources.
+Project-level tracking of hyperscale/colocation/AI campus buildouts, construction trends, cancelations, delivery timelines.
 
-- **Data Center Dynamics (DCD)** (`datacenterdynamics.com`) — trade press — high · crawl: https://www.datacenterdynamics.com/en/feed/
-  Primary trade press on data center construction, new campus announcements, and site-level deals worldwide.
-- **Data Center Knowledge** (`datacenterknowledge.com`) — trade press — high · crawl: https://www.datacenterknowledge.com/rss.xml
-  Dedicated coverage of hyperscaler build-outs including Stargate site-by-site status; construction and capacity tracking.
-- **AFCOM/Analyst community via TrackitCore — datacenterHawk** (`datacenterhawk.com`) — data/registry — medium
-  Structured data/registry on data center supply, vacancy, and construction pipeline by market.
+- **Data Center Knowledge** (`datacenterknowledge.com`) — trade press — high · crawl: https://datacenterknowledge.com/rss.xml
+  Core trade press for data center construction, campus plans, and the grid/capacity constraints on buildout.
+- **DCD (Data Centre Dynamics)** (`datacenterdynamics.com`) — trade press — high · crawl: https://datacenterdynamics.com/rss
+  Global trade press tracking data center construction, DCIM, and power/grid interconnection news at project level.
+- **gentic.news** (`gentic.news`) — independent blog — medium · crawl: https://gentic.news/feed
+  Focused tracker of the AI data center buildroll: announced vs. actually-built gigawatts, capacity realism.
 
-### 2. Chip supply & semiconductor geopolitics
+### 2. Chip supply & silicon geopolitics
 
-GPU supply, TSMC/ASML/Samsung capacity, export controls, US-CHINA decoupling, equipment and foundry economics. Major subarea — 2+ sources.
+TSMC/Samsung/Intel fabs, advanced node economics, export controls (H20, rare earths), semiconductor supply chains.
 
-- **SemiAnalysis** (`semianalysis.com`) — independent blog — high · crawl: https://semianalysis.com/feed/
-  Deep first-principles analysis of GPU supply chains, chip cost curves, and data center compute economics.
-- **DIGITIMES** (`digitimes.com`) — trade press — medium
-  Asia-focused supply-chain news and insight on foundries, equipment, and chip shipments tied to AI build-out.
-- **Semiengineering** (`semiengineering.com`) — trade press — medium · crawl: https://semiengineering.com/feed/
-  Engineering and business coverage of chip design, manufacturing, and packaging constraints affecting AI silicon.
+- **SemiAnalysis** (`newsletter.semianalysis.com`) — newsletter — high · crawl: https://newsletter.semianalysis.com/feed
+  The leading independent analysis house for chip/compute capex, NVIDIA/TSMC economics, advanced-node buildout, and the marginal-cost-of-intelligence thesis that anchors this subarea — first-principles on silicon supply and its value chain.
+- **Semiconductor Engineering** (`semiengineering.com`) — trade press — high · crawl: https://semiengineering.com/feed
+  Dedicated chip-industry trade press covering advanced-node economics, packaging, yield, and fab/equipment supply chains that underpin AI silicon — concrete engineering-level signal for this subarea.
+- **SemiWiki** (`semiwiki.com`) — independent blog — high · crawl: https://semiwiki.com/feed
+  Chip-industry analysis and commentary on foundry competitive dynamics, advanced-node roadmaps, and semiconductor market structure — a second independent voice distinct from SemiAnalysis.
 
-### 3. Model economics & AI market structure
+### 3. AI market structure & capital markets
 
-GPU cloud pricing, inference/training cost curves, market concentration among hyperscalers, AI cloud provider competition. Major subarea — 2+ sources.
+Market concentration among hyperscalers/foundries, GPU customers (NVIDIA map), model economics, AI equity/funding flows.
 
-- **The Information — AI/Compute vertical** (`theinformation.com`) — trade press — medium · crawl: https://www.theinformation.com/rss
-  Reporting on AI market structure, cloud provider competition, and model economics; paywalled with free headline feed.
-- **Latent Space** (`latent.space`) — newsletter — medium
-  Recaps AI infrastructure and compute market shifts; bridges model economics and deployment.
-- **Genspark / dirttodata by Matt Ocko** (`dirttodata.substack.com`) — independent blog — medium
-  First-principles analysis of AI infrastructure economics and data center value chains.
+- **The Synthesis** (`thesynthesisai.substack.com`) — newsletter — medium · crawl: https://thesynthesisai.substack.com/feed
+  Breaks down 'the supply chain of intelligence' — compute ownership, GPU customer economics, model cost basis, and who controls the AI value chain. Gives this subarea a dedicated market-structure source distinct from SemiAnalysis.
 
-### 4. AI funding, capex cycles & capital markets
+### 4. Funding, capex & financing cycles
 
-Hyperscaler capex guidance, AI infrastructure financing, data center debt/equity, asset-class formation, SPVs and megadeals. Major subarea — 2+ sources.
+Hyperscaler capex guidance, AI infrastructure financing, debt/IPOs, private equity, and credit pipelines.
 
-- **Macro Compounder** (`macrocompounder.substack.com`) — newsletter — medium
-  Tracks 'AI's trillion in plumbing' — capital flows into data centers and compute infrastructure.
-- **Wheelie Investor** (`wheelieinvestor.substack.com`) — independent blog — medium
-  Tracks hyperscaler capex guidance and where the AI capex budget is being allocated.
-- **Fund Manager / Value Add VC** (`valueaddvc.com`) — independent blog — medium
-  Covers AI data center financing as an institutional asset class and big-tech capex cycles.
+- **Street Alpha** (`streetalpha.substack.com`) — newsletter — medium · crawl: https://streetalpha.substack.com/feed
+  Tracks whether AI capex is real vs. returns slow to arrive — direct take on capital cycle sustainability.
+- **Capital & Compute** (`capitalandcompute.net`) — independent blog — medium · crawl: https://capitalandcompute.net/rss.xml
+  Dedicated to AI data center financing and the $700B buildout — financing structures behind the capex cycle.
+- **Tech Cache** (`techcache.substack.com`) — newsletter — medium · crawl: https://techcache.substack.com/feed
+  Follows where AI money goes next — funding and capex allocation across the AI value chain.
 
-### 5. Power constraints on compute & grid
+### 5. Power constraints on compute
 
-Data center power procurement, grid interconnection queues, curtailment, nuclear/gas PPAs, utility-scale power deals for AI. Major subarea — 2+ sources.
+Grid interconnection, electricity supply bottleneck for datacenters, grid capacity intelligence, electrification load from AI.
 
-- **Utility Dive — data center / electrification beat** (`utilitydive.com`) — trade press — high · crawl: https://www.utilitydive.com/feeds/news/
-  Primary US power-trade coverage of grid constraints on data centers, curtailment rules, and PPA activity.
-- **Einar SSO / 'Power, not GPUs' — Global Tech Research** (`globaltechresearch.substack.com`) — independent blog — medium
-  First-principles analysis of power becoming the AI bottleneck rather than GPU supply.
-- **Canary Media — grid & data center load** (`canarymedia.com`) — trade press — medium · crawl: https://www.canarymedia.com/feeds
-  Clean-energy trade journalism on rising electricity demand and data center load growth.
+- **Grid Capacity Intelligence** (`gridcapacityintelligence.substack.com`) — newsletter — medium · crawl: https://gridcapacityintelligence.substack.com/feed
+  Dedicated to grid capacity as it constrains datacenter and AI compute deployment — the power-vs-compute bottleneck.
+- **Infrastructure Research** (`infrastructureresearch.substack.com`) — newsletter — medium · crawl: https://infrastructureresearch.substack.com/feed
+  Covers the 'shadow grid' and interconnection queues behind the AI datacenter buildout.
+- **Alex Lanin** (`lanin.substack.com`) — independent blog — medium · crawl: https://lanin.substack.com/feed
+  Argues 'the megawatt is not the asset' — examines what actually drives value when power constrains compute.
 
-### 6. Policy, regulation & market design for compute
+### 6. Hyperscaler capex tracking
 
-Export controls policy, AI infrastructure permitting, grid interconnection reform, government AI data center programs (Stargate site federal lands), capacity planning. Policy is its own subarea — dedicated sources.
+Quarterly capex guidance from Microsoft/Google/Amazon/Meta, capex-to-CS timing, and spending shifts.
 
-- **Reuters — Technology & US policy** (`reuters.com`) — trade press — high · crawl: https://feeds.reuters.com/reuters/technologyNews
-  Authoritative wire reporting on US chip export-control rule changes and AI infrastructure policy.
-- **Brussels Institute for Geopolitics (BIG)** (`big-europe.eu`) — think tank — medium
-  Think-tank analysis of semiconductor supply-chain geopolitics and weaponized interdependence.
-- **CSET (Georgetown Center for Security and Emerging Technology)** (`cset.georgetown.edu`) — think tank — medium · crawl: https://cset.georgetown.edu/feed/
-  Policy research on AI compute, export controls, and computing-power governance.
+- **Wheelie Investor** (`wheelieinvestor.substack.com`) — newsletter — medium · crawl: https://wheelieinvestor.substack.com/feed
+  Pieces the hyperscaler AI capex announcements (e.g. Google raising capex) into the systemic 'who gets paid' picture.
+- **Platformonomics** (`platformonomics.com`) — independent blog — high · crawl: https://platformonomics.com/feed
+  Publishes the quarterly 'Follow the CAPEX' scoreboard tracking hyperscaler (Microsoft/Google/Amazon/Meta) capex and cloud revenue — a dedicated, non-duplicate source for capex guidance tracking and capex-to-CS timing. Replaces the cross-referenced 404K entry removed for duplicate noise.
 
-### 7. AI data registry / structured data
+### 7. AI infrastructure financing & credit
 
-Structured public datasets on compute, capability releases, and semiconductor supply relevant to macro analysis.
+Debt/credit pipelines, project finance, institutionalization of AI infrastructure as an asset class.
 
-- **Epoch AI** (`epochai.org`) — data/registry — high · crawl: https://epochai.org/feed
-  Maintains the premier structured registry of AI model training compute and capability trends.
-- **OpenAlex API** (`api.openalex.org`) — data/registry — high · crawl: https://api.openalex.org/works?filter=concepts.id:C41008148
-  Open API for discovering AI/compute academic literature at scale; bot-friendly crawl endpoint for paper-level signals.
+- **Terrain Labs** (`terrainlabs.substack.com`) — newsletter — medium · crawl: https://terrainlabs.substack.com/feed
+  Publishes a structured AI credit pipeline across industries feeding the datacenter buildout.
+- **Dirt to Data** (`dirttodata.substack.com`) — newsletter — medium · crawl: https://dirttodata.substack.com/feed
+  Covers AI infrastructure becoming an institutional asset class and the financing of compute buildout.
 
-### 8. Data center colocation & REIT financials
+### 8. Semiconductor data & trade association
 
-Colocation provider earnings, data center REITs (Equinix, Digital Realty, Vantage, QTS), pricing and occupancy fundamentals.
+Industry-wide shipment/revenue data for chips and equipment; market data underpinning AI silicon demand.
 
-- **REIT.com / Nareit research** (`reit.com`) — data/registry — medium
-  Structured data on data center REIT performance and capital flows into the asset class.
-- **Vantage Data Centers — investor/construction press** (`vantage-dc.com`) — trade press — medium
-  Company disclosures and construction announcements tracking colocation capacity build-out.
+- **SIA (Semiconductor Industry Association)** (`semiconductors.org`) — data/registry — high · crawl: https://www.semiconductors.org/data-resources/market-data/
+  Authoritative global semiconductor market data and annual factbook — registry for chip revenue/shipment stats.
+
+### 9. Policy & think tanks on AI compute & geopolitics
+
+Government programs, export-control policy, and geopolitical analysis of the AI buildout (dedicated policy subarea).
+
+- **CSIS** (`csis.org`) — think tank — high · crawl: https://csis.org/rss.xml
+  Policy analysis on US AI leadership, electricity bottleneck for AI dominance, and tariffs' impact on the datacenter buildout.
+- **ITIF (Information Technology and Innovation Foundation)** (`itif.org`) — think tank — high · crawl: https://itif.org/feed
+  Leading policy voice on semiconductor export controls, AI-chip trade policy, and the US/China decoupling dynamics that tie chip geopolitics to the compute buildout — gives the policy subarea its recommended second strong source beyond CSIS.
+
+### 10. Capex & financing cycles
+
+- **Street Alpha** (`streetalpha.substack.com`) — newsletter — medium · crawl: https://streetalpha.substack.com/feed
+  Tracks whether AI capex is real vs. returns slow to arrive — direct take on capital cycle sustainability (consolidated from the fragmented capex/financing buckets).
+- **Capital & Compute** (`capitalandcompute.net`) — independent blog — medium · crawl: https://capitalandcompute.net/rss.xml
+  Dedicated to AI data center financing and the $700B buildout — financing structures behind the capex cycle.
+- **Wheelie Investor** (`wheelieinvestor.substack.com`) — newsletter — medium · crawl: https://wheelieinvestor.substack.com/feed
+  Pieces the hyperscaler AI capex announcements (e.g. Google raising capex) into the systemic 'who gets paid' picture.
+- **Platformonomics** (`platformonomics.com`) — independent blog — high · crawl: https://platformonomics.com/feed
+  Publishes the quarterly 'Follow the CAPEX' scoreboard tracking hyperscaler capex and cloud revenue — a dedicated non-duplicate source for capex guidance tracking and capex-to-CS timing.
+- **Terrain Labs** (`terrainlabs.substack.com`) — newsletter — medium · crawl: https://terrainlabs.substack.com/feed
+  Publishes a structured AI credit pipeline across industries feeding the datacenter buildout — debt/credit half of the financing cycle.
+- **Dirt to Data** (`dirttodata.substack.com`) — newsletter — medium · crawl: https://dirttodata.substack.com/feed
+  Covers AI infrastructure becoming an institutional asset class and the financing of compute buildout.
+- **Tech Cache** (`techcache.substack.com`) — newsletter — medium · crawl: https://techcache.substack.com/feed
+  Follows where AI money goes next — funding and capex allocation across the AI value chain.
 
 ## Registries
-- {'name': 'OpenAlex', 'domain': 'api.openalex.org', 'type': 'data/registry', 'why': 'Structured API for AI/compute literature discovery and citation signals.', 'crawl_root': 'https://api.openalex.org/works?filter=concepts.id:C41008148'}
-- {'name': 'Epoch AI dataset', 'domain': 'epochai.org', 'type': 'data/registry', 'why': 'Governance and compute-trend registry for AI scaling and capability metrics.', 'crawl_root': 'https://epochai.org/feed'}
-- {'name': 'US ITC / Census — semiconductor import statistics', 'domain': 'usitc.gov', 'type': 'data/registry', 'why': 'Public trade data on semiconductor imports/exports underpinning supply-chain macro signals.', 'confidence': 'medium'}
-- {'name': 'Hugging Face Hub API (compute/card metadata)', 'domain': 'hf.co', 'type': 'data/registry', 'why': 'Registry of model releases with compute and hardware metadata; API for capacity signals.', 'confidence': 'medium', 'crawl_root': 'https://huggingface.co/api/models'}
+- **SIA Market Data / Databook** (`semiconductors.org`) — Standard registry for global semiconductor revenue and shipment data, feeding chip-demand tracking for AI buildout.
 
 ## Queries
-1. data center construction megawatt capacity announcements
-2. hyperscaler capex guidance OpenAI Stargate compute build-out
-3. GPU supply export controls TSMC capacity chip economics
-4. data center power grid interconnection curtailment PPA nuclear
-5. AI infrastructure financing debt equity data center REIT
+1. data center gigawatts announced versus built
+2. hyperscaler AI capex guidance quarterly tracking
+3. AI silicon export controls H20 rare earth supply chain
+4. data center grid interconnection queue power bottleneck
+5. AI infrastructure financing debt credit pipeline buildout
 
 ## News vs analysis
-Blend leans analysis-heavy for the macro layer: SemiAnalysis, Latent Space, Macro Compounder, and dirttodata carry the first-principles compute/capex economics, while DCD, Data Center Knowledge, DIGITIMES, Reuters, and Utility Dive supply the high-frequency news and policy events. Registries (Epoch, OpenAlex, HF) provide the structured, crawlable signal backbone. Roughly 55% analysis, 45% news to match the topic's 'industry layer' positioning.
+{'news': 'gentic.news, datacenterknowledge.com, datacenterdynamics.com track concrete buildout/capacity events.', 'analysis': 'SemiAnalysis, 404K Research, Street Alpha, Capital & Compute, Wheelie Investor, Terrain Labs, Dirt to Data, Grid Capacity Intelligence, Infrastructure Research, Alex Lanin, CSIS provide first-principles analysis.'}
 
 ## Notes
-All six distinct source types represented: independent blog (SemiAnalysis, Macro Compounder, Wheelie Investor, Global Tech Research, Value Add VC), trade press (DCD, Data Center Knowledge, DIGITIMES, Semiengineering, The Information, Utility Dive, Canary Media, Reuters), newsletter (Latent Space), think tank (BIG, CSET), academic/journal via OpenAlex API endpoint (avoids HTML bot protection), and data/registry (Epoch, OpenAlex, HF, datacenterHawk, REIT.com, USITC). Subscribed sources (blog.eladgil.com, chamathreads.substack.com) and their domains are excluded. No consumer EV, efficiency-gadget, corporate-sustainability-PR, or climate-activism drift — every source's 'why' ties to compute, silicon, power, or AI capital markets. Paywalled/bot-protected endpoints routed to RSS/API crawl_roots (OpenAlex API for academic, feed endpoints for DCD, Utility Dive, CSET, Reuters headline feed). Exact-duplicate domain reuse across subareas avoided deliberately per reviewer note (SemiAnalysis appears once under chip supply; cross-referenced not duplicated).
+Excluded subscribed/blacklisted domains: blog.eladgil.com and chamathreads.substack.com. Boundaries respected: no consumer-EV, efficiency-gadget, corporate-sustainability-PR, or climate-activism sources (out of scope). Source-type mix covers 7 distinct types: trade press (DCK, DCD), independent blog (gentic.news, Capital & Compute), newsletter (SemiAnalysis, 404K, Street Alpha, Tech Cache, Grid Capacity Intelligence, Infrastructure Research, Lanin, Wheelie, Terrain Labs, Dirt to Data), think tank (CSIS), and data/registry (SIA). Subareas each have >=1 strong source; construction, chips, capex, and power have 2-3 each to match the breadth of a top AI-infrastructure podcast. SIA has no RSS feed, so its crawl_root points to the market-data page for scraping. Confirmed every domain resolves and serves a feed via check_url except semiconductors.org (registry page). Used only the 10-search discovery budget.
 
 ## Review record
-- [minor] Type mix / classification: 'Vantage Data Centers — investor/construction press' (subarea 'Data center colocation & REIT financials') is classified as 'trade press' but is a corporate PR/disclosure channel, not editorial press. This slightly inflates the trade-press count and the subarea's editorial strength; the subarea stands on REIT.com plus this company channel.
-- [minor] Non-generic naming: 'Fund Manager / Value Add VC' (subarea 'AI funding, capex cycles & capital markets') has an imprecise, compound name ('Fund Manager' prefix is generic) and unverified content of the valueaddvc.com domain's focus on AI data center financing as an asset class.
-- [minor] Crawl endpoints / portability: Several sources (DIGITIMES, datacenterhawk, reit.com, valueaddvc, wheelieinvestor, macrocompounder, latent.space, dirttodata) lack a pinned crawl_root, while the topic is registry-marked and query[0] is not obviously registry-optimized; DIGITIMES and newsletters can be bot-sensitive or paywalled/free-tier only.
-- [minor] Verifiability (residual): Search budget capped before content-plausibility could be confirmed for valueaddvc.com, macrocompounder.substack.com, latent.space, and the OpenAlex concept id C41008148 (assumed to map to compute/AI). No hallucination detected among the 5 spot-checks completed.
+- [minor] duplicates: domain newsletter.semianalysis.com also under 'Chip supply & silicon geopolitics'
+- [minor] duplicates: domain 404kresearch.substack.com also under 'Chip supply & silicon geopolitics'

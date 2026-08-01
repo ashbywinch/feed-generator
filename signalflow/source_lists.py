@@ -282,6 +282,11 @@ def gate_schema(listing: dict[str, Any]) -> list[dict[str, str]]:
                     out.append(_finding("major", "schema", f"{sa['name']}: {s.get('name')} missing type"))
     if not isinstance(listing.get("queries"), list) or not listing.get("queries"):
         out.append(_finding("major", "schema", "no queries"))
+    elif any(not isinstance(q, str) for q in listing["queries"]):
+        out.append(_finding("major", "schema", "queries contain non-string entries"))
+    for field in ("news_vs_analysis", "notes"):
+        if field in listing and not isinstance(listing[field], str):
+            out.append(_finding("major", "schema", f"{field} is not a string"))
     return out
 
 
@@ -749,7 +754,7 @@ def render_markdown(record: dict[str, Any]) -> str:
     for i, sa in enumerate(record["subareas"], 1):
         lines.append(f"### {i}. {sa['name']}")
         if sa.get("coverage"):
-            lines.extend(["", sa["coverage"]])
+            lines.extend(["", str(sa["coverage"])])
         lines.append("")
         for s in sa.get("sources") or []:
             conf = s.get("confidence", "")
@@ -773,10 +778,10 @@ def render_markdown(record: dict[str, Any]) -> str:
         lines.append(f"{i}. {q}")
     lines.append("")
     lines.append("## News vs analysis")
-    lines.append(record.get("news_vs_analysis", ""))
+    lines.append(str(record.get("news_vs_analysis", "")))
     lines.append("")
     lines.append("## Notes")
-    lines.append(record.get("notes", ""))
+    lines.append(str(record.get("notes", "")))
     lines.append("")
     lines.append("## Review record")
     for f in record.get("review_record", {}).get("findings", []):

@@ -43,6 +43,32 @@ def test_normalize_domain_strips_scheme_www_slash() -> None:
     assert normalize_domain("example.com") == "example.com"
 
 
+def test_schema_gate_flags_non_string_contract_fields() -> None:
+    listing = _listing()
+    listing["news_vs_analysis"] = {"news": "x"}
+    listing["queries"] = [{"q": "not a string"}]
+    findings = gate_schema(listing)
+    assert any("news_vs_analysis is not a string" in f["issue"] for f in findings)
+    assert any("non-string entries" in f["issue"] for f in findings)
+
+
+def test_render_markdown_tolerates_dict_news_vs_analysis() -> None:
+    record = {
+        "topic": "T",
+        "status": "needs-human",
+        "iterations": 1,
+        "approved_at": "2026-08-01",
+        "subareas": [{"name": "S", "sources": [{"name": "A", "domain": "a.com", "type": "blog"}]}],
+        "registries": [],
+        "queries": ["q"],
+        "news_vs_analysis": {"news": "x", "analysis": "y"},
+        "notes": "n",
+        "review_record": {"findings": []},
+    }
+    md = render_markdown(record)  # must not raise
+    assert "news" in md
+
+
 def test_schema_gate_flags_missing_domain_and_queries() -> None:
     bad = _listing()
     bad["subareas"][0]["sources"][0]["domain"] = ""  # type: ignore[index]
