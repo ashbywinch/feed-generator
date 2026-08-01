@@ -175,7 +175,7 @@ def _agent_chat(
                 raw_args = fn.get("arguments", "{}")
                 try:
                     args = json.loads(raw_args) if isinstance(raw_args, str) else raw_args
-                    query = str(args.get("query", "")) if isinstance(args, dict) else ""
+                    query = str(args.get("query") or args.get("domain") or "") if isinstance(args, dict) else ""
                 except json.JSONDecodeError:
                     query = ""
                 if name == "web_search" and query and searches < max_searches:

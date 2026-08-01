@@ -181,7 +181,7 @@ def test_apply_revision_creates_missing_subarea() -> None:
     from signalflow.source_lists import _apply_revision
 
     listing = {"topic": "T", "subareas": []}
-    out = _apply_revision(listing, {"add": {"New": [{"name": "X", "domain": "x.com", "type": "blog"}]}})
+    out = _apply_revision(listing, {"add": {"New": [{"name": "X", "domain": "x.com", "type": "blog"}]}}, {"x.com"})
     assert out["subareas"][0]["name"] == "New"
     assert out["subareas"][0]["sources"][0]["domain"] == "x.com"
 
