@@ -99,6 +99,37 @@ def test_parse_json_falls_back_to_braces() -> None:
     assert _parse_json('prefix {"a": 1} suffix') == {"a": 1}
 
 
+def test_apply_revision_remove_replace_add() -> None:
+    from signalflow.source_lists import _apply_revision
+
+    listing = {
+        "topic": "T",
+        "subareas": [
+            {"name": "Markets", "sources": [{"name": "A", "domain": "a.com", "type": "blog"}]},
+            {"name": "Storage", "sources": [{"name": "B", "domain": "b.com", "type": "blog"}]},
+        ],
+    }
+    delta = {
+        "remove": ["a.com"],
+        "replace": {"b.com": {"name": "B2", "domain": "b.com", "type": "trade press"}},
+        "add": {"Markets": [{"name": "C", "domain": "c.com", "type": "blog"}]},
+    }
+    out = _apply_revision(listing, delta)
+    markets = out["subareas"][0]["sources"]
+    storage = out["subareas"][1]["sources"]
+    assert [s["domain"] for s in markets] == ["c.com"]  # a.com removed, C added
+    assert storage == [{"name": "B2", "domain": "b.com", "type": "trade press"}]  # replaced in place
+
+
+def test_apply_revision_creates_missing_subarea() -> None:
+    from signalflow.source_lists import _apply_revision
+
+    listing = {"topic": "T", "subareas": []}
+    out = _apply_revision(listing, {"add": {"New": [{"name": "X", "domain": "x.com", "type": "blog"}]}})
+    assert out["subareas"][0]["name"] == "New"
+    assert out["subareas"][0]["sources"][0]["domain"] == "x.com"
+
+
 def test_parse_json_invalid_braces_raises_agent_error() -> None:
     import pytest
 
@@ -211,16 +242,15 @@ def test_crawlability_redirect_to_working_target_swaps_domain() -> None:
     assert src["domain"] == "newexample.com"  # mechanically corrected, no LLM round-trip
 
 
-def test_crawlability_redirect_to_dead_target_is_blocker() -> None:
+def test_crawlability_redirect_to_dead_target_removes_source() -> None:
     def fetcher(url: str) -> _FakeResp:
         return _FakeResp(
             url="https://dead.example.net/", content_type="text/html", text="<html><body>gone</body></html>"
         )
 
-    findings = gate_crawlability(_crawl_listing(), fetcher=fetcher)
-    assert len(findings) == 1
-    assert findings[0]["severity"] == "blocker"
-    assert "redirects to dead.example.net" in findings[0]["issue"]
+    listing = _crawl_listing()
+    assert gate_crawlability(listing, fetcher=fetcher) == []  # handled mechanically, never bounced
+    assert listing["subareas"][0]["sources"] == []  # dead-redirect source dropped
 
 
 def test_crawlability_bot_block_is_blocker() -> None:

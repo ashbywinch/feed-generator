@@ -58,6 +58,24 @@ user's OPML).
     not HTML article pages. For paywalled trade press, note free headline-feed
     fallbacks. Record the endpoint in `crawl_root`.
 
+## Revision mode (findings from a previous round)
+
+When you are given a CURRENT LIST, do NOT re-emit sources that are already in it and
+unaffected by the findings. Return a DELTA only, strict JSON:
+
+```json
+{"remove": ["<domain>", "..."], "replace": {"<domain>": {full source object}},
+ "add": {"<subarea name>": [source objects]}}
+```
+
+- `remove`: domains to drop entirely (dead, off-topic, unreachable).
+- `replace`: swap a blocked/unsuitable source for a DIFFERENT one — a new domain that is
+  NOT already in the current list (you can see the list; go find something different).
+- `add`: new sources for a subarea when a removal leaves it thin or empty.
+
+Only `add` may introduce a domain that is not a replacement for a removed one. The
+pipeline applies the delta mechanically; unaffected sources are untouched.
+
 ## Output
 
 Strict JSON per the provided schema: `topic`, `subareas[{name, coverage,

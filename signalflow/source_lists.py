@@ -352,7 +352,7 @@ def _absolute(href: str, host: str) -> str:
 
 def _probe_source(
     domain: str, crawl_root: str, fetcher: Callable[[str], Any], _depth: int = 0
-) -> tuple[dict[str, str] | None, dict[str, str] | None]:
+) -> tuple[dict[str, str] | None, dict[str, Any] | None]:
     """Probe a source's feed; return a finding or None if crawlable.
 
     A redirect to another domain is not a knockback: if the redirect target
@@ -385,12 +385,8 @@ def _probe_source(
             target_finding, target_correction = _probe_source(final_host, "", fetcher, _depth + 1)
             if target_finding is None:
                 return None, {"domain": final_host, "crawl_root": (target_correction or {}).get("crawl_root") or url}
-            return _finding(
-                "blocker",
-                "crawlability",
-                f"'{domain}' redirects to {final_host}, which has no crawlable feed",
-                "remove the source or find the real domain",
-            ), None
+            # dead redirect: handled mechanically (drop), never bounced to the LLM
+            return None, {"_remove": True}
         if _is_feed(resp):
             feed_date = _feed_date(resp)
             correction = {"crawl_root": url} if url.rstrip("/") != crawl_root.rstrip("/") else None
@@ -441,21 +437,27 @@ def gate_crawlability(listing: dict[str, Any], fetcher: Callable[[str], Any] | N
     for sa in listing.get("subareas") or []:
         if not isinstance(sa, dict):
             continue
+        kept: list[dict[str, Any]] = []
         for s in sa.get("sources") or []:
             if not isinstance(s, dict):
                 continue
             domain = normalize_domain(s.get("domain", ""))
             if not domain:
+                kept.append(s)
                 continue
             if str(s.get("type", "")).lower() in NON_FEED_TYPES:
                 finding = _probe_homepage(domain, fetch)
                 correction = None
             else:
                 finding, correction = _probe_source(domain, str(s.get("crawl_root", "")), fetch)
+            if correction and correction.get("_remove"):
+                continue  # dead redirect: dropped mechanically, never bounced to the LLM
             if correction:
                 s.update({k: v for k, v in correction.items() if v})
             if finding:
                 out.append(finding)
+            kept.append(s)
+        sa["sources"] = kept
     return out
 
 
@@ -478,6 +480,34 @@ def gate_collision(listing: dict[str, Any], known_domains: set[str]) -> list[dic
                     )
                 )
     return out
+
+
+def _apply_revision(listing: dict[str, Any], delta: dict[str, Any]) -> dict[str, Any]:
+    """Apply a generator DELTA (remove/replace/add by domain) to the current list.
+
+    The generator never re-emits unaffected sources; it only describes changes.
+    """
+    subareas = listing.setdefault("subareas", [])
+    remove_domains = {normalize_domain(d) for d in delta.get("remove") or []}
+    for sa in subareas:
+        if not isinstance(sa, dict):
+            continue
+        srcs = [s for s in sa.get("sources") or [] if isinstance(s, dict)]
+        srcs = [s for s in srcs if normalize_domain(s.get("domain", "")) not in remove_domains]
+        for dom, new_src in (delta.get("replace") or {}).items():
+            if not isinstance(new_src, dict):
+                continue
+            for i, s in enumerate(srcs):
+                if normalize_domain(s.get("domain", "")) == normalize_domain(str(dom)):
+                    srcs[i] = new_src
+        sa["sources"] = srcs
+    for sa_name, new_srcs in (delta.get("add") or {}).items():
+        sa = next((x for x in subareas if isinstance(x, dict) and x.get("name") == sa_name), None)
+        if sa is None:
+            sa = {"name": sa_name, "sources": []}
+            subareas.append(sa)
+        sa.setdefault("sources", []).extend(s for s in new_srcs if isinstance(s, dict))
+    return listing
 
 
 def exclude_domains(feeds: list[dict[str, Any]], topic: dict[str, Any]) -> list[str]:
