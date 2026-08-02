@@ -409,6 +409,58 @@ def test_zero_parse_suspicious_on_first_fetch_when_not_a_feed() -> None:
     assert ws.is_zero_parse_suspicious({"error": "boom", "items": []}, had_items=False) is False
 
 
+# --- weekly_selection: shared feeds keyed on FULL subarea set (r14) --------
+
+
+def test_subarea_key_stable_under_reorder() -> None:
+    """A feed listed under several subareas must key on the full SORTED set.
+
+    Previously the verdict cache key used only the FIRST subarea, so
+    reordering subareas in the discovery JSON re-keyed every cached verdict
+    and the whole week re-judged. Sorted set: order-independent.
+    """
+    ws = _load_spike("weekly_selection")
+    a = {"crawl_root": "https://x/feed", "subarea": "B", "subareas": ["B", "A"]}
+    b = {"crawl_root": "https://x/feed", "subarea": "A", "subareas": ["A", "B"]}  # reordered
+    assert ws.subarea_key(a) == ws.subarea_key(b)
+    assert ws.subarea_key(a) == "A|B"
+
+
+def test_verdict_key_uses_full_subarea_set() -> None:
+    """Verdict cache key = slug|sorted subareas|url — reorder-proof."""
+    ws = _load_spike("weekly_selection")
+    s1 = {
+        "crawl_root": "https://x/feed",
+        "subarea": "Long-duration storage",
+        "subareas": ["Grid-scale batteries & storage", "Long-duration storage"],
+    }
+    s2 = {
+        "crawl_root": "https://x/feed",
+        "subarea": "Long-duration storage",
+        "subareas": ["Long-duration storage", "Grid-scale batteries & storage"],
+    }
+    assert ws.verdict_key("slug", s1, "https://x/a") == ws.verdict_key("slug", s2, "https://x/a")
+    # single-subarea source keeps its old-shaped key
+    s3 = {"crawl_root": "https://y/feed", "subarea": "A", "subareas": ["A"]}
+    assert ws.verdict_key("slug", s3, "u") == "slug|A|u"
+
+
+def test_subarea_label_includes_all_subareas() -> None:
+    """A pick from a feed covering two subareas is attributed to BOTH."""
+    ws = _load_spike("weekly_selection")
+    s = {
+        "crawl_root": "https://x/feed",
+        "subarea": "Long-duration storage",
+        "subareas": ["Grid-scale batteries & storage", "Long-duration storage"],
+    }
+    label = ws.subarea_label(s)
+    assert "Grid-scale batteries & storage" in label
+    assert "Long-duration storage" in label
+    # single-subarea source: label is just that subarea
+    s2 = {"crawl_root": "https://y/feed", "subarea": "A", "subareas": ["A"]}
+    assert ws.subarea_label(s2) == "A"
+
+
 # --- weekly_selection: undated items age out of the window (r10) -----------
 
 

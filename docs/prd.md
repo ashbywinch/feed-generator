@@ -278,6 +278,12 @@ CREATE TABLE IF NOT EXISTS feed_recommendations (
 | `RECENCY_DAYS` | 7 | FR-9 weekly window |
 | `MAX_PICKS_PER_SOURCE` | 3 | FR-9 curation cap per source |
 | `MAX_ITEMS_PER_SOURCE` | 30 | FR-9 LLM-judged items cap per source |
+| `FETCH_TTL` | 21600 (6h) | FR-9 feed cache freshness |
+| `FAILURE_RETRY_TTL` | 86400 (24h) | FR-9 re-fetch failed feeds after this long |
+| `EVAL_INTERVAL` | 1.0 | FR-9 LLM pacing (seconds between router calls) |
+| `PROMPT_REV` | 9 | FR-9 verdict-cache invalidation (bump on prompt change) |
+| `STORY_MAX_ANGLES` | 5 | FR-9 per-subarea story angle lines kept |
+| `STORY_MAX_QUESTIONS` | 8 | FR-9 open questions kept per topic |
 ## Decisions (recommendations; review before lock)
 
 | Question | Decision | Rationale |

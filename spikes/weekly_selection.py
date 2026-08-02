@@ -89,20 +89,32 @@ LLM_BASE = os.environ.get("OPENCODE_GO_BASE_URL", "")
 LLM_KEY = os.environ.get("OPENCODE_GO_API_KEY", "")
 LLM_MODEL = os.environ.get("OPENCODE_GO_MODEL", "deepseek-v4-flash")
 
-RECENCY_DAYS = int(os.environ.get("RECENCY_DAYS", "7"))
-FETCH_TTL = 6 * 60 * 60  # same-day re-runs reuse cached items
-FAILURE_RETRY_TTL = 24 * 60 * 60  # re-fetch a failed feed after this long
+# FR-9 config contract: the weekly-selection constants live on the Config env
+# surface (PRD config table) — the spike derives them from one Config instance
+# instead of hardcoding, so engine and spike cannot drift apart.
+CFG = Config(
+    llm_key=LLM_KEY,
+    llm_base=LLM_BASE,
+    llm_model=LLM_MODEL,
+    google_key=os.environ.get("GOOGLE_API_KEY", ""),
+    embed_model=os.environ.get("EMBEDDING_MODEL", "gemini-embedding-001"),
+    exa_key=os.environ.get("EXA_API_KEY", ""),
+)
+
+RECENCY_DAYS = CFG.weekly_recency_days
+FETCH_TTL = CFG.weekly_fetch_ttl  # same-day re-runs reuse cached items
+FAILURE_RETRY_TTL = CFG.weekly_failure_retry_ttl  # re-fetch a failed feed after this long
 FETCH_WORKERS = 12
 FETCH_TIMEOUT = 12
 FEED_CAP_BYTES = 300_000  # feed body cap; truncation is detected and flagged, never silent
-MAX_ITEMS_PER_SOURCE = 30  # cap on items the LLM judges per source per run
-MAX_PICKS_PER_SOURCE = 3  # curation cap: no feed dominates the weekly digest
+MAX_ITEMS_PER_SOURCE = CFG.weekly_max_items_per_source  # cap on items the LLM judges per source per run
+MAX_PICKS_PER_SOURCE = CFG.weekly_max_picks_per_source  # curation cap: no feed dominates the weekly digest
 JUNK_TITLE_MARKERS = ("factsheet", "fact sheet")  # boilerplate docs: filtered BEFORE the LLM
-STORY_MAX_ANGLES = 5  # angle lines kept per subarea
-STORY_MAX_QUESTIONS = 8  # open questions kept per topic
-EVAL_INTERVAL = 1.0  # seconds between router chat calls (global pacing)
+STORY_MAX_ANGLES = CFG.weekly_story_max_angles  # angle lines kept per subarea
+STORY_MAX_QUESTIONS = CFG.weekly_story_max_questions  # open questions kept per topic
+EVAL_INTERVAL = CFG.weekly_eval_interval  # seconds between router chat calls (global pacing)
 LLM_MAX_TOKENS = 8192
-PROMPT_REV = 9  # bump when the evaluation prompt changes -> stale verdicts ignored
+PROMPT_REV = CFG.weekly_prompt_rev  # bump when the evaluation prompt changes -> stale verdicts ignored
 
 APPEND_LOCK = threading.Lock()  # serialize JSONL appends from worker threads
 
@@ -285,7 +297,7 @@ def evaluate_source(
     """One LLM call judging ALL of a source's weekly items. Zero approvals is valid."""
     rows = "\n".join(_item_row(it) for it in items)
     slice_block = f"\nArea story — what we already track here:\n{story_slice_txt}\n" if story_slice_txt else ""
-    subarea_label = ", ".join(source.get("subareas") or [source["subarea"]])
+    covers_label = subarea_label(source)
     prompt = f"""You select articles for a personal discovery feed on ONE topic.
 This feed is CURATED and DEMANDING: it only surfaces genuinely interesting,
 relevant articles. Most articles fail. Many weeks a source yields nothing at
@@ -296,7 +308,7 @@ Description: {topic["description"]}
 IN scope: {topic["in"]}
 OUT of scope: {topic["out"]}
 
-Source: {source["name"]} ({source.get("type", "")}) — covers subarea(s): {subarea_label}
+Source: {source["name"]} ({source.get("type", "")}) — covers subarea(s): {covers_label}
 Why this source is subscribed: {source.get("why", "")}{slice_block}
 
 This week's items from this source (last {RECENCY_DAYS} days):
@@ -368,7 +380,7 @@ Topic: {topic["name"]}
 IN scope: {topic["in"]}
 OUT of scope: {topic["out"]}
 
-Source: {source["name"]} — covers subarea(s): {subarea_label}{slice_block}
+Source: {source["name"]} — covers subarea(s): {covers_label}{slice_block}
 
 HARD GATE first: REJECT outright anything in the OUT of scope (apply OUT as
 scope, not keywords — EV/policy/market stories are IN, consumer EV content is
@@ -445,7 +457,7 @@ article reports, phrased to stand as the digest's Observed Event bullet.
                 "title": it["title"],
                 "approved": approved,
                 "reason": str(v.get("reason", ""))[:200],
-                "subarea": source["subarea"],  # the source's subarea, never model-invented
+                "subarea": subarea_label(source),  # ALL covered subareas, never model-invented
                 "thesis": str(v.get("thesis", ""))[:200],
                 "empirical_event": str(v.get("empirical_event", ""))[:200] if approved else "",
             }
@@ -856,6 +868,29 @@ def preserve_first_seen(new_items: list[Item], old_items: list[Item]) -> list[It
     return new_items
 
 
+def subarea_key(source: Source) -> str:
+    """Stable cache-key component: the FULL sorted subarea set.
+
+    A feed listed under several subareas must key on all of them (sorted),
+    so reordering subareas in the discovery JSON never re-keys every cached
+    verdict — previously only the FIRST subarea was used, and a reorder
+    re-judged the whole week.
+    """
+    subs = source.get("subareas") or [source["subarea"]]
+    return "|".join(sorted(subs))
+
+
+def verdict_key(slug: str, source: Source, url: str) -> str:
+    """Composite verdict-cache key: (slug, full sorted subarea set, url)."""
+    return f"{slug}|{subarea_key(source)}|{url}"
+
+
+def subarea_label(source: Source) -> str:
+    """Human-readable attribution: all subareas the feed covers, sorted."""
+    subs = source.get("subareas") or [source["subarea"]]
+    return ", ".join(sorted(subs))
+
+
 def is_zero_parse_suspicious(s: Source, had_items: bool) -> bool:
     """A 200 that parsed ZERO entries is a bot-wall/redirect unless it is a
     genuinely clean empty feed (real feed markup, nothing cached before).
@@ -937,16 +972,7 @@ def main(argv: list[str] | None = None) -> int:
 
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     story = load_story(slug)
-    llm = LLM(
-        Config(
-            llm_key=LLM_KEY,
-            llm_base=LLM_BASE,
-            llm_model=LLM_MODEL,
-            google_key=os.environ.get("GOOGLE_API_KEY", ""),
-            embed_model=os.environ.get("EMBEDDING_MODEL", "gemini-embedding-001"),
-            exa_key=os.environ.get("EXA_API_KEY", ""),
-        )
-    )
+    llm = LLM(CFG)
     limiter = RateLimiter(EVAL_INTERVAL)
     if not story.get("angles"):
         # No story yet: generate the initial BIG-PICTURE story from the topic
@@ -1088,7 +1114,7 @@ def main(argv: list[str] | None = None) -> int:
     # use the SAME composite key, or every item looks unevaluated and the fold
     # fires on every re-run, breaking the settle invariant.
     todo_total = sum(
-        1 for s in sources for it in s.get("items", []) if f"{slug}|{s['subarea']}|{it['url']}" not in verdicts_cache
+        1 for s in sources for it in s.get("items", []) if verdict_key(slug, s, it["url"]) not in verdicts_cache
     )
     if todo_total and story.get("pending"):
         print(f"      folding {len(story['pending'])} queued picks into story ...")
@@ -1113,7 +1139,7 @@ def main(argv: list[str] | None = None) -> int:
             # different subareas is judged per-subarea (label + story-slice
             # context differ), so each gets its own entry — keying by url alone
             # made the two sources overwrite each other and re-judge every run.
-            cached_v = verdicts_cache.get(f"{slug}|{s['subarea']}|{it['url']}")
+            cached_v = verdicts_cache.get(verdict_key(slug, s, it["url"]))
             if cached_v is not None:
                 s.setdefault("cached_verdicts", []).append(cached_v)
                 n_cached += 1
@@ -1138,7 +1164,7 @@ def main(argv: list[str] | None = None) -> int:
                 s["verdicts"] = s.get("cached_verdicts", [])
                 continue
             for v in verdicts:
-                key = f"{slug}|{s['subarea']}|{v['url']}"
+                key = verdict_key(slug, s, v["url"])
                 _append_jsonl(
                     VERDICTS_PATH,
                     {"key": key, "slug": slug, "rev": PROMPT_REV, "story_ver": story_version, **v},
@@ -1213,7 +1239,7 @@ def main(argv: list[str] | None = None) -> int:
         {
             "source": s["name"],
             "domain": s["domain"],
-            "subarea": s["subarea"],
+            "subarea": subarea_label(s),
             "fetch_error": s.get("fetch_error", ""),
             "eval_error": s.get("eval_error", ""),
             "stale": s.get("stale", False),

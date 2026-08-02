@@ -33,6 +33,16 @@ class Config:
     # Setup: refuse to persist a blacklist that dropped below this fraction of
     # the previously stored set (truncated-export guard; PRD zero-duplication).
     min_blacklist_ratio: float = 0.5
+    # FR-9 weekly selection (PRD config table: spike constants moved here)
+    weekly_recency_days: int = 7
+    weekly_max_picks_per_source: int = 3
+    weekly_max_items_per_source: int = 30
+    weekly_fetch_ttl: int = 6 * 60 * 60  # same-day re-runs reuse cached items
+    weekly_failure_retry_ttl: int = 24 * 60 * 60  # re-fetch a failed feed after this long
+    weekly_eval_interval: float = 1.0  # seconds between router chat calls
+    weekly_prompt_rev: int = 9  # bump when the eval prompt changes -> stale verdicts ignored
+    weekly_story_max_angles: int = 5  # angle lines kept per subarea
+    weekly_story_max_questions: int = 8  # open questions kept per topic
     # Publishing
     publish_target: str = "netlify"
     deploy_token: str = ""
@@ -58,6 +68,15 @@ class Config:
             embed_batch=int(os.environ.get("EMBED_BATCH", "25")),
             min_feeds_per_topic=int(os.environ.get("MIN_FEEDS_PER_TOPIC", "3")),
             min_blacklist_ratio=float(os.environ.get("MIN_BLACKLIST_RATIO", "0.5")),
+            weekly_recency_days=int(os.environ.get("RECENCY_DAYS", "7")),
+            weekly_max_picks_per_source=int(os.environ.get("MAX_PICKS_PER_SOURCE", "3")),
+            weekly_max_items_per_source=int(os.environ.get("MAX_ITEMS_PER_SOURCE", "30")),
+            weekly_fetch_ttl=int(os.environ.get("FETCH_TTL", str(6 * 60 * 60))),
+            weekly_failure_retry_ttl=int(os.environ.get("FAILURE_RETRY_TTL", str(24 * 60 * 60))),
+            weekly_eval_interval=float(os.environ.get("EVAL_INTERVAL", "1.0")),
+            weekly_prompt_rev=int(os.environ.get("PROMPT_REV", "9")),
+            weekly_story_max_angles=int(os.environ.get("STORY_MAX_ANGLES", "5")),
+            weekly_story_max_questions=int(os.environ.get("STORY_MAX_QUESTIONS", "8")),
             publish_target=os.environ.get("PUBLISH_TARGET", "netlify"),
             deploy_token=os.environ.get("DEPLOY_TOKEN", ""),
         )
