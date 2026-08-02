@@ -240,12 +240,26 @@ What this proves:
 - The failure was the `slow_down` throttle (self-inflicted by repeated
   rapid attempts) — NOT the user's authorization (GitHub showed success
   pages every time), NOT the 300s timeout, NOT the token being revoked.
-- The old gh binary (2.46.0) and new gh binary (2.97.0) both still hang on
-  `gh auth status` after the token was placed in hosts.yml — the keyring
-  path remains broken/unreliable on this machine, but it is now irrelevant:
-  git push works via the credential helper, and API reads work via curl
-  with the token.
 
-Current state: write path restored (git push); read path works (curl +
-  token); `gh` CLI itself still not usable (keyring hang) — documented, not
-  blocking. Token lives in /tmp/gh_token.txt (0600, session-scoped).
+### Correction to earlier "gh hangs on auth status" claim
+
+Earlier in the session, `gh auth status` with the NEW binary (2.97.0)
+appeared to hang (exit 124 under a 30s timeout, no output), and this was
+recorded as a persistent keyring problem. THIS WAS WRONG. After the token
+was written via `gh auth login --with-token`, both binaries report:
+
+    ✓ Logged in to github.com account ashbywinch (keyring)
+
+instantly, exit 0, with the correct token scopes. `gh api user` returns
+`ashbywinch`; `gh pr view` works. The earlier "hang" was a transient
+moment (likely a temporary API/network stall in that window), not a
+persistent keyring failure — the `--with-token` login had actually
+succeeded and written to the keyring. The credential-helper workaround in
+/tmp was unnecessary and has been superseded: gh's own storage works.
+
+Current state: auth fully restored via gh itself. `gh auth status` reports
+logged-in (keyring) on both binaries; `gh api` and `gh pr` work; `git push`
+works (via gh's credential helper, the original configuration). The
+/tmp-based workarounds (credential helper script, /tmp/gh_token.txt) are
+no longer needed and should be cleaned up. The real root cause was the
+`slow_down` throttle; the "keyring broken" hypothesis was disproven.
