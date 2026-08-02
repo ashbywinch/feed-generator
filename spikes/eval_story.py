@@ -80,6 +80,7 @@ EVAL_INTERVAL = CFG.weekly_eval_interval
 LLM_MAX_TOKENS = 8192
 MAX_EVAL_ARTICLES = CFG.eval_max_articles  # held-out articles judged per run
 PASS_FRAC = CFG.eval_pass_frac  # fraction of articles that must contextualize
+RECENCY_DAYS = CFG.weekly_recency_days  # sample window matches the weekly pipeline
 
 # Global-coverage fixtures: held-out articles from OUTSIDE the UK/EU feed bias.
 # The feed cache is UK/EU-heavy, so without fixtures the eval never tests whether
@@ -253,7 +254,7 @@ def held_out_articles(
     story_urls = {e.get("url") for e in story.get("pending", [])}
     out: list[Item] = [dict(f) for f in GLOBAL_FIXTURES]
     seen_sources = {f["source"] for f in GLOBAL_FIXTURES}
-    cutoff = datetime.now(UTC) - timedelta(days=7)
+    cutoff = datetime.now(UTC) - timedelta(days=RECENCY_DAYS)
     for feed in feeds_cache.values():
         for it in feed.get("items", []):
             if len(out) >= MAX_EVAL_ARTICLES:

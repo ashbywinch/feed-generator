@@ -769,6 +769,8 @@ def render_story_markdown(story: dict[str, Any], topic_name: str) -> str:
         lines.append(overview)
         lines.append("")
     for subarea, angles in sorted(story.get("angles", {}).items()):
+        if not isinstance(angles, list):
+            continue  # corrupt section: skip rendering, mechanical_check already flags it
         lines.append(f"## {subarea}")
         lines.append("")
         lines.extend(f"- {a}" for a in angles)
@@ -957,17 +959,23 @@ def is_item_in_window(item: Item, cutoff: datetime) -> bool:
     an undated article first seen before the window is NOT new, and must not be
     re-judged as a fresh "this week" pick after a story-version re-key.
     Legacy cached items without first_seen are kept once (migration safety).
+    Naive cached timestamps are assumed UTC (legacy writes) — never compare
+    naive vs aware directly (TypeError).
     """
+
+    def _aware(dt: datetime) -> datetime:
+        return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
+
     if item.get("published"):
         try:
-            pub = datetime.fromisoformat(item["published"])
+            pub = _aware(datetime.fromisoformat(item["published"]))
         except ValueError:
             pub = None
         return not (pub is not None and pub < cutoff)
     first_seen = item.get("first_seen")
     if first_seen:
         try:
-            return datetime.fromisoformat(first_seen) >= cutoff
+            return _aware(datetime.fromisoformat(first_seen)) >= cutoff
         except ValueError:
             return True  # unparseable first_seen: keep (fail open)
     return True  # legacy undated item without first_seen: keep once
@@ -1250,10 +1258,12 @@ def main(argv: list[str] | None = None) -> int:
     # Queue this run's picks for the NEXT run's fold (deferred — folding now
     # would bump the story version and invalidate the verdicts we just cached,
     # breaking same-week idempotency). A quiet run leaves the queue untouched.
+    # NOTE: this must happen AFTER the pick history is appended below — a
+    # crash between the two must lose the queued fold, never the exclusion,
+    # or the next run would both fold the picks AND re-admit the same URLs.
     if picks:
         known_pending = {p.get("url") for p in story.get("pending", [])}
         story["pending"] = story.get("pending", []) + [p for p in picks if p["url"] not in known_pending]
-        save_story(slug, story)
     story_md = render_story_markdown(story, topic["name"])
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -1309,6 +1319,12 @@ def main(argv: list[str] | None = None) -> int:
             for p in picks
         ]
         _ = fh.writelines(lines)
+
+    # The durable exclusion is on disk — now it is safe to persist the story
+    # with this run's queued picks (a crash before this point loses the fold,
+    # never the exclusion).
+    if picks:
+        save_story(slug, story)
 
     tmp = PICKS_PATH.with_suffix(".tmp")
     payload = json.dumps(

@@ -272,6 +272,7 @@ CREATE TABLE IF NOT EXISTS feed_recommendations (
 | `MAX_CANDIDATES_PER_TOPIC` | 25 | cost cap |
 | `RECURRING_CRON` | `0 6 * * *` | FR-8 recurring run (local tz); set to `0 7 * * 1` (weekly) if daily yield is thin |
 | `MIN_FEEDS_PER_TOPIC` | 3 | coverage gap threshold |
+| `MIN_BLACKLIST_RATIO` | 0.5 | setup guard: refuse a blacklist shrink below this fraction of the stored set (truncated-export protection) |
 | `MAX_SUGGESTIONS_PER_TOPIC` | 5 | recommendation cap |
 | `PUBLISH_TARGET` | `netlify` | static host for the digest |
 | `DEPLOY_TOKEN` | — | netlify/github deploy token (env) |

@@ -14,6 +14,7 @@ construction: dedup L2 + URL-unique inserts mean a re-run emits no duplicates.
 from __future__ import annotations
 
 import sys
+from typing import Any
 
 from .config import Config
 from .dedup import DedupPipeline
@@ -32,12 +33,33 @@ ASSIGNMENT_PATH = PROJECT_ROOT / "spikes" / "state" / "assignment.json"
 
 
 class Engine:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        cfg: Config | None = None,
+        memory: Any | None = None,
+        llm: Any | None = None,
+        embedder: Any | None = None,
+        parse_opml_fn: Any = parse_opml,
+        load_topics_fn: Any = load_topics,
+        discovery_cls: Any = Discovery,
+        pipeline_cls: Any = DedupPipeline,
+        build_digest_fn: Any = build_digest,
+        publish_fn: Any = publish,
+    ) -> None:
+        """Constructor DI: collaborators are injectable so tests never patch
+        module globals (coding-standards: DI over patching). Defaults keep
+        production wiring unchanged."""
         load_env()
-        self._cfg = Config.from_env()
-        self._memory = Memory(self._cfg, DB_PATH)
-        self._llm = LLM(self._cfg)
-        self._embedder = Embedder(self._cfg)
+        self._cfg = cfg if cfg is not None else Config.from_env()
+        self._memory = memory if memory is not None else Memory(self._cfg, DB_PATH)
+        self._llm = llm if llm is not None else LLM(self._cfg)
+        self._embedder = embedder if embedder is not None else Embedder(self._cfg)
+        self._parse_opml = parse_opml_fn
+        self._load_topics = load_topics_fn
+        self._discovery_cls = discovery_cls
+        self._pipeline_cls = pipeline_cls
+        self._build_digest = build_digest_fn
+        self._publish = publish_fn
 
     # -- setup (FR-1/FR-2: one-and-done) -------------------------------------
 
@@ -49,7 +71,7 @@ class Engine:
         `force` bypasses the shrink guard for a deliberate large unsubscribe.
         """
         print("[setup] OPML -> exclusion set + topics")
-        known_domains, feeds = parse_opml(PROJECT_ROOT / "feedly.opml")
+        known_domains, feeds = self._parse_opml(PROJECT_ROOT / "feedly.opml")
         if not known_domains:
             print("FATAL: OPML parsed zero domains — refusing to persist an empty exclusion set")
             print("       (corrupt/truncated feedly.opml? fix it, then re-run setup)")
@@ -77,7 +99,12 @@ class Engine:
             self._memory.save_blacklist(previous)
             print("FATAL: exclusion-set write incomplete — refusing to complete setup (no partial blacklist)")
             return 1
-        seeded = self._seed_from_curated()
+        try:
+            seeded = self._seed_from_curated()
+        except Exception as exc:  # noqa: BLE001 — a seed crash must not leave a partial setup
+            self._memory.save_blacklist(previous)  # roll back: no partial setup
+            print(f"FATAL: topics seed failed ({type(exc).__name__}) — refusing to persist a partial setup")
+            return 1
         if seeded <= 0:
             self._memory.save_blacklist(previous)  # roll back: no partial setup
             print("FATAL: topics seed produced zero topics — refusing to persist a partial setup")
@@ -100,17 +127,17 @@ class Engine:
         print(f"[1/6] engine: {len(known_domains)} blacklist domains, {len(topics)} topics (stored)")
 
         print("[2/6] discovery (registries + Exa per topic strategy)")
-        candidates = Discovery(self._cfg).discover(topics)
+        candidates = self._discovery_cls(self._cfg).discover(topics)
         print(f"      {len(candidates)} candidates across {len(topics)} topics")
 
         print("[3/6] dedup (L1-L4) + evaluation")
-        pipeline = DedupPipeline(self._cfg, known_domains, self._memory, self._llm, self._embedder)
+        pipeline = self._pipeline_cls(self._cfg, known_domains, self._memory, self._llm, self._embedder)
         events = pipeline.process(candidates)
 
         print("[4/6] digest")
         if events:
-            build_digest(self._cfg, events, DIGEST_PATH)
-            publish(self._cfg, DIGEST_PATH)
+            self._build_digest(self._cfg, events, DIGEST_PATH)
+            self._publish(self._cfg, DIGEST_PATH)
         else:
             print("      no new events — keeping previous digest")
 
@@ -123,7 +150,7 @@ class Engine:
 
     def _seed_from_curated(self) -> int:
         """Seed the topics table from the curated topics.json (walkthrough final set)."""
-        topics = load_topics()
+        topics = self._load_topics()
         assignment = {
             "topics": {
                 t["name"]: {
@@ -148,7 +175,7 @@ class Engine:
     def smoke(self) -> int:
         """Fail-fast self-check: opml + memory + embeddings + router chat."""
         print("smoke: opml")
-        known_domains, feeds = parse_opml(PROJECT_ROOT / "feedly.opml")
+        known_domains, feeds = self._parse_opml(PROJECT_ROOT / "feedly.opml")
         print(f"  ok ({len(feeds)} feeds, {len(known_domains)} domains)")
         print("smoke: memory")
         self._memory.topics()

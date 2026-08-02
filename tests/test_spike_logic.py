@@ -524,6 +524,39 @@ def test_mechanical_check_fails_malformed_section() -> None:
     assert any("Bad" in f and "malformed" in f for f in failures)
 
 
+def test_held_out_sample_window_matches_recency(monkeypatch: Any) -> None:
+    """The held-out sampler must window on RECENCY_DAYS, not a hardcoded 7,
+    or the eval can pass on a window that no longer matches production
+    selection when RECENCY_DAYS is changed (r16 finding)."""
+    ev = _load_spike("eval_story")
+    monkeypatch.setattr(ev, "RECENCY_DAYS", 14)
+    cutoff = datetime.now(UTC) - timedelta(days=14)
+    feeds = {
+        "a": {
+            "source": "test-source-a",
+            "items": [
+                # 10 days old: inside a 14-day window, outside a 7-day one
+                {
+                    "url": "https://x/band",
+                    "title": "Band",
+                    "summary": "s",
+                    "published": (cutoff + timedelta(days=4)).isoformat(),
+                },
+                {
+                    "url": "https://x/out",
+                    "title": "Out",
+                    "summary": "s",
+                    "published": (cutoff - timedelta(days=30)).isoformat(),
+                },
+            ],
+        }
+    }
+    got = ev.held_out_articles(feeds, set(), {"pending": []})
+    urls = [i["url"] for i in got]
+    assert "https://x/band" in urls  # within the CONFIGURED window (14d), not a hardcoded 7d
+    assert "https://x/out" not in urls  # outside it — must be excluded
+
+
 # --- weekly_selection: undated items age out of the window (r10) -----------
 
 
@@ -560,6 +593,38 @@ def test_undated_without_first_seen_is_kept_once() -> None:
     cutoff = datetime.now(UTC) - timedelta(days=ws.RECENCY_DAYS)
     legacy = {"url": "https://x/legacy", "title": "L", "published": None, "undated": True}
     assert ws.is_item_in_window(legacy, cutoff) is True
+
+
+def test_naive_cached_timestamps_handled_safely() -> None:
+    """Legacy caches may hold NAIVE timestamps; comparing naive vs aware cutoff
+    raises TypeError — the window check must assume UTC (r15 suggestion)."""
+    cutoff = datetime.now(UTC) - timedelta(days=ws.RECENCY_DAYS)
+    naive_old = {
+        "url": "https://x/n1",
+        "title": "N",
+        "published": None,
+        "undated": True,
+        "first_seen": (cutoff - timedelta(days=2)).isoformat().replace("+00:00", ""),
+    }
+    naive_fresh = {
+        "url": "https://x/n2",
+        "title": "N2",
+        "published": None,
+        "undated": True,
+        "first_seen": (cutoff + timedelta(days=2)).isoformat().replace("+00:00", ""),
+    }
+    assert ws.is_item_in_window(naive_old, cutoff) is False  # naive, seen before window
+    assert ws.is_item_in_window(naive_fresh, cutoff) is True  # naive, within window
+
+
+def test_render_story_markdown_skips_malformed_angles() -> None:
+    """Corrupt (non-list) subarea sections must not crash the markdown render —
+    the mechanical gate already flags them (r15 suggestion)."""
+    story = {"overview": "x" * 60, "angles": {"Good": ["fine sentence."], "Bad": "not a list"}, "open_questions": []}
+    md = ws.render_story_markdown(story, "T")
+    assert "fine sentence." in md
+    assert "## Bad" not in md  # corrupt section's header must not be rendered
+    assert "not a list" not in md  # nor its (string) body
 
 
 # --- weekly_selection: retry prompt carries story context (r10) -------------
