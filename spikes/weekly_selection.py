@@ -654,8 +654,13 @@ Respond with STRICT JSON only:
     except Exception as exc:  # noqa: BLE001 — fold is best-effort; keep the current story
         print(f"      story fold failed: {redact(str(exc))[:160]}")
         return False
+    # Guard isinstance BEFORE touching data: .get on a non-dict raises, and the
+    # call is outside the try — a malformed response must keep pending for retry.
+    if not isinstance(data, dict):
+        print("      story fold returned non-JSON object — pending kept for retry")
+        return False
     raw_angles = data.get("angles")
-    if not isinstance(data, dict) or not isinstance(raw_angles, dict) or not raw_angles:
+    if not isinstance(raw_angles, dict) or not raw_angles:
         print("      story fold returned no angles — pending kept for retry")
         return False
     angles = {
@@ -961,7 +966,12 @@ def main(argv: list[str] | None = None) -> int:
     # re-run — everything cached — never folds, never bumps the version, and
     # stays idempotent). Folding changes the context, so it invalidates the
     # verdict cache; the fresh window is then judged against the enriched story.
-    todo_total = sum(1 for s in sources for it in s.get("items", []) if it["url"] not in verdicts_cache)
+    # Verdicts are cached under "{slug}|{subarea}|{url}" — the fold guard must
+    # use the SAME composite key, or every item looks unevaluated and the fold
+    # fires on every re-run, breaking the settle invariant.
+    todo_total = sum(
+        1 for s in sources for it in s.get("items", []) if f"{slug}|{s['subarea']}|{it['url']}" not in verdicts_cache
+    )
     if todo_total and story.get("pending"):
         print(f"      folding {len(story['pending'])} queued picks into story ...")
         if fold_story(story, story["pending"], topic, llm, limiter):
