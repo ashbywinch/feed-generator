@@ -94,6 +94,7 @@ FETCH_TTL = 6 * 60 * 60  # same-day re-runs reuse cached items
 FAILURE_RETRY_TTL = 24 * 60 * 60  # re-fetch a failed feed after this long
 FETCH_WORKERS = 12
 FETCH_TIMEOUT = 12
+FEED_CAP_BYTES = 300_000  # feed body cap; truncation is detected and flagged, never silent
 MAX_ITEMS_PER_SOURCE = 30  # cap on items the LLM judges per source per run
 MAX_PICKS_PER_SOURCE = 3  # curation cap: no feed dominates the weekly digest
 JUNK_TITLE_MARKERS = ("factsheet", "fact sheet")  # boilerplate docs: filtered BEFORE the LLM
@@ -220,7 +221,13 @@ def fetch_feed(source: Source) -> Source:
         ) as resp:
             resp.raise_for_status()
             resp.raw.decode_content = True
-            content = resp.raw.read(300_000)  # cap: feeds can be multi-MB
+            # Cap feeds at 300 KB, but read one extra byte to DETECT truncation —
+            # a feed bigger than the cap must not be silently parsed as a clean
+            # full item set and cached as a fresh successful fetch.
+            content = resp.raw.read(FEED_CAP_BYTES + 1)
+            if len(content) > FEED_CAP_BYTES:
+                source["truncated"] = True
+                content = content[:FEED_CAP_BYTES]
         parsed = feedparser.parse(content)
         seen: set[str] = set()
         for entry in parsed.entries:
@@ -268,6 +275,7 @@ def evaluate_source(
     """One LLM call judging ALL of a source's weekly items. Zero approvals is valid."""
     rows = "\n".join(_item_row(it) for it in items)
     slice_block = f"\nArea story — what we already track here:\n{story_slice_txt}\n" if story_slice_txt else ""
+    subarea_label = ", ".join(source.get("subareas") or [source["subarea"]])
     prompt = f"""You select articles for a personal discovery feed on ONE topic.
 This feed is CURATED and DEMANDING: it only surfaces genuinely interesting,
 relevant articles. Most articles fail. Many weeks a source yields nothing at
@@ -278,7 +286,7 @@ Description: {topic["description"]}
 IN scope: {topic["in"]}
 OUT of scope: {topic["out"]}
 
-Source: {source["name"]} ({source.get("type", "")}) — covers subarea \"{source["subarea"]}\"
+Source: {source["name"]} ({source.get("type", "")}) — covers subarea(s): {subarea_label}
 Why this source is subscribed: {source.get("why", "")}{slice_block}
 
 This week's items from this source (last {RECENCY_DAYS} days):
@@ -368,12 +376,51 @@ Return EXACTLY one verdict per item below, same order:
                     _ = verdicts.setdefault(v["url"], v)
         except Exception as exc:  # noqa: BLE001 — retry is best-effort
             print(f"      retry failed for {source['name']}: {redact(str(exc))[:160]}")
+
+    # Approved verdicts MUST carry an empirical_event sentence (FR-9 digest
+    # contract). The model sometimes approves without one; retry those once,
+    # then demote any still missing to rejected rather than emitting an empty
+    # Observed Event bullet.
+    missing_event = [
+        it
+        for it in items
+        if parse_bool(verdicts.get(it["url"], {}).get("approved"))
+        and not str(verdicts[it["url"]].get("empirical_event", "")).strip()
+    ]
+    if missing_event:
+        retry_rows = "\n".join(_item_row(it) for it in missing_event)
+        retry_prompt = f"""You approved these items but omitted the required \"empirical_event\"
+sentence. Add it: ONE sentence stating the observed event or data shift the
+article reports, phrased to stand as the digest's Observed Event bullet.
+
+{retry_rows}
+
+{SCHEMA_HINT}"""
+        try:
+            limiter.wait()
+            data = llm.chat_json(retry_prompt, max_tokens=LLM_MAX_TOKENS)
+            for v in data.get("verdicts", []):
+                if isinstance(v, dict) and v.get("url"):
+                    _ = verdicts.setdefault(v["url"], v)
+        except Exception as exc:  # noqa: BLE001 — retry is best-effort
+            print(f"      empirical_event retry failed for {source['name']}: {redact(str(exc))[:160]}")
+
     out: list[Verdict] = []
     for it in items:
         v = verdicts.get(it["url"])
         if v is None:
             v = {"approved": False, "reason": "no verdict returned", "thesis": "", "empirical_event": ""}
         approved = parse_bool(v.get("approved"))
+        if approved and not str(v.get("empirical_event", "")).strip():
+            # Still missing after retry: demote — a digest bullet must not be empty.
+            approved = False
+            v = {
+                **v,
+                "approved": False,
+                "reason": "approved but missing empirical_event",
+                "thesis": "",
+                "empirical_event": "",
+            }
         out.append(
             {
                 "url": it["url"],
@@ -512,10 +559,10 @@ def seed_story(
     except Exception as exc:  # noqa: BLE001 — seed is best-effort
         print(f"      story seed failed: {redact(str(exc))[:160]}")
         return empty_story()
-    if not isinstance(data, dict) or not data.get("angles"):
+    if not isinstance(data, dict) or not isinstance(data.get("angles"), dict) or not data.get("angles"):
         print("      story seed returned no angles — starting with empty story")
         return empty_story()
-    angles = data.get("angles") or {}
+    angles: dict[str, Any] = data.get("angles") or {}
     return {
         "version": 1,
         "updated_at": datetime.now(UTC).isoformat(),
@@ -602,13 +649,12 @@ Respond with STRICT JSON only:
     except Exception as exc:  # noqa: BLE001 — fold is best-effort; keep the current story
         print(f"      story fold failed: {redact(str(exc))[:160]}")
         return False
-    if not isinstance(data, dict) or not data.get("angles"):
+    raw_angles = data.get("angles")
+    if not isinstance(data, dict) or not isinstance(raw_angles, dict) or not raw_angles:
         print("      story fold returned no angles — pending kept for retry")
         return False
     angles = {
-        str(k): [str(a).strip() for a in v][:STORY_MAX_ANGLES]
-        for k, v in (data.get("angles") or {}).items()
-        if isinstance(v, list)
+        str(k): [str(a).strip() for a in v][:STORY_MAX_ANGLES] for k, v in raw_angles.items() if isinstance(v, list)
     }
     questions = [str(q).strip() for q in (data.get("open_questions") or [])][:STORY_MAX_QUESTIONS]
     overview = str(data.get("overview", story.get("overview", ""))).strip()
@@ -832,6 +878,12 @@ def main(argv: list[str] | None = None) -> int:
             }
             if s.get("error"):
                 entry["error"] = s["error"]
+            if s.get("truncated"):
+                entry["truncated"] = True
+                print(
+                    f"      WARNING: {s['name']} feed exceeded {FEED_CAP_BYTES} bytes "
+                    "— parsed partially (newest entries usually survive)"
+                )
             _append_jsonl(FEEDS_PATH, entry)
             s["cached"] = entry
 
@@ -916,7 +968,8 @@ def main(argv: list[str] | None = None) -> int:
         if todo:
             n_new += len(todo)
             try:
-                verdicts = evaluate_source(s, todo, topic, llm, limiter, story_slice(story, s["subarea"]))
+                slices = [story_slice(story, sub) for sub in (s.get("subareas") or [s["subarea"]])]
+                verdicts = evaluate_source(s, todo, topic, llm, limiter, "\n\n".join(x for x in slices if x))
             except Exception as exc:  # noqa: BLE001 — keep the run alive; cached verdicts still count
                 print(f"      evaluation failed for {s['name']}: {redact(str(exc))[:200]}")
                 s["eval_error"] = redact(str(exc))[:200]
