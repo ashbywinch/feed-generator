@@ -53,6 +53,15 @@ class Engine:
             print("FATAL: OPML parsed zero domains — refusing to persist an empty exclusion set")
             print("       (corrupt/truncated feedly.opml? fix it, then re-run setup)")
             return 1
+        previous = self._memory.blacklist()
+        if previous and len(known_domains) < 0.5 * len(previous):
+            print(
+                f"FATAL: OPML parsed {len(known_domains)} domains vs {len(previous)} previously stored "
+                "— a drop this large looks like a truncated/partial export, refusing to shrink the "
+                "exclusion set (the PRD forbids a partial blacklist: it voids the zero-duplication "
+                "guarantee). Fix feedly.opml, then re-run setup."
+            )
+            return 1
         seeded = self._seed_from_curated()
         if seeded <= 0:
             print("FATAL: topics seed produced zero topics — refusing to persist a partial setup")

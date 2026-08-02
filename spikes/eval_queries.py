@@ -68,29 +68,49 @@ MAX_UNCOVERED = 3  # subareas a query set may leave out and still pass
 EVAL_INTERVAL = 1.0
 LLM_MAX_TOKENS = 8192
 
-# Deterministic coverage: subarea -> distinctive tokens. A subarea is covered
-# when ANY query contains one of its tokens (case-insensitive). Token lists are
-# chosen to avoid cross-matching (e.g. "storage" alone would match everything).
-SUBAREA_TOKENS: dict[str, tuple[str, ...]] = {
-    "Grid-scale batteries & storage": ("battery",),
-    "Grid connection queues & network charging": ("connection queue", "network charging"),
-    "Ancillary services & frequency markets": ("ancillary", "frequency market"),
-    "Interconnectors & market coupling": ("interconnector", "market coupling"),
-    "CfD auctions & capacity market (policy)": ("cfd", "capacity market", "strike price"),
-    "Demand-side flexibility & electrification demand growth": ("demand-side", "demand side", "electrification"),
-    "Nuclear new-build economics (RAB, CfDs, SMRs)": ("nuclear", "smr"),
-    "Storage beyond lithium-ion (CAES, thermal, gravity, flow)": (
-        "long-duration",
-        "lithium-ion",
-        "caes",
-        "thermal storage",
-    ),
-    "Offshore wind": ("offshore wind", "floating wind"),
-    "Carbon markets / ETS & climate-economics data": ("carbon market", "ets", "carbon price"),
-    "Regulation, market design & price controls": ("market design", "price control", "regulation"),
-    "Distribution vs transmission & grid data analytics": ("distribution", "grid data", "transmission"),
-    "Hydrogen for power": ("hydrogen",),
-}
+# Coverage tokens are DERIVED from each subarea's name (distinctive words
+# minus generic stopwords), so the gate works for ANY topic — no per-topic
+# hand-maintained map that silently fails on the next topic's subareas.
+SUBAREA_STOPWORDS = frozenset(
+    [
+        "a",
+        "an",
+        "and",
+        "beyond",
+        "by",
+        "for",
+        "from",
+        "in",
+        "of",
+        "on",
+        "or",
+        "the",
+        "to",
+        "vs",
+        "&",
+        "new",
+        "power",
+        "grid",
+        "market",
+        "markets",
+        "storage",
+        "data",
+        "economics",
+        "economic",
+        "policy",
+        "technology",
+        "technologies",
+        "sector",
+        "industry",
+    ]
+)
+
+
+def subarea_tokens(name: str) -> tuple[str, ...]:
+    """Distinctive lowercase words of a subarea name, minus stopwords."""
+    words = re.findall(r"[a-z0-9]+", name.lower())
+    return tuple(w for w in words if w not in SUBAREA_STOPWORDS and len(w) > 3)
+
 
 # Hard geography anchors: a query naming any of these can only find that
 # jurisdiction's news. "European" is softer (multi-country) but still local;
@@ -148,22 +168,15 @@ def mechanical_check(queries: list[str], max_queries: int = MAX_QUERIES) -> list
 def coverage_check(queries: list[str], subareas: list[str]) -> list[str]:
     """Deterministic: every subarea needs a query containing one of its tokens.
 
-    Returns uncovered subarea names. A subarea with NO known token mapping is
-    reported as a failure, not silently passed — an unknown topic must never
-    skate through the coverage gate.
+    Tokens are derived from each subarea name (subarea_tokens), so any topic's
+    subareas are covered — nothing is hardcoded per topic.
     """
     lowered = [q.lower() for q in queries]
     uncovered = []
-    unknown = []
     for sa in subareas:
-        tokens = SUBAREA_TOKENS.get(sa)
-        if tokens is None:
-            unknown.append(sa)
-            continue
+        tokens = subarea_tokens(sa)
         if not any(any(t in q for t in tokens) for q in lowered):
             uncovered.append(sa)
-    if unknown:
-        uncovered.append(f"unknown subarea(s) with no token mapping: {', '.join(unknown[:5])}")
     return uncovered
 
 
@@ -198,6 +211,11 @@ Respond with STRICT JSON only:
     limiter.wait()
     data = llm.chat_json(prompt, max_tokens=LLM_MAX_TOKENS)
     failures: list[str] = []
+    if not isinstance(data, dict):
+        # Malformed model output: every query fails the gate, don't crash.
+        for i, q in enumerate(queries):
+            failures.append(f"query {i + 1} ({q!r}): no parseable LLM judgment")
+        return failures
     judgments = data.get("judgments") or []
     if len(judgments) != len(queries):
         # A partial judgment set means the gate could pass on unjudged queries —

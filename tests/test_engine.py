@@ -153,6 +153,24 @@ def test_setup_fails_fast_when_seed_produces_zero_topics(monkeypatch: Any, cfg: 
     assert "called" not in seen  # blacklist must not be persisted after zero-seed
 
 
+def test_setup_fails_fast_on_shrunk_blacklist(monkeypatch: Any, cfg: Any) -> None:
+    """FR-1/FR-2 setup: a >50% drop vs stored blacklist looks like a truncated export."""
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(engine_mod, "parse_opml", lambda path: ({"only.com"}, []))
+
+    class M(FakeMemory):
+        def blacklist(self) -> set[str]:
+            return {"a.com", "b.com", "c.com"}  # stored: 3; new parse: 1
+
+        def save_blacklist(self, domains: set[str]) -> int:
+            seen["called"] = True
+            return 0
+
+    engine = _engine(monkeypatch, cfg, memory_cls=M)
+    assert engine.setup() == 1
+    assert "called" not in seen
+
+
 def test_setup_persists_blacklist_and_topics(monkeypatch: Any, cfg: Any) -> None:
     """FR-1/FR-2 setup: OPML parsed once, blacklist + topics persisted."""
     seen: dict[str, Any] = {}

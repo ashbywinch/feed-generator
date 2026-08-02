@@ -313,6 +313,17 @@ Respond with STRICT JSON only:
 "missing": "one short phrase: the AREA background the story lacked, or '' if sufficient"}}"""
     limiter.wait()
     data = llm.chat_json(prompt, max_tokens=LLM_MAX_TOKENS)
+    if not isinstance(data, dict):
+        # Malformed model output: judge this article INSUFFICIENT, don't crash.
+        return {
+            "url": article["url"],
+            "title": article["title"],
+            "source": article["source"],
+            "fits": "",
+            "caption": "",
+            "sufficient": False,
+            "missing": "no parseable LLM judgment",
+        }
     return {
         "url": article["url"],
         "title": article["title"],

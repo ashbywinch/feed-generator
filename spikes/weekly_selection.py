@@ -401,10 +401,14 @@ article reports, phrased to stand as the digest's Observed Event bullet.
             limiter.wait()
             data = llm.chat_json(retry_prompt, max_tokens=LLM_MAX_TOKENS)
             for v in data.get("verdicts", []):
-                if isinstance(v, dict) and v.get("url"):
-                    # DIRECT assignment: the retried verdict must REPLACE the
-                    # empty-event one (setdefault would silently discard it).
-                    verdicts[v["url"]] = v
+                if isinstance(v, dict) and v.get("url") and v["url"] in verdicts:
+                    # MERGE, don't replace: the retry may return only the added
+                    # sentence, dropping approved/reason/thesis. Fill just the
+                    # missing empirical_event, keep the original judgment.
+                    existing = verdicts[v["url"]]
+                    retried = str(v.get("empirical_event") or "").strip()
+                    if retried:
+                        existing["empirical_event"] = retried[:200]
         except Exception as exc:  # noqa: BLE001 — retry is best-effort
             print(f"      empirical_event retry failed for {source['name']}: {redact(str(exc))[:160]}")
 
