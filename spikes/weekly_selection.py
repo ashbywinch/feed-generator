@@ -804,6 +804,23 @@ def load_source_list(topic_name: str) -> tuple[dict[str, Any] | None, list[Sourc
     return listing, sources, slug
 
 
+def window_items(items: list[Item], max_items: int) -> list[Item]:
+    """Cap items for LLM evaluation, reserving slots for undated entries.
+
+    Undated items sort last (empty published key) and would always be cut under
+    the cap; reserve a few slots so they're not systematically excluded from
+    evaluation every run.
+    """
+    dated = sorted(
+        (it for it in items if it.get("published")),
+        key=lambda x: str(x.get("published") or ""),
+        reverse=True,
+    )
+    undated = [it for it in items if not it.get("published")]
+    reserved = min(len(undated), max(1, max_items // 5))
+    return dated[: max_items - reserved] + undated[:reserved]
+
+
 def main(argv: list[str] | None = None) -> int:
     del argv  # config comes from env; signature mirrors the engine's main()
     for var in ("OPENCODE_GO_API_KEY", "OPENCODE_GO_BASE_URL"):
@@ -958,8 +975,7 @@ def main(argv: list[str] | None = None) -> int:
             items.append(it)
             if it.get("undated"):
                 n_undated += 1
-        items.sort(key=lambda x: str(x.get("published") or ""), reverse=True)
-        s["items"] = items[:MAX_ITEMS_PER_SOURCE]
+        s["items"] = window_items(items, MAX_ITEMS_PER_SOURCE)
         s["n_total_window"] = len(items)
     n_window = sum(s["n_total_window"] for s in sources)
     n_with_items = sum(1 for s in sources if s["items"])

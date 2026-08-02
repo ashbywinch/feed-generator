@@ -153,6 +153,21 @@ def test_setup_fails_fast_when_seed_produces_zero_topics(monkeypatch: Any, cfg: 
     assert "called" not in seen  # blacklist must not be persisted after zero-seed
 
 
+def test_setup_fails_fast_when_blacklist_write_incomplete(monkeypatch: Any, cfg: Any) -> None:
+    """FR-1/FR-2 setup: a blacklist write that doesn't stick must not complete setup."""
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(engine_mod, "parse_opml", lambda path: ({"sub.com"}, []))
+
+    class M(FakeMemory):
+        def save_blacklist(self, domains: set[str]) -> int:
+            seen["called"] = True
+            return len(domains)  # reports success but does NOT persist (no self._blacklist update)
+
+    engine = _engine(monkeypatch, cfg, memory_cls=M)
+    assert engine.setup() == 1
+    assert seen["called"] is True  # the write was attempted, then detected as incomplete
+
+
 def test_setup_fails_fast_on_shrunk_blacklist(monkeypatch: Any, cfg: Any) -> None:
     """FR-1/FR-2 setup: a >50% drop vs stored blacklist looks like a truncated export."""
     seen: dict[str, Any] = {}
@@ -171,6 +186,36 @@ def test_setup_fails_fast_on_shrunk_blacklist(monkeypatch: Any, cfg: Any) -> Non
     assert "called" not in seen
 
 
+def test_setup_shrink_guard_uses_config_ratio(monkeypatch: Any, cfg: Any) -> None:
+    """FR-1/FR-2 setup: the shrink threshold comes from Config, not a hardcoded 0.5."""
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(engine_mod, "parse_opml", lambda path: ({"a.com", "b.com"}, []))
+
+    class M(FakeMemory):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, **kwargs)
+            self._blacklist = {"a.com", "b.com", "c.com", "d.com", "e.com"}  # stored: 5; new: 2
+
+        def save_blacklist(self, domains: set[str]) -> int:
+            seen["called"] = True
+            self._blacklist = set(domains)
+            return len(domains)
+
+    # ratio 0.5: 2 < 2.5 -> guard trips; ratio 0.25: 2 >= 1.25 -> passes
+    loose = cfg.__class__(
+        llm_key=cfg.llm_key,
+        llm_base=cfg.llm_base,
+        llm_model=cfg.llm_model,
+        embed_model=cfg.embed_model,
+        google_key=cfg.google_key,
+        exa_key=cfg.exa_key,
+        min_blacklist_ratio=0.25,
+    )
+    engine = _engine(monkeypatch, loose, memory_cls=M)
+    assert engine.setup() == 0  # loose ratio lets the shrink through
+    assert seen["called"] is True
+
+
 def test_setup_persists_blacklist_and_topics(monkeypatch: Any, cfg: Any) -> None:
     """FR-1/FR-2 setup: OPML parsed once, blacklist + topics persisted."""
     seen: dict[str, Any] = {}
@@ -183,6 +228,7 @@ def test_setup_persists_blacklist_and_topics(monkeypatch: Any, cfg: Any) -> None
     class M(FakeMemory):
         def save_blacklist(self, domains: set[str]) -> int:
             seen["blacklist"] = domains
+            self._blacklist = set(domains)  # mirror the real write for the verify step
             return len(domains)
 
         def seed_topics(self, assignment: dict[str, Any]) -> int:
@@ -193,6 +239,24 @@ def test_setup_persists_blacklist_and_topics(monkeypatch: Any, cfg: Any) -> None
     assert engine.setup() == 0
     assert seen["blacklist"] == {"sub.com"}
     assert seen["seeded"] is True
+
+
+def test_setup_force_bypasses_shrink_guard(monkeypatch: Any, cfg: Any) -> None:
+    """FR-1/FR-2 setup: --force persists a deliberate large unsubscribe."""
+    monkeypatch.setattr(engine_mod, "parse_opml", lambda path: ({"only.com"}, []))
+
+    class M(FakeMemory):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, **kwargs)
+            self._blacklist = {"a.com", "b.com", "c.com"}  # previously stored set
+
+        def save_blacklist(self, domains: set[str]) -> int:
+            self._blacklist = set(domains)
+            return len(domains)
+
+    engine = _engine(monkeypatch, cfg, memory_cls=M)
+    assert engine.setup(force=True) == 0
+    assert engine._memory.blacklist() == {"only.com"}
 
 
 def test_seed_from_curated_marks_gaps(monkeypatch: Any, cfg: Any) -> None:

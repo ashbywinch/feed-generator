@@ -30,6 +30,9 @@ class Config:
     embed_batch: int = 25
     # Coverage
     min_feeds_per_topic: int = 3
+    # Setup: refuse to persist a blacklist that dropped below this fraction of
+    # the previously stored set (truncated-export guard; PRD zero-duplication).
+    min_blacklist_ratio: float = 0.5
     # Publishing
     publish_target: str = "netlify"
     deploy_token: str = ""
@@ -54,6 +57,7 @@ class Config:
             embed_interval=float(os.environ.get("EMBED_INTERVAL", "20.0")),
             embed_batch=int(os.environ.get("EMBED_BATCH", "25")),
             min_feeds_per_topic=int(os.environ.get("MIN_FEEDS_PER_TOPIC", "3")),
+            min_blacklist_ratio=float(os.environ.get("MIN_BLACKLIST_RATIO", "0.5")),
             publish_target=os.environ.get("PUBLISH_TARGET", "netlify"),
             deploy_token=os.environ.get("DEPLOY_TOKEN", ""),
         )

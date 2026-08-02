@@ -41,11 +41,12 @@ class Engine:
 
     # -- setup (FR-1/FR-2: one-and-done) -------------------------------------
 
-    def setup(self) -> int:
+    def setup(self, force: bool = False) -> int:
         """One-and-done: parse OPML, persist exclusion set + curated topics.
 
         Re-run only when the user adds/removes a topic. The recurring run
         (`run`) reads the stored blacklist and topics — it never touches OPML.
+        `force` bypasses the shrink guard for a deliberate large unsubscribe.
         """
         print("[setup] OPML -> exclusion set + topics")
         known_domains, feeds = parse_opml(PROJECT_ROOT / "feedly.opml")
@@ -54,12 +55,14 @@ class Engine:
             print("       (corrupt/truncated feedly.opml? fix it, then re-run setup)")
             return 1
         previous = self._memory.blacklist()
-        if previous and len(known_domains) < 0.5 * len(previous):
+        ratio = self._cfg.min_blacklist_ratio
+        if previous and not force and len(known_domains) < ratio * len(previous):
             print(
                 f"FATAL: OPML parsed {len(known_domains)} domains vs {len(previous)} previously stored "
-                "— a drop this large looks like a truncated/partial export, refusing to shrink the "
-                "exclusion set (the PRD forbids a partial blacklist: it voids the zero-duplication "
-                "guarantee). Fix feedly.opml, then re-run setup."
+                f"— a drop this large (>{1 - ratio:.0%}) looks like a truncated/partial export, "
+                "refusing to shrink the exclusion set (the PRD forbids a partial blacklist: it voids "
+                "the zero-duplication guarantee). Fix feedly.opml, or re-run `setup --force` if the "
+                "shrink is a deliberate unsubscribe."
             )
             return 1
         seeded = self._seed_from_curated()
@@ -67,6 +70,9 @@ class Engine:
             print("FATAL: topics seed produced zero topics — refusing to persist a partial setup")
             return 1
         self._memory.save_blacklist(known_domains)
+        if self._memory.blacklist() != known_domains:
+            print("FATAL: exclusion-set write incomplete — refusing to complete setup (no partial blacklist)")
+            return 1
         print(f"      {len(feeds)} feeds, {len(known_domains)} blacklist domains stored")
         print("[setup] done — topics + exclusion set persisted")
         return 0
@@ -179,11 +185,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"pruned {removed} events")
         return 0
     if command == "setup":
-        return engine.setup()
+        return engine.setup(force="--force" in args)
     if command == "run":
         return engine.run()
     print(
         "usage: python -m signalflow "
-        + "[run|setup|smoke|topics|topics-doc|reseed|prune|sources <topic>]  (default: run)"
+        + "[run|setup [--force]|smoke|topics|topics-doc|reseed|prune|sources <topic>]  (default: run)"
     )
     return 2

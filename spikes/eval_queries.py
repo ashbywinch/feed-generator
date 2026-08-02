@@ -230,9 +230,14 @@ For EACH query judge four properties:
 Respond with STRICT JSON only:
 {{"judgments": [{{"global": true/false, "mechanism_first": true/false,
 "in_scope": true/false, "distinct": true/false}}]}}"""
-    limiter.wait()
-    data = llm.chat_json(prompt, max_tokens=LLM_MAX_TOKENS)
     failures: list[str] = []
+    try:
+        limiter.wait()
+        data = llm.chat_json(prompt, max_tokens=LLM_MAX_TOKENS)
+    except Exception as exc:  # noqa: BLE001 — a router error must FAIL the gate, not crash it
+        for i, q in enumerate(queries):
+            failures.append(f"query {i + 1} ({q!r}): LLM call failed ({redact(str(exc))[:100]})")
+        return failures
     if not isinstance(data, dict):
         # Malformed model output: every query fails the gate, don't crash.
         for i, q in enumerate(queries):
