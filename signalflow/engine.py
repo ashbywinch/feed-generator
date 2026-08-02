@@ -49,6 +49,10 @@ class Engine:
         """
         print("[setup] OPML -> exclusion set + topics")
         known_domains, feeds = parse_opml(PROJECT_ROOT / "feedly.opml")
+        if not known_domains:
+            print("FATAL: OPML parsed zero domains — refusing to persist an empty exclusion set")
+            print("       (corrupt/truncated feedly.opml? fix it, then re-run setup)")
+            return 1
         self._memory.save_blacklist(known_domains)
         print(f"      {len(feeds)} feeds, {len(known_domains)} blacklist domains stored")
         self._seed_from_curated()

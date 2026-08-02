@@ -58,8 +58,8 @@ DISCOVERY_DIR = ROOT / "docs" / "discovery"
 PROMPTS_DIR = ROOT / "prompts"
 QUERIES_PROMPT_PATH = PROMPTS_DIR / "generate_discovery_queries.md"
 
-LLM_BASE = os.environ["OPENCODE_GO_BASE_URL"]
-LLM_KEY = os.environ["OPENCODE_GO_API_KEY"]
+LLM_BASE = os.environ.get("OPENCODE_GO_BASE_URL", "")
+LLM_KEY = os.environ.get("OPENCODE_GO_API_KEY", "")
 LLM_MODEL = os.environ.get("OPENCODE_GO_MODEL", "deepseek-v4-flash")
 
 MIN_QUERIES = 5
@@ -80,7 +80,10 @@ SUBAREA_TOKENS: dict[str, tuple[str, ...]] = {
     "Demand-side flexibility & electrification demand growth": ("demand-side", "demand side", "electrification"),
     "Nuclear new-build economics (RAB, CfDs, SMRs)": ("nuclear", "smr"),
     "Storage beyond lithium-ion (CAES, thermal, gravity, flow)": (
-        "long-duration", "lithium-ion", "caes", "thermal storage"
+        "long-duration",
+        "lithium-ion",
+        "caes",
+        "thermal storage",
     ),
     "Offshore wind": ("offshore wind", "floating wind"),
     "Carbon markets / ETS & climate-economics data": ("carbon market", "ets", "carbon price"),
@@ -158,9 +161,7 @@ def coverage_check(queries: list[str], subareas: list[str]) -> list[str]:
     return uncovered
 
 
-def llm_check(
-    queries: list[str], topic: dict[str, Any], llm: LLM, limiter: RateLimiter
-) -> list[str]:
+def llm_check(queries: list[str], topic: dict[str, Any], llm: LLM, limiter: RateLimiter) -> list[str]:
     """LLM judgment per query: global, mechanism-first, in-scope, distinct.
 
     Coverage is judged deterministically (coverage_check), not by the LLM —
@@ -169,9 +170,9 @@ def llm_check(
     q_rows = "\n".join(f"{i + 1}. {q}" for i, q in enumerate(queries))
     prompt = f"""You are auditing the search-query set for a personal discovery engine.
 
-Topic: {topic['name']}
-IN scope: {topic['in']}
-OUT of scope: {topic['out']}
+Topic: {topic["name"]}
+IN scope: {topic["in"]}
+OUT of scope: {topic["out"]}
 
 Queries under audit:
 {q_rows}
@@ -305,8 +306,10 @@ def main(argv: list[str] | None = None) -> int:
     uncovered = coverage_check(queries, subareas)
     if len(uncovered) > MAX_UNCOVERED:
         failures.append(f"{len(uncovered)} subareas uncovered (limit {MAX_UNCOVERED}): {', '.join(uncovered[:6])}")
-    print(f"      coverage: {len(subareas) - len(uncovered)}/{len(subareas)} subareas "
-          + (f"— uncovered: {', '.join(uncovered[:6])}" if uncovered else "— all covered"))
+    print(
+        f"      coverage: {len(subareas) - len(uncovered)}/{len(subareas)} subareas "
+        + (f"— uncovered: {', '.join(uncovered[:6])}" if uncovered else "— all covered")
+    )
 
     llm_failures = llm_check(queries, topic, llm, limiter)
     print(f"[3/3] LLM judgment gate: {'PASS' if not llm_failures else 'FAIL'} ({len(llm_failures)} finding(s))")

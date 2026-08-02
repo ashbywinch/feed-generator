@@ -85,8 +85,8 @@ STORY_DIR = STATE_DIR / "stories"
 PROMPTS_DIR = ROOT / "prompts"
 STORY_PROMPT_PATH = PROMPTS_DIR / "generate_area_story.md"
 
-LLM_BASE = os.environ["OPENCODE_GO_BASE_URL"]
-LLM_KEY = os.environ["OPENCODE_GO_API_KEY"]
+LLM_BASE = os.environ.get("OPENCODE_GO_BASE_URL", "")
+LLM_KEY = os.environ.get("OPENCODE_GO_API_KEY", "")
 LLM_MODEL = os.environ.get("OPENCODE_GO_MODEL", "deepseek-v4-flash")
 
 RECENCY_DAYS = int(os.environ.get("RECENCY_DAYS", "7"))
@@ -101,7 +101,7 @@ STORY_MAX_ANGLES = 5  # angle lines kept per subarea
 STORY_MAX_QUESTIONS = 8  # open questions kept per topic
 EVAL_INTERVAL = 1.0  # seconds between router chat calls (global pacing)
 LLM_MAX_TOKENS = 8192
-PROMPT_REV = 8  # bump when the evaluation prompt changes -> stale verdicts ignored
+PROMPT_REV = 9  # bump when the evaluation prompt changes -> stale verdicts ignored
 
 APPEND_LOCK = threading.Lock()  # serialize JSONL appends from worker threads
 
@@ -128,6 +128,7 @@ input item, in the SAME ORDER as the input list — never omit or reorder items:
 
 
 # --- disk cache helpers ---------------------------------------------------
+
 
 def _load_jsonl(path: Path) -> dict[str, dict[str, Any]]:
     """key -> latest entry (last line per key wins)."""
@@ -187,6 +188,7 @@ def record_pick(entry: dict[str, Any]) -> None:
 
 
 # --- feed fetching --------------------------------------------------------
+
 
 def strip_html(text: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", text or "")).strip()
@@ -254,6 +256,7 @@ def fetch_feed(source: Source) -> Source:
 
 # --- LLM evaluation -------------------------------------------------------
 
+
 def _item_row(it: Item) -> str:
     pub = it.get("published") or "(no date)"
     return f"- [{pub}] {it['title']} — {it['summary']} ({it['url']})"
@@ -270,13 +273,13 @@ This feed is CURATED and DEMANDING: it only surfaces genuinely interesting,
 relevant articles. Most articles fail. Many weeks a source yields nothing at
 all — that is the expected outcome, not a gap.
 
-Topic: {topic['name']}
-Description: {topic['description']}
-IN scope: {topic['in']}
-OUT of scope: {topic['out']}
+Topic: {topic["name"]}
+Description: {topic["description"]}
+IN scope: {topic["in"]}
+OUT of scope: {topic["out"]}
 
-Source: {source['name']} ({source.get('type', '')}) — covers subarea \"{source['subarea']}\"
-Why this source is subscribed: {source.get('why', '')}{slice_block}
+Source: {source["name"]} ({source.get("type", "")}) — covers subarea \"{source["subarea"]}\"
+Why this source is subscribed: {source.get("why", "")}{slice_block}
 
 This week's items from this source (last {RECENCY_DAYS} days):
 {rows}
@@ -331,9 +334,7 @@ digest's Observed Event bullet.
     limiter.wait()
     data = llm.chat_json(prompt, max_tokens=LLM_MAX_TOKENS)
     verdicts: dict[str, dict[str, Any]] = {
-        v["url"]: v
-        for v in data.get("verdicts", [])
-        if isinstance(v, dict) and v.get("url")
+        v["url"]: v for v in data.get("verdicts", []) if isinstance(v, dict) and v.get("url")
     }
     missing = [it for it in items if it["url"] not in verdicts]
     if missing:
@@ -341,7 +342,21 @@ digest's Observed Event bullet.
         # exactly the missing ones before falling back to reject.
         retry_rows = "\n".join(_item_row(it) for it in missing)
         retry_prompt = f"""You omitted verdicts for these items from the previous batch.
-Same rules. Return EXACTLY one verdict per item below, same order:
+Same rules — this call is stateless, so the full bar is restated:
+
+Topic: {topic["name"]}
+IN scope: {topic["in"]}
+OUT of scope: {topic["out"]}
+
+Source: {source["name"]} — covers subarea \"{source["subarea"]}\"
+
+HARD GATE first: REJECT outright anything in the OUT of scope (apply OUT as
+scope, not keywords — EV/policy/market stories are IN, consumer EV content is
+OUT). Then approve only empirical data shifts, first-principles systems
+analysis, or structural surprises; reject announcements, PR, explainers, and
+routine updates. When unsure, reject. Zero approvals is valid.
+
+Return EXACTLY one verdict per item below, same order:
 {retry_rows}
 
 {SCHEMA_HINT}"""
@@ -374,6 +389,7 @@ Same rules. Return EXACTLY one verdict per item below, same order:
 
 
 # --- report ---------------------------------------------------------------
+
 
 def render_report(summary: dict[str, Any], sections: list[dict[str, Any]]) -> str:
     lines = [
@@ -505,9 +521,7 @@ def seed_story(
         "updated_at": datetime.now(UTC).isoformat(),
         "overview": str(data.get("overview", "")).strip(),
         "angles": {
-            str(k): [str(a).strip() for a in v][:STORY_MAX_ANGLES]
-            for k, v in angles.items()
-            if isinstance(v, list)
+            str(k): [str(a).strip() for a in v][:STORY_MAX_ANGLES] for k, v in angles.items() if isinstance(v, list)
         },
         "open_questions": [str(q).strip() for q in (data.get("open_questions") or [])][:STORY_MAX_QUESTIONS],
         "pending": [],
@@ -534,7 +548,7 @@ def story_slice(story: dict[str, Any], subarea: str) -> str:
 
 def fold_story(
     story: dict[str, Any], picks: list[dict[str, Any]], topic: dict[str, Any], llm: LLM, limiter: RateLimiter
-) -> None:
+) -> bool:
     """Adapt the story's BIG PICTURE from approved picks: one LLM call.
 
     The story stays big-picture: angles evolve only when the new evidence
@@ -542,6 +556,10 @@ def fold_story(
     numbers) are NEVER appended. If the model judges nothing material changed
     (returns the current story), the version is NOT bumped — so a quiet fold
     leaves the verdict cache intact.
+
+    Returns True when the fold ran to completion (changed OR unchanged); False
+    when the LLM call failed or returned malformed output — the caller must
+    then KEEP the pending queue so the fold is retried, not silently dropped.
     """
     rows = "\n".join(
         f"- [{p.get('date', '?')}] ({p.get('subarea', '')}) {p['title']} "
@@ -555,9 +573,9 @@ that explain how the area works (mechanisms, tensions, what is changing), and a
 few open questions. It must stay in the big picture — it is NOT a log of
 articles and NOT a list of questions.
 
-Topic: {topic['name']}
-IN scope: {topic['in']}
-OUT of scope: {topic['out']}
+Topic: {topic["name"]}
+IN scope: {topic["in"]}
+OUT of scope: {topic["out"]}
 
 Current story:
 {json.dumps(current, indent=2, ensure_ascii=False)}
@@ -583,9 +601,10 @@ Respond with STRICT JSON only:
         data = llm.chat_json(prompt, max_tokens=LLM_MAX_TOKENS)
     except Exception as exc:  # noqa: BLE001 — fold is best-effort; keep the current story
         print(f"      story fold failed: {redact(str(exc))[:160]}")
-        return
+        return False
     if not isinstance(data, dict) or not data.get("angles"):
-        return
+        print("      story fold returned no angles — pending kept for retry")
+        return False
     angles = {
         str(k): [str(a).strip() for a in v][:STORY_MAX_ANGLES]
         for k, v in (data.get("angles") or {}).items()
@@ -595,12 +614,13 @@ Respond with STRICT JSON only:
     overview = str(data.get("overview", story.get("overview", ""))).strip()
     if angles == story.get("angles") and questions == story.get("open_questions") and overview == story.get("overview"):
         print("      story unchanged by fold — version kept")
-        return
+        return True
     story["overview"] = overview
     story["angles"] = angles
     story["open_questions"] = questions
     story["version"] = int(story.get("version", 0)) + 1
     story["updated_at"] = datetime.now(UTC).isoformat()
+    return True
 
 
 def render_story_markdown(story: dict[str, Any], topic_name: str) -> str:
@@ -633,6 +653,7 @@ def render_story_markdown(story: dict[str, Any], topic_name: str) -> str:
 
 
 # --- main -----------------------------------------------------------------
+
 
 def redact(message: str) -> str:
     for secret in (LLM_KEY,):
@@ -758,17 +779,21 @@ def main(argv: list[str] | None = None) -> int:
         story = seed_story(slug, topic, listing, llm, limiter)
         if story.get("angles"):
             save_story(slug, story)
-            print(f"      story seeded: v{story['version']} — "
-                  + f"{sum(len(v) for v in story['angles'].values())} angles, "
-                  + f"{len(story['open_questions'])} open questions")
+            print(
+                f"      story seeded: v{story['version']} — "
+                + f"{sum(len(v) for v in story['angles'].values())} angles, "
+                + f"{len(story['open_questions'])} open questions"
+            )
     story_version = int(story.get("version", 0))
     feeds_cache = load_feeds()
     verdicts_cache = load_verdicts(story_version)
     picked_urls = load_picked_urls()
     if story_version:
-        print(f"      story: v{story_version} ({story.get('updated_at', '')[:10]}) — "
-              + f"{sum(len(v) for v in story.get('angles', {}).values())} angles, "
-              + f"{len(story.get('open_questions', []))} open questions")
+        print(
+            f"      story: v{story_version} ({story.get('updated_at', '')[:10]}) — "
+            + f"{sum(len(v) for v in story.get('angles', {}).values())} angles, "
+            + f"{len(story.get('open_questions', []))} open questions"
+        )
 
     # Fetch: reuse fresh cache; re-fetch stale or long-failed; a fetch failure
     # falls back to the last cached items (a transient outage never reads as
@@ -852,25 +877,27 @@ def main(argv: list[str] | None = None) -> int:
     n_with_items = sum(1 for s in sources if s["items"])
     print(f"      sources: {n_fetched} fetched, {n_cache} cache reuse, {n_failed} failed/stale")
 
-    print(f"[3/6] window filter: {n_window} items in last {RECENCY_DAYS} days "
-          + f"({n_undated} undated, {n_junk} boilerplate-filtered) across {n_with_items} sources")
+    print(
+        f"[3/6] window filter: {n_window} items in last {RECENCY_DAYS} days "
+        + f"({n_undated} undated, {n_junk} boilerplate-filtered) across {n_with_items} sources"
+    )
 
     # Deferred story fold: queued picks from previous runs fold into the story
     # ONLY when this run has genuinely new items to evaluate (so a same-week
     # re-run — everything cached — never folds, never bumps the version, and
     # stays idempotent). Folding changes the context, so it invalidates the
     # verdict cache; the fresh window is then judged against the enriched story.
-    todo_total = sum(
-        1 for s in sources for it in s.get("items", []) if it["url"] not in verdicts_cache
-    )
+    todo_total = sum(1 for s in sources for it in s.get("items", []) if it["url"] not in verdicts_cache)
     if todo_total and story.get("pending"):
         print(f"      folding {len(story['pending'])} queued picks into story ...")
-        fold_story(story, story["pending"], topic, llm, limiter)
-        story["pending"] = []
-        save_story(slug, story)
-        story_version = int(story.get("version", 0))
-        verdicts_cache = load_verdicts(story_version)
-        print(f"      story now v{story_version} — verdict cache re-keyed")
+        if fold_story(story, story["pending"], topic, llm, limiter):
+            story["pending"] = []
+            save_story(slug, story)
+            story_version = int(story.get("version", 0))
+            verdicts_cache = load_verdicts(story_version)
+            print(f"      story now v{story_version} — verdict cache re-keyed")
+        else:
+            print("      story fold failed — pending picks kept for the next run")
 
     n_new = n_cached = 0
     print(f"[4/6] LLM evaluation (per source, {EVAL_INTERVAL}s global pacing) ...")
@@ -903,10 +930,13 @@ def main(argv: list[str] | None = None) -> int:
     print(f"      evaluated {n_new} new items, {n_cached} from cache")
 
     picks: list[dict[str, Any]] = []
-    picks: list[dict[str, Any]] = []
     seen_pick_urls: set[str] = set()
     for s in sources:
-        approved = [v for v in s.get("verdicts", []) if parse_bool(v.get("approved"))]
+        order = {it["url"]: i for i, it in enumerate(s["items"])}
+        approved = sorted(
+            (v for v in s.get("verdicts", []) if parse_bool(v.get("approved"))),
+            key=lambda v: order.get(v["url"], len(s["items"])),
+        )
         if len(approved) > MAX_PICKS_PER_SOURCE:
             print(f"      cap: {s['name']} approved {len(approved)} — keeping {MAX_PICKS_PER_SOURCE}")
         s["picks"] = approved[:MAX_PICKS_PER_SOURCE]

@@ -57,8 +57,8 @@ VERDICTS_PATH = STATE_DIR / "weekly_verdicts.jsonl"
 PICKS_HISTORY_PATH = STATE_DIR / "weekly_picks.jsonl"
 STORY_DIR = STATE_DIR / "stories"
 
-LLM_BASE = os.environ["OPENCODE_GO_BASE_URL"]
-LLM_KEY = os.environ["OPENCODE_GO_API_KEY"]
+LLM_BASE = os.environ.get("OPENCODE_GO_BASE_URL", "")
+LLM_KEY = os.environ.get("OPENCODE_GO_API_KEY", "")
 LLM_MODEL = os.environ.get("OPENCODE_GO_MODEL", "deepseek-v4-flash")
 
 OVERVIEW_MIN_WORDS = 50
@@ -151,6 +151,7 @@ def sentences(text: str) -> list[str]:
 def is_question(s: str) -> bool:
     starters = ("how ", "what ", "why ", "when ", "where ", "which ", "who ", "is ", "are ", "can ", "will ", "should ")
     return s.rstrip().endswith("?") or s.strip().lower().startswith(starters)
+
 
 def question_frac(text: str) -> float:
     ss = sentences(text)
@@ -266,9 +267,7 @@ def held_out_articles(
     return out
 
 
-def contextualize(
-    article: Item, story_text: str, topic_name: str, llm: LLM, limiter: RateLimiter
-) -> dict[str, Any]:
+def contextualize(article: Item, story_text: str, topic_name: str, llm: LLM, limiter: RateLimiter) -> dict[str, Any]:
     """Give the story + article to a reader; get the linking caption + self-judgment.
 
     The criterion is PLACEMENT: can the reader fit the article into the story's
@@ -287,8 +286,8 @@ STORY (background material):
 {story_text}
 
 NEW ARTICLE:
-Title: {article['title']}
-Summary: {article['summary']}
+Title: {article["title"]}
+Summary: {article["summary"]}
 
 First, WHERE does this article fit in the big picture? Name the specific
 subarea, mechanism, or tension from the STORY that this article speaks to
