@@ -478,6 +478,9 @@ def render_report(summary: dict[str, Any], sections: list[dict[str, Any]]) -> st
                     lines.append(f"  - thesis: {p['thesis']}")
                 if p.get("empirical_event"):
                     lines.append(f"  - observed event: {p['empirical_event']}")
+        elif sec.get("eval_error"):
+            # A failed evaluation is NOT a valid zero-pick outcome — say so.
+            lines.append("- evaluation failed — no verdicts judged (not a zero-pick outcome).")
         else:
             lines.append("- 0 picked — nothing worth surfacing this week (valid outcome).")
         lines.append("")

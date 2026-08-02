@@ -24,6 +24,8 @@ Run the spike: `make spike`
 ## Testing rules
 
 - ALWAYS use `make` targets (`make test`, `make lint`, `make typecheck`, `make coverage`); NEVER construct ad-hoc test commands.
+- **TDD is mandatory: a failing test comes FIRST, run it RED, then fix, then GREEN.** Tests must call the real code path — never re-implement logic inline. Weak tests (inline reimplementation, tautologies) are forbidden; the RED run is the proof. See `docs/testing-standards.md`.
+- **PR review loop:** every PR goes through AI review; read the FULL comment, fix every actionable finding test-first, re-run the full gate, push, repeat. Stop only when a round returns nothing but nitpicks/opinions/disagreements. See `docs/testing-standards.md` §PR review loop.
 - Tests mirror module paths under `tests/`; deterministic, no network; `e2e`-marked tests excluded by default.
 - See `docs/testing-standards.md`.
 
