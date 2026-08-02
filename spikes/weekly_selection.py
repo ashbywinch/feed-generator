@@ -856,6 +856,16 @@ def is_item_in_window(item: Item, cutoff: datetime) -> bool:
     return True  # legacy undated item without first_seen: keep once
 
 
+def count_zero_pick_sources(sources: list[Source]) -> int:
+    """Sources with items but no picks — EXCLUDING evaluation failures.
+
+    A source whose evaluation raised (eval_error set) is not a genuine
+    "nothing worth surfacing" outcome; counting it would misreport a router
+    failure as a valid zero-pick week.
+    """
+    return sum(1 for s in sources if s["items"] and not s["picks"] and not s.get("eval_error"))
+
+
 def main(argv: list[str] | None = None) -> int:
     del argv  # config comes from env; signature mirrors the engine's main()
     for var in ("OPENCODE_GO_API_KEY", "OPENCODE_GO_BASE_URL"):
@@ -1142,7 +1152,7 @@ def main(argv: list[str] | None = None) -> int:
         "items_new": n_new,
         "items_cached": n_cached,
         "picked": len(picks),
-        "zero_pick_sources": sum(1 for s in sources if s["items"] and not s["picks"]),
+        "zero_pick_sources": count_zero_pick_sources(sources),
         "story_version": story.get("version", 0),
         "story_updated": story.get("updated_at", "")[:10],
     }

@@ -363,6 +363,25 @@ def contextualization_passes(sufficient: int, total: int, pass_frac: float) -> b
     return sufficient >= total - 1 or sufficient / total >= pass_frac
 
 
+def load_picked_urls() -> set[str]:
+    """URLs already surfaced (pick history); torn tail lines are skipped.
+
+    Mirrors weekly_selection.load_picked_urls — every cache reader must
+    tolerate a torn tail line from a crash mid-append.
+    """
+    out: set[str] = set()
+    if not PICKS_HISTORY_PATH.exists():
+        return out
+    for line in PICKS_HISTORY_PATH.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            out.add(json.loads(line)["url"])
+        except (json.JSONDecodeError, KeyError):
+            continue  # torn tail line from a crash; that entry is lost anyway
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     del argv
     for var in ("OPENCODE_GO_API_KEY", "OPENCODE_GO_BASE_URL"):
@@ -409,11 +428,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     limiter = RateLimiter(EVAL_INTERVAL)
-    picked: set[str] = set()
-    if PICKS_HISTORY_PATH.exists():
-        for line in PICKS_HISTORY_PATH.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                picked.add(json.loads(line)["url"])
+    picked = load_picked_urls()
     feeds_cache = _load_jsonl(FEEDS_PATH)
     articles = held_out_articles(feeds_cache, picked, story)
     print(f"[3/3] contextualization gate: {len(articles)} held-out article(s)")

@@ -305,6 +305,38 @@ def test_window_reserves_slots_for_undated_items() -> None:
     assert all(str(it.get("title")).startswith("U") for it in out if it.get("undated"))
 
 
+# --- eval_story: pick-history read tolerates torn lines (r11) --------------
+
+
+def test_eval_story_load_picked_urls_handles_torn_lines(tmp_path: Any, monkeypatch: Any) -> None:
+    """A torn JSONL tail line must not crash the eval's pick-history read."""
+    ev = _load_spike("eval_story")
+    cache = tmp_path / "weekly_picks.jsonl"
+    cache.write_text(
+        json.dumps({"url": "https://x/ok", "title": "T"})
+        + "\n"
+        + '{"url": "torn", extra'  # invalid JSON tail line
+        + "\n"
+    )
+    monkeypatch.setattr(ev, "PICKS_HISTORY_PATH", cache)
+    picked = ev.load_picked_urls()
+    assert "https://x/ok" in picked  # valid entry survives
+    assert "torn" not in picked  # corrupt line skipped, no crash
+
+
+# --- weekly_selection: zero_pick_sources excludes eval-failed sources (r11) --
+
+
+def test_zero_pick_sources_excludes_eval_failed() -> None:
+    """A source whose evaluation failed must NOT count as a valid zero-pick."""
+    # Real sources shaped like the pipeline builds them
+    ok_zero = {"items": [1], "picks": [], "eval_error": ""}  # genuine zero-pick
+    eval_failed = {"items": [1], "picks": [], "eval_error": "router timeout"}  # not a zero-pick
+    picked = {"items": [1], "picks": [1], "eval_error": ""}  # has picks
+    sources = [ok_zero, eval_failed, picked]
+    assert ws.count_zero_pick_sources(sources) == 1  # only the genuine zero-pick counts
+
+
 # --- weekly_selection: undated items age out of the window (r10) -----------
 
 
