@@ -126,6 +126,20 @@ def subarea_tokens(name: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys(out))  # dedupe, keep order
 
 
+def parse_bool(value: Any) -> bool:
+    """Strict truthiness for LLM booleans: only real True or true-ish strings.
+
+    bool("false") is True — a model emitting the string "false" must not pass
+    the gate. Accepts bool True and strings in (true, yes, 1); everything else
+    (including "false"/"no"/0) is False.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "yes", "1")
+    return False
+
+
 # Hard geography anchors: a query naming any of these can only find that
 # jurisdiction's news. "European" is softer (multi-country) but still local;
 # keep the strict list to single-jurisdiction terms. U.K. gets its own branch
@@ -152,6 +166,7 @@ def load_listing(topic_name: str) -> tuple[dict[str, Any] | None, str]:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
+            print(f"      WARNING: {path.name}: unreadable JSON — skipped")
             continue
         if data.get("topic") == topic_name:
             return data, path.stem
@@ -254,13 +269,13 @@ Respond with STRICT JSON only:
         if not isinstance(j, dict):
             failures.append(f"query {i + 1} ({q!r}): no judgment returned")
             continue
-        if not j.get("global"):
+        if not parse_bool(j.get("global")):
             failures.append(f"query {i + 1} ({q!r}): not global")
-        if not j.get("mechanism_first"):
+        if not parse_bool(j.get("mechanism_first")):
             failures.append(f"query {i + 1} ({q!r}): not mechanism-first")
-        if not j.get("in_scope"):
+        if not parse_bool(j.get("in_scope")):
             failures.append(f"query {i + 1} ({q!r}): out of scope")
-        if not j.get("distinct"):
+        if not parse_bool(j.get("distinct")):
             failures.append(f"query {i + 1} ({q!r}): duplicates another query")
     return failures
 

@@ -125,14 +125,18 @@ def _load_jsonl(path: Path) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     if not path.exists():
         return out
+    skipped = 0
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         try:
             entry = json.loads(line)
         except json.JSONDecodeError:
+            skipped += 1  # torn tail line from a crash; that work is redone
             continue
         out[entry["key"]] = entry
+    if skipped:
+        print(f"      WARNING: {path.name}: skipped {skipped} corrupt line(s) — work will be redone")
     return out
 
 
@@ -186,20 +190,21 @@ def mechanical_check(story: dict[str, Any]) -> list[str]:
     angles = story.get("angles", {})
     if not isinstance(angles, dict) or not angles:
         failures.append("no subarea sections in story")
-    for subarea, lines in angles.items():
-        if not isinstance(lines, list):
-            continue
-        text = "\n".join(str(x) for x in lines)
-        declarative = sum(1 for s in sentences(text) if not is_question(s))
-        qfrac = question_frac(text)
-        if declarative < MIN_DECLARATIVE_PER_SECTION:
-            failures.append(
-                f"section '{subarea}': only {declarative} declarative sentence(s) — questions, not background"
-            )
-        if qfrac > MAX_QUESTION_FRAC:
-            failures.append(f"section '{subarea}': {qfrac:.0%} interrogative (background, not a question list)")
-        for bad in contamination(text):
-            failures.append(f"section '{subarea}': {bad}")
+    else:
+        for subarea, lines in angles.items():
+            if not isinstance(lines, list):
+                continue
+            text = "\n".join(str(x) for x in lines)
+            declarative = sum(1 for s in sentences(text) if not is_question(s))
+            qfrac = question_frac(text)
+            if declarative < MIN_DECLARATIVE_PER_SECTION:
+                failures.append(
+                    f"section '{subarea}': only {declarative} declarative sentence(s) — questions, not background"
+                )
+            if qfrac > MAX_QUESTION_FRAC:
+                failures.append(f"section '{subarea}': {qfrac:.0%} interrogative (background, not a question list)")
+            for bad in contamination(text):
+                failures.append(f"section '{subarea}': {bad}")
     return failures
 
 

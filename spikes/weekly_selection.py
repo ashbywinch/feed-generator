@@ -136,14 +136,18 @@ def _load_jsonl(path: Path) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     if not path.exists():
         return out
+    skipped = 0
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         try:
             entry = json.loads(line)
         except json.JSONDecodeError:
-            continue  # torn tail line from a crash; that work is redone
+            skipped += 1  # torn tail line from a crash; that work is redone
+            continue
         out[entry["key"]] = entry
+    if skipped:
+        print(f"      WARNING: {path.name}: skipped {skipped} corrupt line(s) — work will be redone")
     return out
 
 
@@ -251,6 +255,7 @@ def fetch_feed(source: Source) -> Source:
                     "summary": summary,
                     "published": published.isoformat() if published else None,
                     "undated": published is None,
+                    "first_seen": datetime.now(UTC).isoformat(),  # window anchor for undated items
                 }
             )
     except Exception as exc:  # noqa: BLE001 — feed fetch/parse fails in many ways; log and continue
@@ -355,7 +360,7 @@ Topic: {topic["name"]}
 IN scope: {topic["in"]}
 OUT of scope: {topic["out"]}
 
-Source: {source["name"]} — covers subarea \"{source["subarea"]}\"
+Source: {source["name"]} — covers subarea(s): {subarea_label}{slice_block}
 
 HARD GATE first: REJECT outright anything in the OUT of scope (apply OUT as
 scope, not keywords — EV/policy/market stories are IN, consumer EV content is
@@ -590,12 +595,15 @@ def story_slice(story: dict[str, Any], subarea: str) -> str:
 
     Only this source's subarea: its big-picture angles plus a couple of the
     topic's open questions. Never the whole story — no prompt grows with it.
+    Returns "" when the subarea has no story section; the caller decides how
+    to surface that (evaluation runs without context, which is honest).
     """
+    angles = story.get("angles", {})
+    if not isinstance(angles, dict) or not angles.get(subarea):
+        return ""  # no story background for this subarea — judged without it
     lines: list[str] = []
-    angles = story.get("angles", {}).get(subarea, [])
-    if angles:
-        lines.append(f"Big-picture angles we track on this subarea ({subarea}):")
-        lines.extend(f"- {a}" for a in angles[:STORY_MAX_ANGLES])
+    lines.append(f"Big-picture angles we track on this subarea ({subarea}):")
+    lines.extend(f"- {a}" for a in angles[subarea][:STORY_MAX_ANGLES])
     questions = story.get("open_questions", [])
     if questions:
         lines.append("Open questions this area is tracking:")
@@ -824,6 +832,30 @@ def window_items(items: list[Item], max_items: int) -> list[Item]:
     return dated[: max_items - reserved] + undated[:reserved]
 
 
+def is_item_in_window(item: Item, cutoff: datetime) -> bool:
+    """Is this item a candidate for the current window?
+
+    Dated items are windowed on their publish date. Undated items have no
+    publish date, so they are windowed on first_seen (stamped at fetch time) —
+    an undated article first seen before the window is NOT new, and must not be
+    re-judged as a fresh "this week" pick after a story-version re-key.
+    Legacy cached items without first_seen are kept once (migration safety).
+    """
+    if item.get("published"):
+        try:
+            pub = datetime.fromisoformat(item["published"])
+        except ValueError:
+            pub = None
+        return not (pub is not None and pub < cutoff)
+    first_seen = item.get("first_seen")
+    if first_seen:
+        try:
+            return datetime.fromisoformat(first_seen) >= cutoff
+        except ValueError:
+            return True  # unparseable first_seen: keep (fail open)
+    return True  # legacy undated item without first_seen: keep once
+
+
 def main(argv: list[str] | None = None) -> int:
     del argv  # config comes from env; signature mirrors the engine's main()
     for var in ("OPENCODE_GO_API_KEY", "OPENCODE_GO_BASE_URL"):
@@ -968,13 +1000,8 @@ def main(argv: list[str] | None = None) -> int:
             if any(m in it["title"].lower() for m in JUNK_TITLE_MARKERS):
                 n_junk += 1  # boilerplate document, not an article — never reaches the LLM
                 continue
-            if it.get("published"):
-                try:
-                    pub = datetime.fromisoformat(it["published"])
-                except ValueError:
-                    pub = None
-                if pub is not None and pub < cutoff:
-                    continue
+            if not is_item_in_window(it, cutoff):
+                continue  # dated-before-window, or undated first seen before the window
             items.append(it)
             if it.get("undated"):
                 n_undated += 1
@@ -1033,6 +1060,14 @@ def main(argv: list[str] | None = None) -> int:
             n_new += len(todo)
             try:
                 slices = [story_slice(story, sub) for sub in (s.get("subareas") or [s["subarea"]])]
+                sub_list = s.get("subareas") or [s["subarea"]]
+                missing_subs = [sub for sub, sl in zip(sub_list, slices, strict=True) if not sl]
+                if missing_subs:
+                    print(
+                        f"      WARNING: no story section for {s['name']} subarea(s) "
+                        + f"{', '.join(missing_subs)} — judging without story context "
+                        "(story angle names may have drifted from the discovery list)"
+                    )
                 verdicts = evaluate_source(s, todo, topic, llm, limiter, "\n\n".join(x for x in slices if x))
             except Exception as exc:  # noqa: BLE001 — keep the run alive; cached verdicts still count
                 print(f"      evaluation failed for {s['name']}: {redact(str(exc))[:200]}")

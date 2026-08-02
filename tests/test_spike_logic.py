@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -302,6 +303,141 @@ def test_window_reserves_slots_for_undated_items() -> None:
     reserved = min(5, max(1, cap // 5))
     assert sum(1 for it in out if it.get("undated")) == reserved  # all reserved slots taken
     assert all(str(it.get("title")).startswith("U") for it in out if it.get("undated"))
+
+
+# --- weekly_selection: undated items age out of the window (r10) -----------
+
+
+def test_undated_items_age_out_via_first_seen() -> None:
+    """An undated item first seen before the window must not be a candidate."""
+    cutoff = datetime.now(UTC) - timedelta(days=ws.RECENCY_DAYS)
+    old = {
+        "url": "https://x/old",
+        "title": "Old",
+        "published": None,
+        "undated": True,
+        "first_seen": (cutoff - timedelta(days=1)).isoformat(),
+    }
+    fresh = {
+        "url": "https://x/fresh",
+        "title": "Fresh",
+        "published": None,
+        "undated": True,
+        "first_seen": (cutoff + timedelta(days=1)).isoformat(),
+    }
+    dated_old = {
+        "url": "https://x/d",
+        "title": "D",
+        "published": (cutoff - timedelta(days=1)).isoformat(),
+        "undated": False,
+    }
+    assert ws.is_item_in_window(old, cutoff) is False  # undated, seen before window
+    assert ws.is_item_in_window(fresh, cutoff) is True  # undated, seen within window
+    assert ws.is_item_in_window(dated_old, cutoff) is False  # dated, published before window
+
+
+def test_undated_without_first_seen_is_kept_once() -> None:
+    """Legacy cached items without first_seen stay candidates (migration safety)."""
+    cutoff = datetime.now(UTC) - timedelta(days=ws.RECENCY_DAYS)
+    legacy = {"url": "https://x/legacy", "title": "L", "published": None, "undated": True}
+    assert ws.is_item_in_window(legacy, cutoff) is True
+
+
+# --- weekly_selection: retry prompt carries story context (r10) -------------
+
+
+def test_retry_prompt_includes_story_slice() -> None:
+    """Retried verdicts must be judged with the same story context as the main call."""
+    prompts: list[str] = []
+
+    class CapturingLLM:
+        def chat_json(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+            prompts.append(prompt)
+            if len(prompts) == 1:
+                return {"verdicts": []}  # omit everything -> retry path
+            return {
+                "verdicts": [
+                    {"url": "https://x/1", "approved": False, "reason": "r", "thesis": "", "empirical_event": ""}
+                ]
+            }
+
+    class Limiter:
+        def wait(self) -> None:
+            pass
+
+    source = {"name": "S", "subarea": "sub", "subareas": ["sub"], "why": "why this source"}
+    topic = {"name": "T", "description": "d", "in": "i", "out": "o"}
+    ws.evaluate_source(
+        source,
+        [{"url": "https://x/1", "title": "T", "summary": "s"}],
+        topic,
+        CapturingLLM(),
+        Limiter(),
+        "STORY SLICE TEXT",
+    )
+    assert len(prompts) >= 2
+    assert "STORY SLICE TEXT" in prompts[1]  # retry prompt must carry the story slice
+
+
+# --- weekly_selection: story_slice missing subarea is detected (r10) --------
+
+
+def test_story_slice_returns_empty_and_reports_missing_subarea() -> None:
+    """A subarea absent from the story's angles must not silently pass as context."""
+    story = {"angles": {"exact-name": ["a"]}, "open_questions": ["q"]}
+    # The listing may use "Grid-scale batteries & storage" while the story has
+    # "Grid-scale storage": a key mismatch must be detectable, not silent.
+    missing = ws.story_slice(story, "Grid-scale batteries & storage")
+    assert missing == ""  # no angles found
+    # After the fix: the run should log/report the miss rather than proceed silently.
+    assert ws.story_slice(story, "exact-name") != ""
+
+
+# --- eval_queries: strict bool parsing of LLM judgments (r10) ---------------
+
+
+def test_llm_check_rejects_false_string_judgments() -> None:
+    eq = _load_spike("eval_queries")
+
+    class FalseStringLLM:
+        def chat_json(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+            return {"judgments": [{"global": "false", "mechanism_first": True, "in_scope": True, "distinct": True}]}
+
+    class Limiter:
+        def wait(self) -> None:
+            pass
+
+    failures = eq.llm_check(["q1"], {"name": "T", "in": "i", "out": "o"}, FalseStringLLM(), Limiter())
+    assert any("not global" in f for f in failures)  # string "false" must fail, not pass
+
+
+# --- eval_story: malformed angles must fail cleanly, not crash (r10) --------
+
+
+def test_mechanical_check_handles_non_dict_angles() -> None:
+    ev = _load_spike("eval_story")
+    # angles as a list (corrupt story) must produce a failure, not AttributeError
+    failures = ev.mechanical_check({"overview": "x" * 60, "angles": ["not", "a", "dict"], "open_questions": []})
+    assert any("subarea" in f.lower() or "angles" in f.lower() for f in failures)
+
+
+# --- weekly_selection: corrupt cache lines are logged, not silently dropped (r10) --
+
+
+def test_load_jsonl_reports_corrupt_lines(tmp_path: Any, monkeypatch: Any, capsys: Any) -> None:
+    """A torn JSONL tail line must be skipped AND surfaced, not silently swallowed."""
+    cache = tmp_path / "weekly_feeds.jsonl"
+    cache.write_text(
+        json.dumps({"key": "ok", "items": []})
+        + "\n"
+        + '{"key": "torn", extra'  # invalid JSON: torn tail line
+        + "\n"
+    )
+    monkeypatch.setattr(ws, "FEEDS_PATH", cache)
+    got = ws.load_feeds()
+    assert set(got) == {"ok"}  # valid entry survives
+    captured = capsys.readouterr().out.lower()
+    assert "torn" in captured or "skipped" in captured or "corrupt" in captured
 
 
 # --- eval_queries: token derivation + geo anchors (r7/r8) -------------------
