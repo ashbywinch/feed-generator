@@ -25,12 +25,14 @@ attention than "adequate"):
 
 ## Output
 
-Respond with STRICT JSON only:
+Respond with STRICT JSON only. Return EXACTLY ONE query per subarea — same
+number of queries as subareas, each explicitly serving one subarea:
 
 {
-  "queries": [
-    "5-13 diverse search query formulations for this topic"
-  ]
+  "queries": {
+    "<subarea name>": "the search query for this subarea",
+    ...
+  }
 }
 
 ## Rules
@@ -44,9 +46,13 @@ Respond with STRICT JSON only:
   revenue streams as markets mature", "floating offshore wind auction
   results", "demand-side flexibility market design". A reader anywhere in
   the world should find it.
-- COVERAGE. Aim for one query per subarea (up to 13). Strong subareas may
+- COVERAGE. Aim for one query per subarea. Strong subareas may
   get two; group related subareas under one query if you need fewer. The set
   as a whole should span every subarea.
+- GROUNDED IN THE SUBAREA NAMES. Each query should carry distinctive words
+  from the subarea name it serves (e.g. for a subarea called "AI market
+  structure & capital markets" use words like market-structure or capital in
+  the query), so coverage can be checked mechanically.
 - DIVERSE. Each query targets a different angle (policy, market data,
   technology, economics, geopolitics). No near-duplicates.
 - SEARCH-SHAPED. Formulate for a search index: concrete noun phrases a

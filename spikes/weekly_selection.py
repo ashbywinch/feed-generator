@@ -185,10 +185,6 @@ def load_picked_urls() -> set[str]:
     return out
 
 
-def record_pick(entry: dict[str, Any]) -> None:
-    _append_jsonl(PICKS_HISTORY_PATH, {"key": entry["url"], "picked_at": datetime.now(UTC).isoformat(), **entry})
-
-
 # --- feed fetching --------------------------------------------------------
 
 
@@ -342,6 +338,8 @@ digest's Observed Event bullet.
 {SCHEMA_HINT}"""
     limiter.wait()
     data = llm.chat_json(prompt, max_tokens=LLM_MAX_TOKENS)
+    if not isinstance(data, dict):
+        data = {}  # malformed output: every item is "missing" -> the retry path below handles all
     verdicts: dict[str, dict[str, Any]] = {
         v["url"]: v for v in data.get("verdicts", []) if isinstance(v, dict) and v.get("url")
     }
@@ -372,7 +370,7 @@ Return EXACTLY one verdict per item below, same order:
         try:
             limiter.wait()
             data = llm.chat_json(retry_prompt, max_tokens=LLM_MAX_TOKENS)
-            for v in data.get("verdicts", []):
+            for v in data.get("verdicts", []) if isinstance(data, dict) else []:
                 if isinstance(v, dict) and v.get("url"):
                     _ = verdicts.setdefault(v["url"], v)
         except Exception as exc:  # noqa: BLE001 — retry is best-effort
@@ -400,7 +398,7 @@ article reports, phrased to stand as the digest's Observed Event bullet.
         try:
             limiter.wait()
             data = llm.chat_json(retry_prompt, max_tokens=LLM_MAX_TOKENS)
-            for v in data.get("verdicts", []):
+            for v in data.get("verdicts", []) if isinstance(data, dict) else []:
                 if isinstance(v, dict) and v.get("url") and v["url"] in verdicts:
                     # MERGE, don't replace: the retry may return only the added
                     # sentence, dropping approved/reason/thesis. Fill just the
@@ -670,7 +668,14 @@ Respond with STRICT JSON only:
     angles = {
         str(k): [str(a).strip() for a in v][:STORY_MAX_ANGLES] for k, v in raw_angles.items() if isinstance(v, list)
     }
-    questions = [str(q).strip() for q in (data.get("open_questions") or [])][:STORY_MAX_QUESTIONS]
+    # A MISSING open_questions means "unchanged", not "cleared" — only an
+    # explicit empty array clears (the model often omits fields it didn't touch).
+    raw_questions = data.get("open_questions")
+    questions = (
+        [str(q).strip() for q in raw_questions][:STORY_MAX_QUESTIONS]
+        if raw_questions is not None
+        else story.get("open_questions", [])
+    )
     overview = str(data.get("overview", story.get("overview", ""))).strip()
     if angles == story.get("angles") and questions == story.get("open_questions") and overview == story.get("overview"):
         print("      story unchanged by fold — version kept")
@@ -1016,16 +1021,15 @@ def main(argv: list[str] | None = None) -> int:
                 s["verdicts"] = s.get("cached_verdicts", [])
                 continue
             for v in verdicts:
+                key = f"{slug}|{s['subarea']}|{v['url']}"
                 _append_jsonl(
                     VERDICTS_PATH,
-                    {
-                        "key": f"{slug}|{s['subarea']}|{v['url']}",
-                        "slug": slug,
-                        "rev": PROMPT_REV,
-                        "story_ver": story_version,
-                        **v,
-                    },
+                    {"key": key, "slug": slug, "rev": PROMPT_REV, "story_ver": story_version, **v},
                 )
+                # Mirror into the in-memory cache: two sources in the SAME
+                # subarea carrying the same URL (syndicated content) must not
+                # re-judge it in this run — one verdict per (slug, subarea, url).
+                verdicts_cache[key] = v
             s["verdicts"] = s.get("cached_verdicts", []) + verdicts
         else:
             s["verdicts"] = s.get("cached_verdicts", [])
@@ -1105,6 +1109,23 @@ def main(argv: list[str] | None = None) -> int:
     _ = report_path.write_text(render_report(summary, sections), encoding="utf-8")
     _ = story_md_path.write_text(story_md, encoding="utf-8")
 
+    # Durable exclusion FIRST, in ONE atomic append: a picked URL must never be
+    # re-picked, so the history that enforces it must be on disk before the
+    # machine-readable picks file (a crash between the two must lose the picks
+    # file, never the exclusion). Per-pick appends could interleave with a crash
+    # and leave some URLs out of the history.
+    with APPEND_LOCK, PICKS_HISTORY_PATH.open("a", encoding="utf-8") as fh:
+        now = datetime.now(UTC).isoformat()
+        lines = [
+            json.dumps(
+                {"key": p["url"], "picked_at": now, "url": p["url"], "title": p["title"], "source": p["source"]},
+                ensure_ascii=False,
+            )
+            + "\n"
+            for p in picks
+        ]
+        _ = fh.writelines(lines)
+
     tmp = PICKS_PATH.with_suffix(".tmp")
     payload = json.dumps(
         {"generated_at": summary["generated_at"], "topic": topic["name"], "picks": picks},
@@ -1113,12 +1134,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     _ = tmp.write_text(payload + "\n", encoding="utf-8")
     _ = tmp.replace(PICKS_PATH)
-
-    # Record the pick history ONLY after every output artifact is written — a
-    # crash before this point must not permanently exclude URLs from future
-    # evaluation (picked URLs never re-enter the window).
-    for p in picks:
-        record_pick({"url": p["url"], "title": p["title"], "source": p["source"]})
     print(f"[5/6] picked {len(picks)} articles")
     for p in picks:
         print(f"      - [{p['source']}] {p['title'][:90]}")

@@ -107,17 +107,34 @@ SUBAREA_STOPWORDS = frozenset(
 
 
 def subarea_tokens(name: str) -> tuple[str, ...]:
-    """Distinctive lowercase words of a subarea name, minus stopwords."""
+    """Distinctive words of a subarea name, minus stopwords, with singular/plural variants.
+
+    Emits each significant word plus its singular/plural variant so "batteries"
+    in a subarea matches "battery" in a query (and vice versa). Acronyms like
+    CAES keep their exact spelling (the bare trailing-s strip would mangle them).
+    """
     words = re.findall(r"[a-z0-9]+", name.lower())
-    return tuple(w for w in words if w not in SUBAREA_STOPWORDS and len(w) > 3)
+    out = []
+    for w in words:
+        if w in SUBAREA_STOPWORDS or len(w) <= 3:
+            continue
+        out.append(w)
+        if w.endswith("ies"):
+            out.append(w[:-3] + "y")  # batteries -> battery
+        elif w.endswith("s") and not w.endswith(("ss", "is", "us")):
+            out.append(w[:-1])  # markets -> market
+    return tuple(dict.fromkeys(out))  # dedupe, keep order
 
 
 # Hard geography anchors: a query naming any of these can only find that
 # jurisdiction's news. "European" is softer (multi-country) but still local;
-# keep the strict list to single-jurisdiction terms.
+# keep the strict list to single-jurisdiction terms. U.K. gets its own branch
+# with a (?!\w) lookahead — the trailing \b on the group would require a word
+# char right after the period, which never happens (dead alternative).
 GEO_ANCHORS = re.compile(
-    r"\b(GB|UK|U\.K\.|Britain|British|England|Wales|Scotland|N\.Ireland|"
-    + r"Ofgem|NESO|Elexon|National Grid|NEMO|DESNZ|ERCOT|FERC|CAISO)\b",
+    r"\b(GB|UK|Britain|British|England|Wales|Scotland|N\.Ireland|"
+    + r"Ofgem|NESO|Elexon|National Grid|NEMO|DESNZ|ERCOT|FERC|CAISO)\b|"
+    + r"U\.K\.(?!\w)",
     re.IGNORECASE,
 )
 
@@ -175,7 +192,12 @@ def coverage_check(queries: list[str], subareas: list[str]) -> list[str]:
     uncovered = []
     for sa in subareas:
         tokens = subarea_tokens(sa)
-        if not any(any(t in q for t in tokens) for q in lowered):
+        if not tokens:
+            # Subarea name made entirely of stopwords: cannot judge coverage
+            # mechanically — fail loudly rather than silently pass.
+            uncovered.append(f"{sa} (no derivable tokens)")
+            continue
+        if not any(any(re.search(rf"\b{t}\b", q) for t in tokens) for q in lowered):
             uncovered.append(sa)
     return uncovered
 
@@ -265,7 +287,12 @@ def generate_queries(
         return None
     if not isinstance(data, dict):
         return None
-    queries = [str(q).strip() for q in (data.get("queries") or []) if str(q).strip()]
+    raw = data.get("queries")
+    if isinstance(raw, dict):
+        # One query per subarea (subarea -> query): coverage is structural.
+        queries = [str(q).strip() for q in raw.values() if str(q).strip()]
+    else:
+        queries = [str(q).strip() for q in (raw or []) if str(q).strip()]
     return queries or None
 
 
