@@ -53,9 +53,12 @@ class Engine:
             print("FATAL: OPML parsed zero domains — refusing to persist an empty exclusion set")
             print("       (corrupt/truncated feedly.opml? fix it, then re-run setup)")
             return 1
+        seeded = self._seed_from_curated()
+        if seeded <= 0:
+            print("FATAL: topics seed produced zero topics — refusing to persist a partial setup")
+            return 1
         self._memory.save_blacklist(known_domains)
         print(f"      {len(feeds)} feeds, {len(known_domains)} blacklist domains stored")
-        self._seed_from_curated()
         print("[setup] done — topics + exclusion set persisted")
         return 0
 

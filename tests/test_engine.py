@@ -135,6 +135,24 @@ def test_setup_fails_fast_on_empty_opml(monkeypatch: Any, cfg: Any) -> None:
     assert "called" not in seen  # blacklist must not be persisted
 
 
+def test_setup_fails_fast_when_seed_produces_zero_topics(monkeypatch: Any, cfg: Any) -> None:
+    """FR-1/FR-2 setup: topics seed of zero -> abort before persisting blacklist."""
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(engine_mod, "parse_opml", lambda path: ({"sub.com"}, []))
+
+    class M(FakeMemory):
+        def seed_topics(self, assignment: dict[str, Any]) -> int:
+            return 0
+
+        def save_blacklist(self, domains: set[str]) -> int:
+            seen["called"] = True
+            return 0
+
+    engine = _engine(monkeypatch, cfg, memory_cls=M)
+    assert engine.setup() == 1
+    assert "called" not in seen  # blacklist must not be persisted after zero-seed
+
+
 def test_setup_persists_blacklist_and_topics(monkeypatch: Any, cfg: Any) -> None:
     """FR-1/FR-2 setup: OPML parsed once, blacklist + topics persisted."""
     seen: dict[str, Any] = {}

@@ -873,16 +873,33 @@ def main(argv: list[str] | None = None) -> int:
         for fut in as_completed(futures):
             s = fut.result()
             old = feeds_cache.get(s["crawl_root"], {})
-            entry: CacheEntry = {
-                "key": s["crawl_root"],
-                "source": s["name"],
-                "fetched_at": time.time(),
-                # Failure keeps the last good items (stale fallback); a clean
-                # empty fetch replaces them (the feed really went quiet).
-                "items": old.get("items", []) if s.get("error") else s.get("items", []),
-            }
-            if s.get("error"):
-                entry["error"] = s["error"]
+            had_items = bool(old.get("items"))
+            # A 200 HTML/bot-wall/redirect page parses to ZERO entries without
+            # raising. Treat that like an outage, not "feed went quiet": keep
+            # the last good items and flag it, so a transient bot-wall never
+            # reads as "site has no articles". Only a genuinely clean empty
+            # feed (no items AND none cached before) is stored as empty.
+            zero_new = not s.get("error") and not s.get("items") and had_items
+            if s.get("error") or zero_new:
+                entry: CacheEntry = {
+                    "key": s["crawl_root"],
+                    "source": s["name"],
+                    "fetched_at": time.time(),
+                    "items": old.get("items", []),  # keep the last good cache
+                }
+                if s.get("error"):
+                    entry["error"] = s["error"]
+                else:
+                    entry["error"] = f"parsed 0 entries; kept {len(old.get('items', []))} cached items"
+                    entry["stale"] = True
+                    s["stale"] = True  # surface in the report, not just the cache
+            else:
+                entry = {
+                    "key": s["crawl_root"],
+                    "source": s["name"],
+                    "fetched_at": time.time(),
+                    "items": s.get("items", []),
+                }
             if s.get("truncated"):
                 entry["truncated"] = True
                 print(
@@ -964,11 +981,12 @@ def main(argv: list[str] | None = None) -> int:
             continue
         todo: list[Item] = []
         for it in s["items"]:
-            cached_v = verdicts_cache.get(it["url"])
-            # Same URL can surface in two sources with different subareas; a
-            # cached verdict carries the subarea it was judged under (label +
-            # story-slice context) — only reuse when it matches this source.
-            if cached_v is not None and cached_v.get("subarea") == s["subarea"]:
+            # Cache key = (slug, subarea, url): the same URL in two sources with
+            # different subareas is judged per-subarea (label + story-slice
+            # context differ), so each gets its own entry — keying by url alone
+            # made the two sources overwrite each other and re-judge every run.
+            cached_v = verdicts_cache.get(f"{slug}|{s['subarea']}|{it['url']}")
+            if cached_v is not None:
                 s.setdefault("cached_verdicts", []).append(cached_v)
                 n_cached += 1
             else:
@@ -985,7 +1003,14 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             for v in verdicts:
                 _append_jsonl(
-                    VERDICTS_PATH, {"key": v["url"], "slug": slug, "rev": PROMPT_REV, "story_ver": story_version, **v}
+                    VERDICTS_PATH,
+                    {
+                        "key": f"{slug}|{s['subarea']}|{v['url']}",
+                        "slug": slug,
+                        "rev": PROMPT_REV,
+                        "story_ver": story_version,
+                        **v,
+                    },
                 )
             s["verdicts"] = s.get("cached_verdicts", []) + verdicts
         else:

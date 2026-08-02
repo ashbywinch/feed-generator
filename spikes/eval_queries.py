@@ -121,10 +121,10 @@ def load_listing(topic_name: str) -> tuple[dict[str, Any] | None, str]:
     return None, ""
 
 
-def mechanical_check(queries: list[str]) -> list[str]:
+def mechanical_check(queries: list[str], max_queries: int = MAX_QUERIES) -> list[str]:
     failures: list[str] = []
-    if not (MIN_QUERIES <= len(queries) <= MAX_QUERIES):
-        failures.append(f"{len(queries)} queries (need {MIN_QUERIES}-{MAX_QUERIES})")
+    if not (MIN_QUERIES <= len(queries) <= max_queries):
+        failures.append(f"{len(queries)} queries (need {MIN_QUERIES}-{max_queries})")
     seen: set[str] = set()
     for q in queries:
         qq = q.strip()
@@ -303,17 +303,15 @@ def main(argv: list[str] | None = None) -> int:
         queries = [str(q) for q in (listing.get("queries") or [])]
         print(f"[1/3] eval {len(queries)} queries currently in {slug}.json")
 
-    failures = mechanical_check(queries)
-    print(f"[2/3] mechanical gate: {'PASS' if not failures else 'FAIL'} ({len(failures)} finding(s))")
-    for f in failures:
-        print(f"      - {f}")
-
     subareas = [sa.get("name", "?") for sa in listing.get("subareas") or []]
     # Upper bound tracks the topic's real subarea count (one query per subarea
     # max), not a hardcoded 13 — a topic with 14+ subareas must be able to pass.
     max_queries = max(len(subareas), MIN_QUERIES)
-    if not (MIN_QUERIES <= len(queries) <= max_queries):
-        failures.append(f"{len(queries)} queries (need {MIN_QUERIES}-{max_queries})")
+    failures = mechanical_check(queries, max_queries)
+    print(f"[2/3] mechanical gate: {'PASS' if not failures else 'FAIL'} ({len(failures)} finding(s))")
+    for f in failures:
+        print(f"      - {f}")
+
     uncovered = coverage_check(queries, subareas)
     if len(uncovered) > MAX_UNCOVERED:
         failures.append(f"{len(uncovered)} subareas uncovered (limit {MAX_UNCOVERED}): {', '.join(uncovered[:6])}")
