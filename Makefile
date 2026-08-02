@@ -109,10 +109,10 @@ refresh-queries: setup
 	@$(UV) run --env-file .env python spikes/eval_queries.py --generate
 
 lint: setup
-	@$(RUFF) check signalflow tests spikes/weekly_selection.py spikes/eval_story.py spikes/eval_queries.py
+	@$(RUFF) check signalflow tests spikes
 
 lint-github: setup
-	@$(RUFF) check signalflow tests spikes/weekly_selection.py spikes/eval_story.py spikes/eval_queries.py --output-format=github
+	@$(RUFF) check signalflow tests spikes --output-format=github
 
 typecheck: setup
 	@$(BASEDPYRIGHT) --outputjson | $(PYTHON) -c "import json,sys; d=json.load(sys.stdin); sys.exit(1 if d['summary']['errorCount'] else 0)"
@@ -124,8 +124,8 @@ coverage: setup
 	@$(PYTHON) -m pytest --cov=signalflow --cov-report=term-missing --cov-report=xml
 
 format: setup
-	@$(RUFF) check --fix signalflow tests spikes/weekly_selection.py spikes/eval_story.py spikes/eval_queries.py
-	@$(RUFF) format signalflow tests spikes/weekly_selection.py spikes/eval_story.py spikes/eval_queries.py
+	@$(RUFF) check --fix signalflow tests spikes
+	@$(RUFF) format signalflow tests spikes
 
 clean:
 	@rm -rf .venv htmlcov/

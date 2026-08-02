@@ -16,14 +16,21 @@ import json
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import topic_elicitation_resumable as s  # noqa: E402
+from topic_elicitation_resumable import (  # noqa: E402  # pyright: ignore[reportImplicitRelativeImport]
+    OPML_PATH,
+    load_embeddings,
+    load_samples,
+    parse_opml,
+    spherical_kmeans,
+)
 
-feeds = s.parse_opml(s.OPML_PATH)
-samples = s.load_samples()
-emb = s.load_embeddings()
+feeds = parse_opml(OPML_PATH)
+samples = load_samples()
+emb = load_embeddings()
 
 ok = [f for f in feeds if samples.get(f["url"], {}).get("items")]
 for f in ok:
@@ -42,14 +49,14 @@ if flagged:
 topic_k = max(24, min(45, round(len(ok) / 5)))
 topic_k = int(__import__("os").environ.get("TOPIC_K", topic_k))
 item_texts: list[str] = [item for f in ok for item in f["items"]] + [f["title"] for f in ok]
-labels = s.spherical_kmeans([emb[t] for t in item_texts], topic_k)
+labels = spherical_kmeans([emb[t] for t in item_texts], topic_k)
 
 idx = 0
 frag_labels: dict[int, list[int]] = {}
 for f in ok:
     frag_labels[id(f)] = labels[idx : idx + len(f["items"]) + 1]
     idx += len(f["items"]) + 1
-topic_map: dict[int, list[dict]] = {}
+topic_map: dict[int, list[dict[str, Any]]] = {}
 for f in ok:
     votes = frag_labels[id(f)]
     best = max(set(votes), key=votes.count)
@@ -57,7 +64,7 @@ for f in ok:
 
 print(f"k={topic_k} -> {len(topic_map)} topics, {len(ok)} feeds")
 print("\n== folder x topic (feed counts) ==")
-folder_topics: dict[str, Counter] = defaultdict(Counter)
+folder_topics: dict[str, Counter[int]] = defaultdict(Counter)
 for label, feeds_in in topic_map.items():
     for f in feeds_in:
         folder_topics[f["folder"]][label] += 1
