@@ -356,29 +356,37 @@ def contextualization_passes(sufficient: int, total: int, pass_frac: float) -> b
 
     Small samples must not tighten the bar to 100%: with only the 2 fixtures
     (stale/empty feed cache), pass_frac * 2 rounds to 2/2. Allow one miss for
-    tiny samples so a single fixture judged insufficient doesn't fail the gate.
+    samples of >= 2 so a single fixture judged insufficient doesn't fail the
+    gate — but NEVER for total == 1 (0 >= 0 via total - 1 would pass a fully
+    failing single-article gate).
     """
     if total == 0:
         return False
-    return sufficient >= total - 1 or sufficient / total >= pass_frac
+    if total >= 2 and sufficient >= total - 1:
+        return True
+    return sufficient / total >= pass_frac
 
 
 def load_picked_urls() -> set[str]:
-    """URLs already surfaced (pick history); torn tail lines are skipped.
+    """URLs already surfaced (pick history); torn tail lines are skipped + logged.
 
-    Mirrors weekly_selection.load_picked_urls — every cache reader must
-    tolerate a torn tail line from a crash mid-append.
+    Mirrors weekly_selection.load_picked_urls and _load_jsonl — every cache
+    reader must tolerate a torn tail line AND surface it (compliance: never
+    swallow errors silently).
     """
     out: set[str] = set()
     if not PICKS_HISTORY_PATH.exists():
         return out
+    skipped = 0
     for line in PICKS_HISTORY_PATH.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         try:
             out.add(json.loads(line)["url"])
         except (json.JSONDecodeError, KeyError):
-            continue  # torn tail line from a crash; that entry is lost anyway
+            skipped += 1  # torn tail line from a crash; that entry is lost anyway
+    if skipped:
+        print(f"      WARNING: {PICKS_HISTORY_PATH.name}: skipped {skipped} corrupt line(s)")
     return out
 
 

@@ -179,13 +179,16 @@ def load_picked_urls() -> set[str]:
     out: set[str] = set()
     if not PICKS_HISTORY_PATH.exists():
         return out
+    skipped = 0
     for line in PICKS_HISTORY_PATH.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         try:
             out.add(json.loads(line)["url"])
         except (json.JSONDecodeError, KeyError):
-            continue
+            skipped += 1  # torn tail line from a crash; that entry is lost anyway
+    if skipped:
+        print(f"      WARNING: {PICKS_HISTORY_PATH.name}: skipped {skipped} corrupt line(s)")
     return out
 
 
@@ -832,6 +835,22 @@ def window_items(items: list[Item], max_items: int) -> list[Item]:
     return dated[: max_items - reserved] + undated[:reserved]
 
 
+def preserve_first_seen(new_items: list[Item], old_items: list[Item]) -> list[Item]:
+    """Carry each item's ORIGINAL first_seen across a re-fetch.
+
+    A weekly run re-fetches (6h feed TTL); without this, fetch_feed re-stamps
+    first_seen as "now" every time and undated items never age out of the
+    window. Items that already existed keep their first-seen date; genuinely
+    new items keep their fetch stamp.
+    """
+    old_by_url = {it["url"]: it.get("first_seen") for it in old_items}
+    for it in new_items:
+        prior = old_by_url.get(it["url"])
+        if prior:
+            it["first_seen"] = prior  # undated: keep the ORIGINAL first-seen across re-fetch
+    return new_items
+
+
 def is_item_in_window(item: Item, cutoff: datetime) -> bool:
     """Is this item a candidate for the current window?
 
@@ -974,7 +993,10 @@ def main(argv: list[str] | None = None) -> int:
                     "key": s["crawl_root"],
                     "source": s["name"],
                     "fetched_at": time.time(),
-                    "items": s.get("items", []),
+                    # Keep each item's ORIGINAL first_seen across re-fetch, or
+                    # undated items would be re-stamped "now" every weekly run
+                    # and never age out of the window.
+                    "items": preserve_first_seen(s.get("items", []), old.get("items", [])),
                 }
             if s.get("truncated"):
                 entry["truncated"] = True

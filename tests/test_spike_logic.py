@@ -337,6 +337,47 @@ def test_zero_pick_sources_excludes_eval_failed() -> None:
     assert ws.count_zero_pick_sources(sources) == 1  # only the genuine zero-pick counts
 
 
+# --- weekly_selection: first_seen survives re-fetch (r12) ------------------
+
+
+def test_first_seen_preserved_across_refresh() -> None:
+    """A re-fetched undated item keeps its ORIGINAL first_seen — not 'now'.
+
+    Without this, a weekly run re-fetches (6h TTL), re-stamps first_seen as
+    today, and stale undated articles never age out of the window.
+    """
+    old_first_seen = (datetime.now(UTC) - timedelta(days=30)).isoformat()
+    old_items = [{"url": "https://x/u", "title": "U", "published": None, "undated": True, "first_seen": old_first_seen}]
+    new_items = [
+        {
+            "url": "https://x/u",
+            "title": "U",
+            "published": None,
+            "undated": True,
+            "first_seen": datetime.now(UTC).isoformat(),
+        }
+    ]
+    merged = ws.preserve_first_seen(new_items, old_items)
+    assert merged[0]["first_seen"] == old_first_seen  # original preserved, not re-stamped
+
+
+def test_first_seen_new_item_keeps_fetch_time() -> None:
+    """A genuinely new undated item (not in old cache) keeps its fetch stamp."""
+    old_items = [
+        {
+            "url": "https://x/other",
+            "title": "O",
+            "published": None,
+            "undated": True,
+            "first_seen": "2026-01-01T00:00:00+00:00",
+        }
+    ]
+    fetch_time = (datetime.now(UTC)).isoformat()
+    new_items = [{"url": "https://x/u", "title": "U", "published": None, "undated": True, "first_seen": fetch_time}]
+    merged = ws.preserve_first_seen(new_items, old_items)
+    assert merged[0]["first_seen"] == fetch_time  # new item: fetch time is correct
+
+
 # --- weekly_selection: undated items age out of the window (r10) -----------
 
 
@@ -615,6 +656,13 @@ def test_full_sample_still_requires_ratio() -> None:
     assert ev.contextualization_passes(sufficient=3, total=4, pass_frac=ev.PASS_FRAC) is True
     assert ev.contextualization_passes(sufficient=2, total=4, pass_frac=ev.PASS_FRAC) is False
     assert ev.contextualization_passes(sufficient=0, total=0, pass_frac=ev.PASS_FRAC) is False
+
+
+def test_single_article_never_passes_via_tolerance() -> None:
+    ev = _load_spike("eval_story")
+    # total == 1 with zero sufficient must FAIL (was: 0 >= 0 via total-1 passed).
+    assert ev.contextualization_passes(sufficient=0, total=1, pass_frac=ev.PASS_FRAC) is False
+    assert ev.contextualization_passes(sufficient=1, total=1, pass_frac=ev.PASS_FRAC) is True
 
 
 if __name__ == "__main__":
