@@ -156,17 +156,18 @@ def load_feeds() -> dict[str, dict[str, Any]]:
     return _load_jsonl(FEEDS_PATH)
 
 
-def load_verdicts(story_version: int) -> dict[str, dict[str, Any]]:
-    """Cached verdicts for the CURRENT prompt revision AND story version only.
+def load_verdicts(story_version: int, slug: str) -> dict[str, dict[str, Any]]:
+    """Cached verdicts for the CURRENT topic, prompt revision, and story version.
 
-    A prompt change (PROMPT_REV bump) or a folded story (version bump)
-    invalidates every cached verdict — otherwise a re-run silently reuses
-    judgments made under a looser bar or without the accumulated context.
+    The cache is shared across topics, so a verdict is only reusable when it
+    was produced under the same topic (slug) — otherwise topic A's judgment
+    could be replayed for the same article URL under topic B. A prompt change
+    (PROMPT_REV bump) or a folded story (version bump) also invalidates.
     """
     return {
         k: v
         for k, v in _load_jsonl(VERDICTS_PATH).items()
-        if v.get("rev") == PROMPT_REV and v.get("story_ver", 0) == story_version
+        if v.get("slug") == slug and v.get("rev") == PROMPT_REV and v.get("story_ver", 0) == story_version
     }
 
 
@@ -401,7 +402,9 @@ article reports, phrased to stand as the digest's Observed Event bullet.
             data = llm.chat_json(retry_prompt, max_tokens=LLM_MAX_TOKENS)
             for v in data.get("verdicts", []):
                 if isinstance(v, dict) and v.get("url"):
-                    _ = verdicts.setdefault(v["url"], v)
+                    # DIRECT assignment: the retried verdict must REPLACE the
+                    # empty-event one (setdefault would silently discard it).
+                    verdicts[v["url"]] = v
         except Exception as exc:  # noqa: BLE001 — retry is best-effort
             print(f"      empirical_event retry failed for {source['name']}: {redact(str(exc))[:160]}")
 
@@ -458,6 +461,8 @@ def render_report(summary: dict[str, Any], sections: list[dict[str, Any]]) -> st
         lines.append("")
         if sec["fetch_error"]:
             lines.append(f"- **fetch failed**: {sec['fetch_error']}")
+        if sec["eval_error"]:
+            lines.append(f"- **evaluation failed** (no verdicts judged): {sec['eval_error']}")
         if sec["stale"]:
             lines.append("- **stale cache fallback** (fetch failed, cached items shown)")
         lines.append(f"- items in window: {sec['n_items']} | picked: {sec['n_picked']}")
@@ -832,7 +837,7 @@ def main(argv: list[str] | None = None) -> int:
             )
     story_version = int(story.get("version", 0))
     feeds_cache = load_feeds()
-    verdicts_cache = load_verdicts(story_version)
+    verdicts_cache = load_verdicts(story_version, slug)
     picked_urls = load_picked_urls()
     if story_version:
         print(
@@ -946,7 +951,7 @@ def main(argv: list[str] | None = None) -> int:
             story["pending"] = []
             save_story(slug, story)
             story_version = int(story.get("version", 0))
-            verdicts_cache = load_verdicts(story_version)
+            verdicts_cache = load_verdicts(story_version, slug)
             print(f"      story now v{story_version} — verdict cache re-keyed")
         else:
             print("      story fold failed — pending picks kept for the next run")
@@ -960,7 +965,10 @@ def main(argv: list[str] | None = None) -> int:
         todo: list[Item] = []
         for it in s["items"]:
             cached_v = verdicts_cache.get(it["url"])
-            if cached_v is not None:
+            # Same URL can surface in two sources with different subareas; a
+            # cached verdict carries the subarea it was judged under (label +
+            # story-slice context) — only reuse when it matches this source.
+            if cached_v is not None and cached_v.get("subarea") == s["subarea"]:
                 s.setdefault("cached_verdicts", []).append(cached_v)
                 n_cached += 1
             else:
@@ -976,7 +984,9 @@ def main(argv: list[str] | None = None) -> int:
                 s["verdicts"] = s.get("cached_verdicts", [])
                 continue
             for v in verdicts:
-                _append_jsonl(VERDICTS_PATH, {"key": v["url"], "rev": PROMPT_REV, "story_ver": story_version, **v})
+                _append_jsonl(
+                    VERDICTS_PATH, {"key": v["url"], "slug": slug, "rev": PROMPT_REV, "story_ver": story_version, **v}
+                )
             s["verdicts"] = s.get("cached_verdicts", []) + verdicts
         else:
             s["verdicts"] = s.get("cached_verdicts", [])
@@ -1045,6 +1055,7 @@ def main(argv: list[str] | None = None) -> int:
             "domain": s["domain"],
             "subarea": s["subarea"],
             "fetch_error": s.get("fetch_error", ""),
+            "eval_error": s.get("eval_error", ""),
             "stale": s.get("stale", False),
             "n_items": s.get("n_total_window", len(s["items"])),
             "n_picked": len(s.get("picks", [])),

@@ -63,7 +63,7 @@ LLM_KEY = os.environ.get("OPENCODE_GO_API_KEY", "")
 LLM_MODEL = os.environ.get("OPENCODE_GO_MODEL", "deepseek-v4-flash")
 
 MIN_QUERIES = 5
-MAX_QUERIES = 13  # one per subarea (the topic has 13)
+MAX_QUERIES = 13  # upper bound; a topic's actual subarea count may be lower (see main)
 MAX_UNCOVERED = 3  # subareas a query set may leave out and still pass
 EVAL_INTERVAL = 1.0
 LLM_MAX_TOKENS = 8192
@@ -148,16 +148,22 @@ def mechanical_check(queries: list[str]) -> list[str]:
 def coverage_check(queries: list[str], subareas: list[str]) -> list[str]:
     """Deterministic: every subarea needs a query containing one of its tokens.
 
-    Returns uncovered subarea names.
+    Returns uncovered subarea names. A subarea with NO known token mapping is
+    reported as a failure, not silently passed — an unknown topic must never
+    skate through the coverage gate.
     """
     lowered = [q.lower() for q in queries]
     uncovered = []
+    unknown = []
     for sa in subareas:
         tokens = SUBAREA_TOKENS.get(sa)
         if tokens is None:
-            continue  # unknown subarea: not this eval's job
+            unknown.append(sa)
+            continue
         if not any(any(t in q for t in tokens) for q in lowered):
             uncovered.append(sa)
+    if unknown:
+        uncovered.append(f"unknown subarea(s) with no token mapping: {', '.join(unknown[:5])}")
     return uncovered
 
 
@@ -303,6 +309,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"      - {f}")
 
     subareas = [sa.get("name", "?") for sa in listing.get("subareas") or []]
+    # Upper bound tracks the topic's real subarea count (one query per subarea
+    # max), not a hardcoded 13 — a topic with 14+ subareas must be able to pass.
+    max_queries = max(len(subareas), MIN_QUERIES)
+    if not (MIN_QUERIES <= len(queries) <= max_queries):
+        failures.append(f"{len(queries)} queries (need {MIN_QUERIES}-{max_queries})")
     uncovered = coverage_check(queries, subareas)
     if len(uncovered) > MAX_UNCOVERED:
         failures.append(f"{len(uncovered)} subareas uncovered (limit {MAX_UNCOVERED}): {', '.join(uncovered[:6])}")
