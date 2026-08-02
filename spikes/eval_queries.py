@@ -192,7 +192,13 @@ Respond with STRICT JSON only:
     data = llm.chat_json(prompt, max_tokens=LLM_MAX_TOKENS)
     failures: list[str] = []
     judgments = data.get("judgments") or []
-    for i, (q, j) in enumerate(zip(queries, judgments, strict=False)):
+    if len(judgments) != len(queries):
+        # A partial judgment set means the gate could pass on unjudged queries —
+        # fail loudly instead of letting misalignment slide.
+        for i, q in enumerate(queries):
+            failures.append(f"query {i + 1} ({q!r}): no judgment returned ({len(judgments)}/{len(queries)})")
+        return failures
+    for i, (q, j) in enumerate(zip(queries, judgments, strict=True)):
         if not isinstance(j, dict):
             failures.append(f"query {i + 1} ({q!r}): no judgment returned")
             continue

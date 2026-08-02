@@ -107,6 +107,20 @@ def redact(message: str) -> str:
     return message
 
 
+def parse_bool(value: Any) -> bool:
+    """Strict truthiness for LLM booleans: only real True or true-ish strings.
+
+    bool("false") is True — a model emitting the string "false" must not be
+    counted as sufficient. Accepts bool True and strings in (true, yes, 1);
+    everything else (including "false"/"no"/0) is False.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "yes", "1")
+    return False
+
+
 def _load_jsonl(path: Path) -> dict[str, dict[str, Any]]:
     out: dict[str, dict[str, Any]] = {}
     if not path.exists():
@@ -306,7 +320,7 @@ Respond with STRICT JSON only:
         "source": article["source"],
         "fits": str(data.get("fits", "")),
         "caption": str(data.get("caption", "")),
-        "sufficient": bool(data.get("sufficient")),
+        "sufficient": parse_bool(data.get("sufficient")),
         "missing": str(data.get("missing", ""))[:200],
     }
 

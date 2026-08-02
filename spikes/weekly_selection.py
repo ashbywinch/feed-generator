@@ -358,7 +358,7 @@ Same rules. Return EXACTLY one verdict per item below, same order:
         v = verdicts.get(it["url"])
         if v is None:
             v = {"approved": False, "reason": "no verdict returned", "thesis": "", "empirical_event": ""}
-        approved = bool(v.get("approved"))
+        approved = parse_bool(v.get("approved"))
         out.append(
             {
                 "url": it["url"],
@@ -641,6 +641,20 @@ def redact(message: str) -> str:
     return message
 
 
+def parse_bool(value: Any) -> bool:
+    """Strict truthiness for LLM booleans: only real True or true-ish strings.
+
+    bool("false") is True — a model emitting the string "false" must reject,
+    not approve. Accepts bool True and strings in (true, yes, 1); everything
+    else (including "false"/"no"/0) is False.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() in ("true", "yes", "1")
+    return False
+
+
 def smoke_test() -> None:
     """Fail fast on config/auth/model errors before any expensive work."""
     print("[0/6] smoke test: router chat ...")
@@ -889,9 +903,17 @@ def main(argv: list[str] | None = None) -> int:
     print(f"      evaluated {n_new} new items, {n_cached} from cache")
 
     picks: list[dict[str, Any]] = []
+    picks: list[dict[str, Any]] = []
+    seen_pick_urls: set[str] = set()
     for s in sources:
-        s["picks"] = [v for v in s.get("verdicts", []) if v.get("approved")]
+        approved = [v for v in s.get("verdicts", []) if parse_bool(v.get("approved"))]
+        if len(approved) > MAX_PICKS_PER_SOURCE:
+            print(f"      cap: {s['name']} approved {len(approved)} — keeping {MAX_PICKS_PER_SOURCE}")
+        s["picks"] = approved[:MAX_PICKS_PER_SOURCE]
         for v in s["picks"]:
+            if v["url"] in seen_pick_urls:
+                continue  # same normalized URL surfaced by two feeds: pick once
+            seen_pick_urls.add(v["url"])
             picks.append(
                 {
                     "url": v["url"],
@@ -904,7 +926,6 @@ def main(argv: list[str] | None = None) -> int:
                     "empirical_event": v.get("empirical_event", ""),
                 }
             )
-            record_pick({"url": v["url"], "title": v["title"], "source": s["name"]})
 
     # Queue this run's picks for the NEXT run's fold (deferred — folding now
     # would bump the story version and invalidate the verdicts we just cached,
@@ -959,6 +980,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     _ = tmp.write_text(payload + "\n", encoding="utf-8")
     _ = tmp.replace(PICKS_PATH)
+
+    # Record the pick history ONLY after every output artifact is written — a
+    # crash before this point must not permanently exclude URLs from future
+    # evaluation (picked URLs never re-enter the window).
+    for p in picks:
+        record_pick({"url": p["url"], "title": p["title"], "source": p["source"]})
     print(f"[5/6] picked {len(picks)} articles")
     for p in picks:
         print(f"      - [{p['source']}] {p['title'][:90]}")
