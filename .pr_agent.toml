@@ -6,10 +6,12 @@ api_base = "https://opencode.ai/zen/go/v1"
 model = "openai/deepseek-v4-flash"
 custom_model_max_tokens = 128000
 max_model_tokens = 128000
-ai_timeout = 600
+ai_timeout = 1800
 fallback_models = []
+verbosity_level = 3
 repo_context_from_default_branch = false
 repo_context_files = [
+    "docs/prd.md",               # the requirements doc — the reviewer enforces product law only if it reads it
     "docs/coding-standards.md",
     "docs/testing-standards.md",
     "docs/writing-documentation.md",
@@ -18,8 +20,8 @@ repo_context_files = [
 [pr_reviewer]
 require_tests_review = true
 require_security_review = true
-num_max_findings = 5
-extra_instructions = "Check the PR against each file in repo_context_files. Add a 'Compliance' section per doc, listing any violations found or 'No violations'."
+num_max_findings = 10
+extra_instructions = "Check the PR against each file in repo_context_files. Add a 'Compliance' section per doc, listing any violations found or 'No violations'. Flag violations as findings, not just notes: style and semantic deviations from docs/coding-standards.md, test-standard deviations, and product-law deviations from the requirements doc."
 
 [github_action_config]
 handle_push_trigger = true
