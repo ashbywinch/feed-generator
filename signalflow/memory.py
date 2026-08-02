@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS topics (
   strategy_json TEXT,
   strategy_revision INTEGER DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS known_domains (
+  domain TEXT PRIMARY KEY
+);
 """
 
 
@@ -43,6 +46,22 @@ class Memory:
         self._conn = sqlite3.connect(str(db_path))
         self._conn.executescript(SCHEMA)
         self._conn.commit()
+
+    # -- exclusion set (FR-1 setup output) ----------------------------------
+
+    def save_blacklist(self, domains: set[str]) -> int:
+        """Replace the stored exclusion set (FR-1 output, written at setup).
+
+        The recurring run reads this — it never re-parses the OPML.
+        """
+        self._conn.execute("DELETE FROM known_domains")
+        self._conn.executemany("INSERT OR IGNORE INTO known_domains (domain) VALUES (?)", [(d,) for d in domains])
+        self._conn.commit()
+        return len(domains)
+
+    def blacklist(self) -> set[str]:
+        rows = self._conn.execute("SELECT domain FROM known_domains").fetchall()
+        return {r[0] for r in rows}
 
     # -- topics (FR-2 table) ------------------------------------------------
 

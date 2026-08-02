@@ -3,6 +3,7 @@
 **Status:** Draft v0.5 · **Audience:** engineers implementing v1 + product owner · **Source:** SignalFlow Architecture Proposal (2025)
 
 Rev 5 changes: embeddings moved to Google `gemini-embedding-2` (router verified to have NO embeddings endpoint); env/config renamed to `OPENCODE_GO_*` + `GOOGLE_API_KEY`; spike proven end-to-end against the real OPML.
+Rev 6 changes: FR-1/FR-2 (OPML → topic model → strategies) reframed as ONE-AND-DONE setup, re-run only when the user adds/removes a topic; FR-8 reframed as a single recurring run (default daily, weekly if daily yield is thin) that executes the STORED strategies (FR-3 discovery + FR-9 feed selection) and never re-derives them. `DAILY_CRON`/`WEEKLY_CRON` merged into `RECURRING_CRON`.
 
 ## Purpose
 
@@ -84,14 +85,14 @@ Priorities: MUST (v1 blocks), SHOULD (expected v1), COULD (stretch).
 - **Never run without OPML.** Missing or unparseable `feedly.opml` aborts the run with a clear error (fail-fast). The reference code's hardcoded fallback domain list is rejected: silently running with a 4-domain blacklist voids the zero-duplication guarantee.
 - Acceptance: given a test OPML with N feeds, `known_domains` contains exactly the N distinct domains.
 
-### FR-2 Topic model & coverage analysis — MUST (core engine stage, runs with the engine)
-Builds the working topic model and the per-topic discovery strategies. This is a first-class engine stage, not a scheduled side job:
+### FR-2 Topic model & coverage analysis — MUST (one-and-done setup, NOT in the recurring run)
+Builds the working topic model and the per-topic discovery strategies. This is a SETUP step, run once (and re-run only when the user adds/removes a topic) — it is NOT part of the daily/weekly execution loop, which starts from the stored strategies:
 1. **Topic elicitation:** embed a sample of each feed's recent items (Google `gemini-embedding-001`), cluster the **item** embeddings with spherical k-means (fixed seed; feed-mean clustering is signal-free — measured cross-feed mean sim 0.72 > intra-feed item sim 0.56), assign each feed to its plurality topic, then have the LLM name and refine each topic. Folder names are hints only — organizational buckets (e.g. "Stories") are never treated as topics, and URL-shaped names are skipped. The proposal's six topics are examples only, never a ceiling or a hardcoded list. **The curated final set (13 topics, walkthrough-approved) lives in `signalflow/topics.json`, human-readable in `docs/topics.md`** — that file is the source of truth the engine seeds from.
-2. **Per-topic discovery strategy (the "take effort" step):** for **each** topic, an LLM crafts a deliberate strategy and stores it: multiple query formulations, high-density domain patterns, source-type mix (independent blogs, academic, newsletters, podcasts), relevant registries/APIs, and news-vs-analysis weighting. Generic one-size-fits-all queries are forbidden — each topic gets its own plan.
+2. **Per-topic discovery strategy (the "take effort" step):** for **each** topic, an LLM crafts a deliberate strategy and stores it: multiple query formulations, high-density domain patterns, source-type mix (independent blogs, academic, newsletters, podcasts), relevant registries/APIs, and news-vs-analysis weighting. Generic one-size-fits-all queries are forbidden — each topic gets its own plan. **This stored strategy is what the recurring run executes** (FR-8); the feedly/OPML inputs are consumed here, once.
 3. **Coverage map & gaps:** map subscribed feeds to topics; topic with < `MIN_FEEDS_PER_TOPIC` feeds → gap.
 4. **Feed recommendations for gaps:** gather candidates (Exa, directories), then **verify by fetching each candidate's recent content and LLM-checking topical fit** — never recommend an uninspected feed. Each recommendation carries the verified sample link + one-line reason.
-5. **Strategy revision:** strategies are not static. When a topic persistently yields nothing or the report shows a stale gap, the strategy is revised on the next run (log the revision).
-- Acceptance: golden OPML with a deliberately thin topic → report flags the gap, shows a non-generic per-topic strategy for it, and recommends only feeds whose verified-sample links resolve. Re-running with one topic's yield artificially zeroed revises that topic's strategy (revision logged).
+5. **Strategy revision:** strategies are not static. When a topic persistently yields nothing or the report shows a stale gap, the user re-runs this setup step (e.g. `make reseed`-style target) or asks the assistant to revise the topic — revision is an explicit, occasional action, not an automatic part of the recurring run.
+- Acceptance: golden OPML with a deliberately thin topic → report flags the gap, shows a non-generic per-topic strategy for it, and recommends only feeds whose verified-sample links resolve. Re-running setup with one topic's yield artificially zeroed revises that topic's strategy (revision logged).
 
 ### FR-3 Discovery tiers — MUST (registries + search)
 Execution uses each topic's strategy from FR-2 — never a fixed global query list.
@@ -140,11 +141,33 @@ Pipeline order — cheapest first; **never** call the LLM before Layer 2:
 - **Publish for Feedly:** the digest must be reachable at a public URL (Feedly polls URLs, not local files). Publish step uploads the file to the configured static host (default: Netlify) using a deploy token. Absolute URLs throughout.
 - Acceptance: output parses with `feedparser`; each entry has both bullets and a working outbound URL; a fresh browser fetch of the public URL returns the current digest.
 
-### FR-8 Daily execution & maintenance — MUST
-- One daily run (cron): parse OPML → topic model & strategies (FR-2) → discover (FR-3) → dedup (FR-4) → evaluate (FR-5) → store (FR-6) → publish RSS (FR-7) → prune. Coverage report is generated as part of this run; no separate schedule.
+### FR-8 Recurring execution & maintenance — MUST
+One recurring run (default daily; drop to weekly if daily surfaces too little new good content — see Decisions) executes the STORED strategies: load topics + strategies (seeded by FR-2 setup, NOT re-derived) → discover (FR-3) → feed-selection (FR-9) → dedup (FR-4) → evaluate (FR-5) → store (FR-6) → publish RSS (FR-7) → prune. The feedly/OPML/topic-model work (FR-1/FR-2) is NOT in this run — it happened at setup; the run starts from `signalflow/topics.json` + stored `strategy_json`.
 - Idempotent: a re-run of the same day produces the same RSS (no duplicates).
 - All failures logged; a failed run never publishes a partial or empty feed over a good one (atomic swap, keep previous digest).
 - Acceptance: two consecutive runs with unchanged inputs produce identical digests; a coverage report is emitted by the run.
+
+### FR-9 Weekly feed-based selection (spike-proven) — MUST
+Crawl each topic's discovery source list (`docs/discovery/{slug}.json` → `crawl_root`) weekly and LLM-judge the week's items against the topic boundary, surfacing only genuinely interesting, relevant articles. Zero picks per source is a valid outcome. The mechanism is proven in `spikes/weekly_selection.py` and is slated to become an engine stage; the spike stays as the reference implementation until the stage lands.
+
+Pipeline: load topic boundary + source list → fetch feeds (TTL'd cache, stale-fallback) → window to `RECENCY_DAYS` → exclude already-picked URLs → per-source LLM evaluation (hard OUT-scope gate, `MAX_PICKS_PER_SOURCE` cap, one retry for omitted verdicts) → defer folds into the per-topic area story → emit picks + report.
+
+- **Area story** (`spikes/state/stories/{slug}.json`): long-form big-picture background (overview, per-subarea angles, open questions), seeded from the topic boundary + subareas ONLY (`prompts/generate_area_story.md`, no article input) and folded from approved picks in a way that adapts the big picture without appending article specifics. The story is injected as a per-subarea slice into evaluation prompts (no prompt grows with the story). Story quality is gated by `spikes/eval_story.py` (`make eval-story`): a reader with only generic-news exposure must be able to place a held-out article using the story alone.
+- **Idempotency**: verdict cache keyed on (prompt revision, story version) — a prompt or story change re-keys and re-judges, exactly like FR-5 prompt bumps. Feed cache TTL + pick-history URL exclusion make same-week re-runs cheap; the system settles after one re-evaluation.
+- **Global coverage**: topic boundary is geography-agnostic; evaluation prompt explicitly rejects OUT terms as scope-not-keywords (EV *policy* is IN, consumer EV *content* is OUT) and states there is no geographic restriction. Discovery queries are gated global by `spikes/eval_queries.py` (`make eval-queries`; regenerate via `make refresh-queries`).
+- **Acceptance**: `make spike-weekly` on topic 01 emits picks with why-relevant notes and theses; `make eval-story` and `make eval-queries` pass; a re-run of the same week reuses the verdict cache (no re-evaluation).
+
+**Wire-up contract** (decisions; the spike outputs become engine inputs):
+- **Entry point**: weekly picks are trusted selection output. They do NOT re-enter the FR-4/FR-5 dedup+evaluate pipeline (that would double-judge and discard the story context). They DO pass the cheap mechanical dedup layers (L1 domain blacklist, L2 seen_events URL check) before entering the digest, so a story that also arrived via search cannot appear twice.
+- **Persistence**: approved weekly picks ARE written to `seen_events` (FR-6) like any approved event — that is what makes the search→weekly duplicate guarantee hold in both directions (daily L2 blocks URLs already surfaced weekly). Storage: `url` = pick URL, `title` = pick title, `event_summary` = the `empirical_event` sentence, `topic` = the topic name, `embedding` = computed from the title+summary at write time (same embedder as FR-6). The weekly pick-history (`weekly_picks.jsonl`) remains the in-run exclusion set; `seen_events` is the cross-cadence source of truth.
+- **Digest merge**: the weekly run renders ONLY its own picks into the digest (it does not rebuild from all `seen_events`, which would republish daily entries and break FR-8 idempotency). Both runs write `signalflow_digest.xml` atomically; the weekly publish replaces the daily digest with the weekly selection, so readers see the curated weekly set (decided: weekly wins the shared file). If both cadences must coexist in one feed, the digest entries are simply the union with per-entry id = source URL (Feedly de-dupes); default is weekly-wins.
+- **Multi-topic iteration**: the weekly stage iterates every topic in `signalflow/topics.json` that has a `docs/discovery/{slug}.json`; topics without a discovery list are skipped and reported (they cannot be fed-selected until `make topic-sources` produces a list). Per-topic picks aggregate into one digest.
+- **Contract adaptation**: the digest (FR-7) renders `analysis.empirical_event` + `analysis.core_thesis` from `ApprovedEvent`. Weekly picks carry `reason` + `thesis`; the engine stage maps pick → `Analysis`: `empirical_event` = the pick's `empirical_event` field (see below), `core_thesis` = pick `thesis`, `topic` = the topic name, `approved` = true. `Candidate`: `title` = pick title, `summary` = the `empirical_event` sentence, `url` = pick URL, `topic` = topic name, `source_tier` = `"weekly"` (a new tier value alongside `registry`/`search`; `models.py` must accept it). The pick `reason` (why-relevant note) is dropped from the digest body (it exists for curation transparency in the weekly report, not for readers); the digest keeps Observed Event + Systemic Thesis.
+- **empirical_event schema**: the weekly evaluation verdict schema extends to `{"url", "approved", "reason", "thesis", "empirical_event"}`; `empirical_event` is REQUIRED for approved verdicts (empty/absent → verdict treated as malformed, retried once, then rejected), optional for rejected ones. It is the one-sentence description of the observed event, phrased for the digest bullet.
+- **Query-store sync**: the engine's `discovery.py` reads queries from the topics table `strategy_json` (currently seeded empty), while `refresh-queries` writes `docs/discovery/*.json`. The engine stage must load queries from the discovery docs (or seed `strategy_json` from them) so the global query set actually runs.
+- **Scheduling**: the recurring run (FR-8) executes BOTH FR-3 discovery tiers and the FR-9 feed-selection stage from the stored strategies — one cadence, default daily, configurable to weekly (`RECURRING_CRON`). There is no separate weekly engine run; the spike's "weekly" window (`RECENCY_DAYS`, default 7) applies to the feed-selection stage inside the recurring run. If daily runs surface too little new content, the whole run is set weekly (config-only, user decision).
+- **Config**: `RECENCY_DAYS`, `MAX_PICKS_PER_SOURCE`, `MAX_ITEMS_PER_SOURCE`, eval thresholds move from spike constants into `signalflow/config.py` env surface.
+- **Eval gates in the loop**: `make eval-story` / `make eval-queries` are manual pre-merge gates (LLM/network); they are not in CI, which stays deterministic.
 
 ## Non-Functional Requirements
 
@@ -167,28 +190,36 @@ Pipeline order — cheapest first; **never** call the LLM before Layer 2:
 
 ```mermaid
 flowchart LR
-  A[feedly.opml] --> B[OPML parser]
-  B -->|known_domains| C{4-layer dedup}
-  B -->|feeds + folders| D[Topic model & strategies]
-  D -->|per-topic queries| E[Exa search]
-  F[Registries per topic] --> G[Registry poller]
-  E --> C
-  G --> C
-  C -->|L1 domain| X[Discard: subscribed]
-  C -->|L2 hash| Y[Discard: seen]
-  C -->|L3 cosine 0.65-0.82| H[L4 delta evaluator]
-  C -->|L3 < 0.65| I[Approve]
-  H -->|no delta| Y
-  H -->|delta| I
-  I --> J[history_memory.db]
-  I --> K[signalflow_digest.xml]
-  K --> L[Publish to public URL]
-  L --> M[Feedly]
-  D -->|coverage + gaps| N[Feed candidates]
-  N --> O[Content verification]
-  O --> P[coverage_report.md]
-  P --> Q[User adds feeds to Feedly]
-  Q --> A
+  subgraph SETUP["Setup (one-and-done; re-run on topic changes)"]
+    A[feedly.opml] --> B[OPML parser]
+    B -->|known_domains| D0[known_domains: exclusion set]
+    B -->|feeds + folders| D[Topic model & strategies]
+    D -->|coverage + gaps| N[Feed candidates]
+    N --> O[Content verification]
+    O --> P[coverage_report.md]
+    P --> Q[User adds feeds to Feedly]
+  end
+  D0 -.-> C
+  D -.->|stored strategy_json| S[Stored topics + strategies]
+
+  subgraph RECUR["Recurring run (daily; weekly if yield thin)"]
+    S --> E[Exa search]
+    S -->|discovery source lists| F9[Feed selection FR-9]
+    F[Registries per topic] --> G[Registry poller]
+    E --> C{4-layer dedup}
+    G --> C
+    F9 --> C
+    C -->|L1 domain| X[Discard: subscribed]
+    C -->|L2 hash| Y[Discard: seen]
+    C -->|L3 cosine 0.65-0.82| H[L4 delta evaluator]
+    C -->|L3 < 0.65| I[Approve]
+    H -->|no delta| Y
+    H -->|delta| I
+    I --> J[history_memory.db]
+    I --> K[signalflow_digest.xml]
+    K --> L[Publish to public URL]
+    L --> M[Feedly]
+  end
 ```
 
 ## Data Model
@@ -239,12 +270,14 @@ CREATE TABLE IF NOT EXISTS feed_recommendations (
 | `SIM_THRESHOLD_LOW` | 0.65 | L3 → L4 band bound |
 | `RETENTION_DAYS` | 365 | FR-6 pruning age |
 | `MAX_CANDIDATES_PER_TOPIC` | 25 | cost cap |
-| `DAILY_CRON` | `0 6 * * *` | daily run (local tz) |
+| `RECURRING_CRON` | `0 6 * * *` | FR-8 recurring run (local tz); set to `0 7 * * 1` (weekly) if daily yield is thin |
 | `MIN_FEEDS_PER_TOPIC` | 3 | coverage gap threshold |
 | `MAX_SUGGESTIONS_PER_TOPIC` | 5 | recommendation cap |
 | `PUBLISH_TARGET` | `netlify` | static host for the digest |
 | `DEPLOY_TOKEN` | — | netlify/github deploy token (env) |
-
+| `RECENCY_DAYS` | 7 | FR-9 weekly window |
+| `MAX_PICKS_PER_SOURCE` | 3 | FR-9 curation cap per source |
+| `MAX_ITEMS_PER_SOURCE` | 30 | FR-9 LLM-judged items cap per source |
 ## Decisions (recommendations; review before lock)
 
 | Question | Decision | Rationale |
@@ -258,8 +291,11 @@ CREATE TABLE IF NOT EXISTS feed_recommendations (
 | Search provider | Exa | AI-native search with content extraction; user-selected. Replaces the proposal's Serper |
 | LLM provider | Reasoning via Opencode go router (DeepSeek v4 Flash); embeddings via Google `gemini-embedding-001` | User-selected. Router verified to have NO embeddings endpoint; Google key already exists ($0.15–0.20/M list, whole-OPML run well under a cent); never mix embedding models |
 | Topic set | Derived per-user from OPML; proposal's six topics are examples only | Explicit user requirement: topics and per-topic strategies must be crafted, not fixed |
-| Feedly analysis | Core engine stage (FR-2), runs with the daily engine | Explicit user requirement: part of the project, not a weekly side job |
+| Feedly analysis | Setup step (FR-2), run once — re-run only when the user adds/removes a topic | OPML → topic model → strategies is one-and-done; the recurring run executes the STORED strategies, it never re-derives them |
 | Coverage recommendations | Content-verified before recommendation (FR-2.4) | "Actually look at the feeds" is a hard acceptance gate |
+| Weekly selection entry point | Trusted curated output; skips FR-4/FR-5 re-judgment, passes L1+L2 mechanical dedup | The spike already judged with story context; re-judging doubles cost and discards the story. Mechanical dedup still runs so search/feed duplicates cannot double-publish (FR-9 wire-up) |
+| Weekly vs daily | One recurring run (default daily); drop to weekly if daily yield is thin | Both FR-3 discovery and FR-9 feed selection run in the SAME recurring run from stored strategies — not two competing cadences. Default `RECURRING_CRON` daily; if a week of daily runs surfaces little genuinely-new good content, set it weekly (user decision, config-only) |
+| Eval gates | Manual pre-merge (`make eval-story`, `make eval-queries`); not in CI | LLM/network evals are non-deterministic; CI stays deterministic (FR-9) |
 
 ## Acceptance Criteria (v1 ship gate)
 

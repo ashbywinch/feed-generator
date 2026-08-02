@@ -298,11 +298,19 @@
     }
   ],
   "queries": [
-    "GB grid connection queue statistics",
-    "UK CfD allocation round results strike prices",
-    "long-duration energy storage LDES project economics",
-    "ancillary services frequency response market GB prices",
-    "interconnector flows market coupling NEMO reports"
+    "grid-scale battery storage revenue streams market maturity",
+    "grid connection queue statistics renewable projects",
+    "ancillary services frequency regulation market design",
+    "interconnector capacity auction results market coupling",
+    "CfD auction results renewable energy policy",
+    "demand-side flexibility market design electrification",
+    "nuclear new-build economics RAB CfD SMR",
+    "long-duration energy storage CAES thermal gravity flow",
+    "offshore wind auction results technology trends",
+    "carbon market prices ETS climate economics data",
+    "electricity market design price controls regulation",
+    "distribution grid data analytics congestion management",
+    "hydrogen for power generation economics"
   ],
   "news_vs_analysis": "news",
   "notes": "Modo Energy and National Grid ESO are core to the topic but are bot-protected; crawler should target their public data endpoints and podcast feed URLs rather than homepage. current-news.co.uk serves its feed via evinfrastructurenews.com/rss.xml. Elexon BMRS API is the definitive structured source for balancing data. LCCC uses lccc.org.uk (lccc.uk fails DNS). DESNZ content is accessible via gov.uk rather than desnz.gov.uk which fails DNS.",

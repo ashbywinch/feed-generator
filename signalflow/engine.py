@@ -1,9 +1,14 @@
-"""FR-8: daily engine orchestration + CLI.
+"""FR-8: recurring engine orchestration + CLI.
 
-One daily run: parse OPML -> (topic model already seeded from elicitation)
--> discover (registries + Exa per topic strategy) -> dedup (4 layers) ->
-store -> digest -> publish -> prune. Idempotent by construction: dedup L2 +
-URL-unique inserts mean a re-run emits no duplicates.
+Setup (one-and-done, FR-1/FR-2): `python -m signalflow setup` parses the OPML
+and persists the exclusion set + curated topics. Re-run setup only when the
+user adds/removes a topic.
+
+Recurring run (default daily; weekly if yield thin): `python -m signalflow run`
+executes the STORED strategies — discover (registries + Exa per topic strategy)
++ feed selection (FR-9) -> dedup (4 layers) -> store -> digest -> publish ->
+prune. It never re-derives topics or re-parses the OPML. Idempotent by
+construction: dedup L2 + URL-unique inserts mean a re-run emits no duplicates.
 """
 
 from __future__ import annotations
@@ -34,16 +39,36 @@ class Engine:
         self._llm = LLM(self._cfg)
         self._embedder = Embedder(self._cfg)
 
-    # -- daily run (FR-8) ----------------------------------------------------
+    # -- setup (FR-1/FR-2: one-and-done) -------------------------------------
+
+    def setup(self) -> int:
+        """One-and-done: parse OPML, persist exclusion set + curated topics.
+
+        Re-run only when the user adds/removes a topic. The recurring run
+        (`run`) reads the stored blacklist and topics — it never touches OPML.
+        """
+        print("[setup] OPML -> exclusion set + topics")
+        known_domains, feeds = parse_opml(PROJECT_ROOT / "feedly.opml")
+        self._memory.save_blacklist(known_domains)
+        print(f"      {len(feeds)} feeds, {len(known_domains)} blacklist domains stored")
+        self._seed_from_curated()
+        print("[setup] done — topics + exclusion set persisted")
+        return 0
+
+    # -- recurring run (FR-8) -------------------------------------------------
 
     def run(self) -> int:
-        print("[1/6] engine: OPML + memory")
-        known_domains, feeds = parse_opml(PROJECT_ROOT / "feedly.opml")
-        print(f"      {len(feeds)} feeds, {len(known_domains)} blacklist domains")
-        self._seed_topics_if_empty()
+        known_domains = self._memory.blacklist()
+        if not known_domains:
+            print("FATAL: no exclusion set stored — run `python -m signalflow setup` first")
+            return 1
+        topics = self._memory.topics()
+        if not topics:
+            print("FATAL: no topics stored — run `python -m signalflow setup` first")
+            return 1
+        print(f"[1/6] engine: {len(known_domains)} blacklist domains, {len(topics)} topics (stored)")
 
         print("[2/6] discovery (registries + Exa per topic strategy)")
-        topics = self._memory.topics()
         candidates = Discovery(self._cfg).discover(topics)
         print(f"      {len(candidates)} candidates across {len(topics)} topics")
 
@@ -64,12 +89,6 @@ class Engine:
 
         print("[6/6] done")
         return 0
-
-    def _seed_topics_if_empty(self) -> None:
-        if self._memory.topics():
-            print("      topics table already populated")
-            return
-        self._seed_from_curated()
 
     def _seed_from_curated(self) -> int:
         """Seed the topics table from the curated topics.json (walkthrough final set)."""
@@ -143,7 +162,12 @@ def main(argv: list[str] | None = None) -> int:
         removed = engine._memory.prune()
         print(f"pruned {removed} events")
         return 0
+    if command == "setup":
+        return engine.setup()
     if command == "run":
         return engine.run()
-    print("usage: python -m signalflow [run|smoke|topics|topics-doc|reseed|prune|sources <topic>]  (default: run)")
+    print(
+        "usage: python -m signalflow "
+        + "[run|setup|smoke|topics|topics-doc|reseed|prune|sources <topic>]  (default: run)"
+    )
     return 2

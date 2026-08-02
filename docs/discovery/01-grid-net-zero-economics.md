@@ -1,6 +1,6 @@
 # Grid & Net Zero economics — Discovery Source List
 
-Status: needs-human by reviewer loop (iteration 4). 13 subareas, 21 sources, 5 queries. Generated 2026-08-01.
+Status: needs-human by reviewer loop (iteration 4). 13 subareas, 21 sources, 13 queries. Generated 2026-08-01.
 
 ## Subareas
 ### 1. Grid-scale batteries & storage
@@ -119,11 +119,19 @@ adequate
 - **Elexon Insights Data Platform** (`insights.elexon.co.uk`) — Aggregated UK electricity generation and market insight dashboards.
 
 ## Queries
-1. GB grid connection queue statistics
-2. UK CfD allocation round results strike prices
-3. long-duration energy storage LDES project economics
-4. ancillary services frequency response market GB prices
-5. interconnector flows market coupling NEMO reports
+1. grid-scale battery storage revenue streams market maturity
+2. grid connection queue statistics renewable projects
+3. ancillary services frequency regulation market design
+4. interconnector capacity auction results market coupling
+5. CfD auction results renewable energy policy
+6. demand-side flexibility market design electrification
+7. nuclear new-build economics RAB CfD SMR
+8. long-duration energy storage CAES thermal gravity flow
+9. offshore wind auction results technology trends
+10. carbon market prices ETS climate economics data
+11. electricity market design price controls regulation
+12. distribution grid data analytics congestion management
+13. hydrogen for power generation economics
 
 ## News vs analysis
 news

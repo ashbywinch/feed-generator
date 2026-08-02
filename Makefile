@@ -1,5 +1,5 @@
 # Makefile for feed-generator (SignalFlow)
-.PHONY: help setup run smoke topics spike spike-bg spike-logs spike-stop topic-sources topic-sources-bg topic-sources-logs topic-sources-stop lint lint-github typecheck test coverage format clean
+.PHONY: help setup run smoke topics spike spike-bg spike-logs spike-stop spike-weekly spike-weekly-bg spike-weekly-logs spike-weekly-stop eval-story eval-queries refresh-queries topic-sources topic-sources-bg topic-sources-logs topic-sources-stop lint lint-github typecheck test coverage format clean
 
 PYTHON := .venv/bin/python
 UV := $(shell command -v uv 2>/dev/null || echo $(HOME)/.local/bin/uv)
@@ -14,7 +14,7 @@ NC := \033[0m
 help:
 	@echo "Available commands:"
 	@echo "  ${GREEN}make setup${NC}        Create venv, install deps + pre-commit hooks, ensure .env exists"
-	@echo "  ${GREEN}make run${NC}          Daily engine run (FR-8)"
+	@echo "  ${GREEN}make run${NC}          Recurring run from stored strategies (setup first)"
 	@echo "  ${GREEN}make smoke${NC}        Engine self-check (opml+memory+embeddings+chat)"
 	@echo "  ${GREEN}make topics${NC}       Show the seeded topic table"
 	@echo "  ${GREEN}make topic-sources${NC} Generate a topic's source list (TOPIC=\"name\")"
@@ -22,6 +22,13 @@ help:
 	@echo "  ${GREEN}make spike-bg${NC}     Run spike in background; log to spikes/state/run.log"
 	@echo "  ${GREEN}make spike-logs${NC}   Tail the background spike log"
 	@echo "  ${GREEN}make spike-stop${NC}   Stop the background spike"
+	@echo "  ${GREEN}make spike-weekly${NC} Weekly article selection spike (TOPIC=\"name\")"
+	@echo "  ${GREEN}make spike-weekly-bg${NC} Run weekly spike in background; log to spikes/state/weekly.log"
+	@echo "  ${GREEN}make spike-weekly-logs${NC} Tail the background weekly spike log"
+	@echo "  ${GREEN}make spike-weekly-stop${NC} Stop the background weekly spike"
+	@echo "  ${GREEN}make eval-story${NC}   Eval: can the story contextualize fresh articles"
+	@echo "  ${GREEN}make eval-queries${NC}  Eval: are discovery queries global + well-formed"
+	@echo "  ${GREEN}make refresh-queries${NC} Regenerate discovery queries via prompt (eval-gated, persists)"
 	@echo "  ${GREEN}make lint${NC}         Check code quality (ruff)"
 	@echo "  ${GREEN}make typecheck${NC}    Static type check (basedpyright)"
 	@echo "  ${GREEN}make test${NC}         Run tests (lint + typecheck gate)"
@@ -76,11 +83,36 @@ spike-logs:
 spike-stop:
 	@if [ -f spikes/state/spike.pid ]; then kill $$(cat spikes/state/spike.pid) 2>/dev/null && rm spikes/state/spike.pid && echo "spike stopped"; else echo "no pid file — not running?"; fi
 
+spike-weekly: setup
+	@$(UV) run --env-file .env python spikes/weekly_selection.py
+
+spike-weekly-bg: setup
+	mkdir -p spikes/state
+	@nohup $(UV) run --env-file .env python -u spikes/weekly_selection.py >> spikes/state/weekly.log 2>&1 & echo $$! > spikes/state/weekly.pid
+	@echo "weekly spike running in background (pid $$(cat spikes/state/weekly.pid))"
+	@echo "  monitor: make spike-weekly-logs"
+	@echo "  stop:    make spike-weekly-stop"
+
+spike-weekly-logs:
+	tail -f spikes/state/weekly.log
+
+spike-weekly-stop:
+	@if [ -f spikes/state/weekly.pid ]; then kill $$(cat spikes/state/weekly.pid) 2>/dev/null && rm spikes/state/weekly.pid && echo "weekly spike stopped"; else echo "no pid file — not running?"; fi
+
+eval-story: setup
+	@$(UV) run --env-file .env python spikes/eval_story.py
+
+eval-queries: setup
+	@$(UV) run --env-file .env python spikes/eval_queries.py
+
+refresh-queries: setup
+	@$(UV) run --env-file .env python spikes/eval_queries.py --generate
+
 lint: setup
-	@$(RUFF) check signalflow tests
+	@$(RUFF) check signalflow tests spikes/weekly_selection.py spikes/eval_story.py spikes/eval_queries.py
 
 lint-github: setup
-	@$(RUFF) check signalflow tests --output-format=github
+	@$(RUFF) check signalflow tests spikes/weekly_selection.py spikes/eval_story.py spikes/eval_queries.py --output-format=github
 
 typecheck: setup
 	@$(BASEDPYRIGHT) --outputjson | $(PYTHON) -c "import json,sys; d=json.load(sys.stdin); sys.exit(1 if d['summary']['errorCount'] else 0)"
@@ -92,8 +124,8 @@ coverage: setup
 	@$(PYTHON) -m pytest --cov=signalflow --cov-report=term-missing --cov-report=xml
 
 format: setup
-	@$(RUFF) check --fix signalflow tests
-	@$(RUFF) format signalflow tests
+	@$(RUFF) check --fix signalflow tests spikes/weekly_selection.py spikes/eval_story.py spikes/eval_queries.py
+	@$(RUFF) format signalflow tests spikes/weekly_selection.py spikes/eval_story.py spikes/eval_queries.py
 
 clean:
 	@rm -rf .venv htmlcov/

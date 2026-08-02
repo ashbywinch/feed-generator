@@ -13,6 +13,7 @@ from signalflow.engine import Engine
 class FakeMemory:
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._topics: list[dict[str, Any]] = []
+        self._blacklist: set[str] = set()
 
     def topics(self) -> list[dict[str, Any]]:
         return self._topics
@@ -25,6 +26,13 @@ class FakeMemory:
 
     def set_topics(self, topics: list[dict[str, Any]]) -> None:
         self._topics = topics
+
+    def save_blacklist(self, domains: set[str]) -> int:
+        self._blacklist = set(domains)
+        return len(domains)
+
+    def blacklist(self) -> set[str]:
+        return self._blacklist
 
     def prune(self) -> int:
         return 2
@@ -65,11 +73,6 @@ def _engine(
 
 def test_run_sequences_stages_and_publishes(monkeypatch: Any, cfg: Any) -> None:
     order: list[str] = []
-    monkeypatch.setattr(
-        engine_mod,
-        "parse_opml",
-        lambda path: ({"sub.com"}, [{"folder": "F", "title": "T", "url": "https://sub.com/f"}]),
-    )
 
     class D(FakeDiscovery):
         def discover(self, topics: list[dict[str, Any]]) -> list[Any]:
@@ -85,6 +88,7 @@ def test_run_sequences_stages_and_publishes(monkeypatch: Any, cfg: Any) -> None:
     monkeypatch.setattr(engine_mod, "publish", lambda cfg, path: order.append("publish"))
 
     engine = _engine(monkeypatch, cfg, discovery_cls=D, pipeline_cls=P)
+    cast(Any, engine._memory).save_blacklist({"sub.com"})
     cast(Any, engine._memory).set_topics(
         [{"name": "T", "status": "adequate", "feed_count": 3, "strategy": {"queries": ["q"]}}]
     )
@@ -93,14 +97,51 @@ def test_run_sequences_stages_and_publishes(monkeypatch: Any, cfg: Any) -> None:
 
 
 def test_run_no_events_keeps_previous_digest(monkeypatch: Any, cfg: Any) -> None:
-    monkeypatch.setattr(engine_mod, "parse_opml", lambda path: (set(), []))
     called: list[str] = []
     monkeypatch.setattr(engine_mod, "build_digest", lambda *a: called.append("build"))
     monkeypatch.setattr(engine_mod, "publish", lambda *a: called.append("publish"))
     engine = _engine(monkeypatch, cfg)
+    cast(Any, engine._memory).save_blacklist({"sub.com"})
     cast(Any, engine._memory).set_topics([{"name": "T"}])
     assert engine.run() == 0
     assert called == []  # no events: previous digest is kept, nothing published
+
+
+def test_run_fails_fast_without_setup(monkeypatch: Any, cfg: Any) -> None:
+    """FR-8 recurring run never re-derives: no stored blacklist -> abort, no OPML."""
+
+    def _no_opml(path: Any) -> Any:
+        raise AssertionError("run() must not parse OPML")
+
+    monkeypatch.setattr(engine_mod, "parse_opml", _no_opml)
+    engine = _engine(monkeypatch, cfg)
+    assert engine.run() == 1  # no blacklist stored
+    cast(Any, engine._memory).save_blacklist({"sub.com"})
+    assert engine.run() == 1  # still no topics stored
+
+
+def test_setup_persists_blacklist_and_topics(monkeypatch: Any, cfg: Any) -> None:
+    """FR-1/FR-2 setup: OPML parsed once, blacklist + topics persisted."""
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(
+        engine_mod,
+        "parse_opml",
+        lambda path: ({"sub.com"}, [{"folder": "F", "title": "T", "url": "https://sub.com/f"}]),
+    )
+
+    class M(FakeMemory):
+        def save_blacklist(self, domains: set[str]) -> int:
+            seen["blacklist"] = domains
+            return len(domains)
+
+        def seed_topics(self, assignment: dict[str, Any]) -> int:
+            seen["seeded"] = True
+            return len(assignment["topics"])
+
+    engine = _engine(monkeypatch, cfg, memory_cls=M)
+    assert engine.setup() == 0
+    assert seen["blacklist"] == {"sub.com"}
+    assert seen["seeded"] is True
 
 
 def test_seed_from_curated_marks_gaps(monkeypatch: Any, cfg: Any) -> None:
@@ -117,12 +158,6 @@ def test_seed_from_curated_marks_gaps(monkeypatch: Any, cfg: Any) -> None:
     topics = seen["assignment"]["topics"]
     assert topics["Agriculture"]["gap"] is True  # 1 source < MIN_FEEDS_PER_TOPIC
     assert topics["Leadership / Management"]["gap"] is False  # 8 sources
-
-
-def test_seed_topics_if_empty_seeds_curated(monkeypatch: Any, cfg: Any) -> None:
-    engine = _engine(monkeypatch, cfg)
-    engine._seed_topics_if_empty()  # empty table -> seeds from topics.json
-    assert len(cast(Any, engine._memory)._topics) == 0  # FakeMemory records nothing; path must not crash
 
 
 def test_reseed_clears_then_seeds(monkeypatch: Any, cfg: Any) -> None:
