@@ -71,6 +71,10 @@ class Engine:
         # blacklist back so setup is atomic in both failure directions.
         self._memory.save_blacklist(known_domains)
         if self._memory.blacklist() != known_domains:
+            # The failed write may have already wiped the stored set (partial
+            # DELETE+INSERT) — restore the last-good exclusion set so the
+            # recurring run keeps working, matching the zero-seed rollback.
+            self._memory.save_blacklist(previous)
             print("FATAL: exclusion-set write incomplete — refusing to complete setup (no partial blacklist)")
             return 1
         seeded = self._seed_from_curated()

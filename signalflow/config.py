@@ -43,6 +43,18 @@ class Config:
     weekly_prompt_rev: int = 9  # bump when the eval prompt changes -> stale verdicts ignored
     weekly_story_max_angles: int = 5  # angle lines kept per subarea
     weekly_story_max_questions: int = 8  # open questions kept per topic
+    # Eval-gate thresholds (r15: eval scripts must share the Config env surface
+    # so evals and the weekly pipeline cannot silently drift apart)
+    eval_pass_frac: float = 0.75  # story eval: fraction of articles that must contextualize
+    eval_max_articles: int = 4  # story eval: held-out articles judged per run
+    eval_overview_min_words: int = 50  # story eval: overview length floor
+    eval_min_declarative: int = 2  # story eval: declarative sentences per subarea section
+    eval_max_question_frac: float = 0.35  # story eval: interrogative ceiling per section
+    eval_min_queries: int = 5  # queries eval: lower bound on query count
+    eval_query_slack: int = 2  # queries eval: extras beyond one-per-subarea tolerated
+    eval_max_uncovered: int = 3  # queries eval: subareas a set may leave out
+    # FR-8 recurring schedule (PRD config table; DAILY_CRON/WEEKLY_CRON merged)
+    recurring_cron: str = "0 6 * * *"
     # Publishing
     publish_target: str = "netlify"
     deploy_token: str = ""
@@ -77,6 +89,15 @@ class Config:
             weekly_prompt_rev=int(os.environ.get("PROMPT_REV", "9")),
             weekly_story_max_angles=int(os.environ.get("STORY_MAX_ANGLES", "5")),
             weekly_story_max_questions=int(os.environ.get("STORY_MAX_QUESTIONS", "8")),
+            eval_pass_frac=float(os.environ.get("EVAL_PASS_FRAC", "0.75")),
+            eval_max_articles=int(os.environ.get("EVAL_MAX_ARTICLES", "4")),
+            eval_overview_min_words=int(os.environ.get("EVAL_OVERVIEW_MIN_WORDS", "50")),
+            eval_min_declarative=int(os.environ.get("EVAL_MIN_DECLARATIVE", "2")),
+            eval_max_question_frac=float(os.environ.get("EVAL_MAX_QUESTION_FRAC", "0.35")),
+            eval_min_queries=int(os.environ.get("EVAL_MIN_QUERIES", "5")),
+            eval_query_slack=int(os.environ.get("EVAL_QUERY_SLACK", "2")),
+            eval_max_uncovered=int(os.environ.get("EVAL_MAX_UNCOVERED", "3")),
+            recurring_cron=os.environ.get("RECURRING_CRON", "0 6 * * *"),
             publish_target=os.environ.get("PUBLISH_TARGET", "netlify"),
             deploy_token=os.environ.get("DEPLOY_TOKEN", ""),
         )

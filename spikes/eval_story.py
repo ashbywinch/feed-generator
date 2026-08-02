@@ -61,13 +61,25 @@ LLM_BASE = os.environ.get("OPENCODE_GO_BASE_URL", "")
 LLM_KEY = os.environ.get("OPENCODE_GO_API_KEY", "")
 LLM_MODEL = os.environ.get("OPENCODE_GO_MODEL", "deepseek-v4-flash")
 
-OVERVIEW_MIN_WORDS = 50
-MIN_DECLARATIVE_PER_SECTION = 2
-MAX_QUESTION_FRAC = 0.35
-EVAL_INTERVAL = 1.0
+# Eval-gate thresholds live on the Config env surface (PRD config contract,
+# r15): the eval and the weekly pipeline share one source of truth so a
+# threshold changed via .env cannot silently drift the two apart.
+CFG = Config(
+    llm_key=LLM_KEY,
+    llm_base=LLM_BASE,
+    llm_model=LLM_MODEL,
+    google_key=os.environ.get("GOOGLE_API_KEY", ""),
+    embed_model=os.environ.get("EMBEDDING_MODEL", "gemini-embedding-001"),
+    exa_key=os.environ.get("EXA_API_KEY", ""),
+)
+
+OVERVIEW_MIN_WORDS = CFG.eval_overview_min_words
+MIN_DECLARATIVE_PER_SECTION = CFG.eval_min_declarative
+MAX_QUESTION_FRAC = CFG.eval_max_question_frac
+EVAL_INTERVAL = CFG.weekly_eval_interval
 LLM_MAX_TOKENS = 8192
-MAX_EVAL_ARTICLES = 4  # held-out articles judged per run
-PASS_FRAC = 0.75  # fraction of articles that must contextualize
+MAX_EVAL_ARTICLES = CFG.eval_max_articles  # held-out articles judged per run
+PASS_FRAC = CFG.eval_pass_frac  # fraction of articles that must contextualize
 
 # Global-coverage fixtures: held-out articles from OUTSIDE the UK/EU feed bias.
 # The feed cache is UK/EU-heavy, so without fixtures the eval never tests whether
@@ -193,6 +205,7 @@ def mechanical_check(story: dict[str, Any]) -> list[str]:
     else:
         for subarea, lines in angles.items():
             if not isinstance(lines, list):
+                failures.append(f"section '{subarea}': malformed (not a list)")
                 continue
             text = "\n".join(str(x) for x in lines)
             declarative = sum(1 for s in sentences(text) if not is_question(s))

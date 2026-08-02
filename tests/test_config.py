@@ -54,6 +54,33 @@ def test_weekly_selection_env_overrides(monkeypatch):
     assert cfg.weekly_story_max_questions == 9
 
 
+def test_eval_gate_env_overrides(monkeypatch):
+    """r15: eval-gate thresholds surface as env so evals and the weekly
+    pipeline cannot silently drift apart (PRD config contract)."""
+    monkeypatch.setenv("OPENCODE_GO_API_KEY", "k")
+    monkeypatch.setenv("OPENCODE_GO_BASE_URL", "https://router/v1")
+    monkeypatch.setenv("GOOGLE_API_KEY", "g")
+    monkeypatch.setenv("EVAL_PASS_FRAC", "0.8")
+    monkeypatch.setenv("EVAL_MAX_ARTICLES", "6")
+    monkeypatch.setenv("EVAL_OVERVIEW_MIN_WORDS", "60")
+    monkeypatch.setenv("EVAL_MIN_DECLARATIVE", "3")
+    monkeypatch.setenv("EVAL_MAX_QUESTION_FRAC", "0.25")
+    monkeypatch.setenv("EVAL_MIN_QUERIES", "4")
+    monkeypatch.setenv("EVAL_QUERY_SLACK", "3")
+    monkeypatch.setenv("EVAL_MAX_UNCOVERED", "2")
+    monkeypatch.setenv("RECURRING_CRON", "0 7 * * 1")
+    cfg = Config.from_env()
+    assert cfg.eval_pass_frac == 0.8
+    assert cfg.eval_max_articles == 6
+    assert cfg.eval_overview_min_words == 60
+    assert cfg.eval_min_declarative == 3
+    assert cfg.eval_max_question_frac == 0.25
+    assert cfg.eval_min_queries == 4
+    assert cfg.eval_query_slack == 3
+    assert cfg.eval_max_uncovered == 2
+    assert cfg.recurring_cron == "0 7 * * 1"
+
+
 def test_defaults_are_prd_values(cfg):
     assert cfg.sim_high == 0.82
     assert cfg.sim_low == 0.65
@@ -68,3 +95,12 @@ def test_defaults_are_prd_values(cfg):
     assert cfg.weekly_prompt_rev == 9
     assert cfg.weekly_story_max_angles == 5
     assert cfg.weekly_story_max_questions == 8
+    assert cfg.eval_pass_frac == 0.75  # eval gates (r15)
+    assert cfg.eval_max_articles == 4
+    assert cfg.eval_overview_min_words == 50
+    assert cfg.eval_min_declarative == 2
+    assert cfg.eval_max_question_frac == 0.35
+    assert cfg.eval_min_queries == 5
+    assert cfg.eval_query_slack == 2
+    assert cfg.eval_max_uncovered == 3
+    assert cfg.recurring_cron == "0 6 * * *"  # FR-8 (PRD config table)

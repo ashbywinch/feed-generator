@@ -62,12 +62,24 @@ LLM_BASE = os.environ.get("OPENCODE_GO_BASE_URL", "")
 LLM_KEY = os.environ.get("OPENCODE_GO_API_KEY", "")
 LLM_MODEL = os.environ.get("OPENCODE_GO_MODEL", "deepseek-v4-flash")
 
-MIN_QUERIES = 5
-MAX_QUERIES = 13  # upper bound; a topic's actual subarea count may be lower (see main)
-QUERY_SLACK = 2  # extra queries tolerated beyond one-per-subarea (prompt: "strong subareas may get two")
+# Eval-gate thresholds live on the Config env surface (PRD config contract,
+# r15): the eval and the weekly pipeline share one source of truth so a
+# threshold changed via .env cannot silently drift the two apart.
+CFG = Config(
+    llm_key=LLM_KEY,
+    llm_base=LLM_BASE,
+    llm_model=LLM_MODEL,
+    google_key=os.environ.get("GOOGLE_API_KEY", ""),
+    embed_model=os.environ.get("EMBEDDING_MODEL", "gemini-embedding-001"),
+    exa_key=os.environ.get("EXA_API_KEY", ""),
+)
 
-MAX_UNCOVERED = 3  # subareas a query set may leave out and still pass
-EVAL_INTERVAL = 1.0
+MIN_QUERIES = CFG.eval_min_queries
+MAX_QUERIES = 13  # upper bound; a topic's actual subarea count may be lower (see main)
+QUERY_SLACK = CFG.eval_query_slack  # extras beyond one-per-subarea (prompt: "strong subareas may get two")
+
+MAX_UNCOVERED = CFG.eval_max_uncovered  # subareas a query set may leave out and still pass
+EVAL_INTERVAL = CFG.weekly_eval_interval
 LLM_MAX_TOKENS = 8192
 
 # Coverage tokens are DERIVED from each subarea's name (distinctive words

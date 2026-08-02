@@ -183,18 +183,35 @@ def test_setup_does_not_seed_topics_when_blacklist_write_fails(monkeypatch: Any,
 
 
 def test_setup_fails_fast_when_blacklist_write_incomplete(monkeypatch: Any, cfg: Any) -> None:
-    """FR-1/FR-2 setup: a blacklist write that doesn't stick must not complete setup."""
-    seen: dict[str, Any] = {}
+    """FR-1/FR-2 setup: a blacklist write that doesn't stick must not complete setup.
+
+    The previous blacklist is restored so the failed write never destroys the
+    last-good exclusion set (r15 suggestion: the zero-seed branch rolls back,
+    the incomplete-write branch must too).
+    """
+    saved: list[set[str]] = []
     monkeypatch.setattr(engine_mod, "parse_opml", lambda path: ({"sub.com"}, []))
 
     class M(FakeMemory):
+        _write_sticks: bool = True
+
+        def blacklist(self) -> set[str]:
+            return self._blacklist
+
         def save_blacklist(self, domains: set[str]) -> int:
-            seen["called"] = True
-            return len(domains)  # reports success but does NOT persist (no self._blacklist update)
+            saved.append(set(domains))
+            if self._write_sticks:
+                self._blacklist = set(domains)
+                return len(domains)
+            return 0  # write does NOT stick (no self._blacklist update)
 
     engine = _engine(monkeypatch, cfg, memory_cls=M)
+    cast(Any, engine._memory)._blacklist = {"old.com"}  # last-good set
+    cast(Any, engine._memory)._write_sticks = False
     assert engine.setup() == 1
-    assert seen["called"] is True  # the write was attempted, then detected as incomplete
+    assert saved[0] == {"sub.com"}  # attempted write
+    assert saved[1] == {"old.com"}  # previous restored
+    assert engine._memory.blacklist() == {"old.com"}  # last-good set survives
 
 
 def test_setup_fails_fast_on_shrunk_blacklist(monkeypatch: Any, cfg: Any) -> None:

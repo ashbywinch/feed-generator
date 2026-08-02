@@ -461,6 +461,69 @@ def test_subarea_label_includes_all_subareas() -> None:
     assert ws.subarea_label(s2) == "A"
 
 
+# --- weekly_selection: tracker params normalized so one article = one url (r15) ---
+
+
+def test_normalize_url_strips_tracker_families() -> None:
+    """Feeds appending fbclid/gclid/ref/cmp variants must normalize to ONE url
+    or the article re-enters the window, re-judges, and can be picked twice."""
+    ws = _load_spike("weekly_selection")
+    base = "https://example.com/story/42"
+    assert ws.normalize_url(base) == base
+    for q in (
+        "?utm_source=x&utm_medium=y",
+        "?fbclid=abc",
+        "?gclid=xyz",
+        "?ref=newsletter",
+        "?cmp=week-3",
+        "?mc_cid=1&mc_eid=2",
+        "?utm_source=x&fbclid=abc&ref=r",
+    ):
+        assert ws.normalize_url(base + q) == base, q
+    # meaningful params are KEPT
+    assert ws.normalize_url(base + "?page=2") == base + "?page=2"
+
+
+# --- weekly_selection: shared feeds keyed on FULL subarea set (r14) --------
+
+
+def test_shared_feed_subareas_deduplicated_on_merge(tmp_path: Any, monkeypatch: Any) -> None:
+    """A crawl_root repeated WITHIN the same subarea must not append the
+    subarea twice: ['A','A'] would turn the verdict key from A into A|A and
+    silently re-key every cached verdict (r15 suggestion)."""
+    ws = _load_spike("weekly_selection")
+    listing = {
+        "topic": "T",
+        "subareas": [
+            {"name": "A", "sources": [{"crawl_root": "https://x/feed"}]},
+            {"name": "A", "sources": [{"crawl_root": "https://x/feed"}]},  # same subarea, again
+            {"name": "B", "sources": [{"crawl_root": "https://x/feed"}]},
+        ],
+    }
+    (tmp_path / "t.json").write_text(json.dumps(listing), encoding="utf-8")
+    monkeypatch.setattr(ws, "DISCOVERY_DIR", tmp_path)
+    _, sources, _ = ws.load_source_list("T")
+    assert len(sources) == 1
+    assert sources[0]["subareas"] == ["A", "B"]  # no "A" duplication
+    assert ws.subarea_key(sources[0]) == "A|B"  # stable key
+
+
+# --- eval_story: malformed section must FAIL the gate, not be skipped (r15) -
+
+
+def test_mechanical_check_fails_malformed_section() -> None:
+    """A subarea section whose value is not a list is corrupt story JSON — the
+    gate must record a failure, not silently skip it (r15 suggestion)."""
+    ev = _load_spike("eval_story")
+    story = {
+        "overview": "x" * 60,
+        "angles": {"Good": ["fine sentence here."], "Bad": "not a list"},
+        "open_questions": [],
+    }
+    failures = ev.mechanical_check(story)
+    assert any("Bad" in f and "malformed" in f for f in failures)
+
+
 # --- weekly_selection: undated items age out of the window (r10) -----------
 
 

@@ -211,12 +211,51 @@ def strip_html(text: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", text or "")).strip()
 
 
+# Tracker query params that must not split one article into several URLs.
+# Feeds append these to the same story; a variant URL would re-enter the
+# window, re-judge, and could be picked twice (FR-6/FR-9 repeatability).
+TRACKER_PARAMS = {
+    "fbclid",
+    "gclid",
+    "msclkid",
+    "twclid",
+    "yclid",
+    "igshid",
+    "ref",
+    "cmp",
+    "mc_cid",
+    "mc_eid",
+    "source",
+    "medium",
+    "campaign",
+    "term",
+    "content",
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_term",
+    "utm_content",
+    "utm_id",
+    "utm_campaignid",
+    "utm_adgroupid",
+    "gbraid",
+    "wbraid",
+    "_hsenc",
+    "_hsmi",
+    "mkt_tok",
+    "spm",
+    "scm",
+    "hm",
+    "from",
+}
+
+
 def normalize_url(url: str) -> str:
     """Drop feed tracking params so one article has ONE url across runs."""
     from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
     parts = urlsplit(url)
-    kept = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if not k.startswith("utm_")]
+    kept = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if k not in TRACKER_PARAMS]
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(kept), parts.fragment))
 
 
@@ -818,7 +857,9 @@ def load_source_list(topic_name: str) -> tuple[dict[str, Any] | None, list[Sourc
                 # Same feed listed under several subareas — evaluate once.
                 for existing in sources:
                     if existing["crawl_root"] == root:
-                        existing["subareas"].append(sa.get("name", ""))
+                        sub = sa.get("name", "")
+                        if sub not in existing["subareas"]:
+                            existing["subareas"].append(sub)
                 continue
             seen.add(root)
             sources.append(
