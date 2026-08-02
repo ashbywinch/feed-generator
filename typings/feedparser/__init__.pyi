@@ -18,6 +18,7 @@ class FeedParserLink:
 
 class FeedParserDict(dict[str, Any]):
     entries: list[FeedParserDict]
+    version: str  # e.g. 'rss20'; empty string when the payload isn't a feed
     link: str
     title: str
     summary: str

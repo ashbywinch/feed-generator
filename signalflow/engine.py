@@ -65,13 +65,18 @@ class Engine:
                 "shrink is a deliberate unsubscribe."
             )
             return 1
-        seeded = self._seed_from_curated()
-        if seeded <= 0:
-            print("FATAL: topics seed produced zero topics — refusing to persist a partial setup")
-            return 1
+        # Persist + verify the exclusion set FIRST — a blacklist write that
+        # doesn't stick must leave NOTHING behind (no topics seeded into a
+        # half-configured store). Then seed topics; a zero-seed rolls the
+        # blacklist back so setup is atomic in both failure directions.
         self._memory.save_blacklist(known_domains)
         if self._memory.blacklist() != known_domains:
             print("FATAL: exclusion-set write incomplete — refusing to complete setup (no partial blacklist)")
+            return 1
+        seeded = self._seed_from_curated()
+        if seeded <= 0:
+            self._memory.save_blacklist(previous)  # roll back: no partial setup
+            print("FATAL: topics seed produced zero topics — refusing to persist a partial setup")
             return 1
         print(f"      {len(feeds)} feeds, {len(known_domains)} blacklist domains stored")
         print("[setup] done — topics + exclusion set persisted")

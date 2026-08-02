@@ -64,6 +64,8 @@ LLM_MODEL = os.environ.get("OPENCODE_GO_MODEL", "deepseek-v4-flash")
 
 MIN_QUERIES = 5
 MAX_QUERIES = 13  # upper bound; a topic's actual subarea count may be lower (see main)
+QUERY_SLACK = 2  # extra queries tolerated beyond one-per-subarea (prompt: "strong subareas may get two")
+
 MAX_UNCOVERED = 3  # subareas a query set may leave out and still pass
 EVAL_INTERVAL = 1.0
 LLM_MAX_TOKENS = 8192
@@ -173,10 +175,24 @@ def load_listing(topic_name: str) -> tuple[dict[str, Any] | None, str]:
     return None, ""
 
 
-def mechanical_check(queries: list[str], max_queries: int = MAX_QUERIES) -> list[str]:
+def query_bounds(subareas: list[str]) -> tuple[int, int]:
+    """Mechanical gate bounds that can never deadlock generation.
+
+    Lower bound tracks the topic's real subarea count (a topic with fewer
+    subareas than MIN_QUERIES legitimately generates fewer queries — the
+    prompt mandates EXACTLY one per subarea), not a hardcoded 5. Upper bound
+    is one-per-subarea plus a small slack for the prompt's "strong subareas
+    may get two", minus nothing.
+    """
+    lo = min(len(subareas), MIN_QUERIES)
+    hi = max(len(subareas), MIN_QUERIES) + QUERY_SLACK
+    return lo, hi
+
+
+def mechanical_check(queries: list[str], min_queries: int = MIN_QUERIES, max_queries: int = MAX_QUERIES) -> list[str]:
     failures: list[str] = []
-    if not (MIN_QUERIES <= len(queries) <= max_queries):
-        failures.append(f"{len(queries)} queries (need {MIN_QUERIES}-{max_queries})")
+    if not (min_queries <= len(queries) <= max_queries):
+        failures.append(f"{len(queries)} queries (need {min_queries}-{max_queries})")
     seen: set[str] = set()
     for q in queries:
         qq = q.strip()
@@ -369,10 +385,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[1/3] eval {len(queries)} queries currently in {slug}.json")
 
     subareas = [sa.get("name", "?") for sa in listing.get("subareas") or []]
-    # Upper bound tracks the topic's real subarea count (one query per subarea
-    # max), not a hardcoded 13 — a topic with 14+ subareas must be able to pass.
-    max_queries = max(len(subareas), MIN_QUERIES)
-    failures = mechanical_check(queries, max_queries)
+    # Bounds track the topic's real subarea count (one query per subarea),
+    # with slack for "strong subareas get two" — never a deadlocked gate.
+    min_queries, max_queries = query_bounds(subareas)
+    failures = mechanical_check(queries, min_queries, max_queries)
     print(f"[2/3] mechanical gate: {'PASS' if not failures else 'FAIL'} ({len(failures)} finding(s))")
     for f in failures:
         print(f"      - {f}")

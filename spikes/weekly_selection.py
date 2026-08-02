@@ -233,6 +233,11 @@ def fetch_feed(source: Source) -> Source:
                 source["truncated"] = True
                 content = content[:FEED_CAP_BYTES]
         parsed = feedparser.parse(content)
+        # Real feeds set version (e.g. 'rss20'); an HTML bot-wall/redirect
+        # page parses to zero entries with an EMPTY version. is_zero_parse_
+        # suspicious uses this to tell "genuinely empty feed" from "never
+        # actually read" on a first fetch.
+        source["feed_version"] = str(parsed.version or "")
         seen: set[str] = set()
         for entry in parsed.entries:
             url = normalize_url((entry.link or "").strip())
@@ -851,6 +856,23 @@ def preserve_first_seen(new_items: list[Item], old_items: list[Item]) -> list[It
     return new_items
 
 
+def is_zero_parse_suspicious(s: Source, had_items: bool) -> bool:
+    """A 200 that parsed ZERO entries is a bot-wall/redirect unless it is a
+    genuinely clean empty feed (real feed markup, nothing cached before).
+
+    Previously the guard only fired when items were cached before, so a
+    first-ever fetch of an HTML bot-wall page was stored as a CLEAN empty
+    cache and read as a valid "0 picked" outcome — a source never actually
+    read. A real feed with no entries yet (feedparser version set) is the one
+    legitimate zero-parse on first fetch.
+    """
+    if s.get("error") or s.get("items"):
+        return False
+    if had_items:
+        return True  # a feed that had items and now parses empty: treat as outage
+    return not bool(s.get("feed_version"))  # first fetch: bot-wall HTML has no feed version
+
+
 def is_item_in_window(item: Item, cutoff: datetime) -> bool:
     """Is this item a candidate for the current window?
 
@@ -882,7 +904,16 @@ def count_zero_pick_sources(sources: list[Source]) -> int:
     "nothing worth surfacing" outcome; counting it would misreport a router
     failure as a valid zero-pick week.
     """
-    return sum(1 for s in sources if s["items"] and not s["picks"] and not s.get("eval_error"))
+    return len(zero_pick_source_names(sources))
+
+
+def zero_pick_source_names(sources: list[Source]) -> list[str]:
+    """Names of sources with items but no picks, excluding eval failures.
+
+    Shared by the summary counter and the console "zero picks" line so the
+    two can never disagree about what counts as a genuine zero-pick outcome.
+    """
+    return [s["name"] for s in sources if s["items"] and not s["picks"] and not s.get("eval_error")]
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -972,9 +1003,9 @@ def main(argv: list[str] | None = None) -> int:
             # A 200 HTML/bot-wall/redirect page parses to ZERO entries without
             # raising. Treat that like an outage, not "feed went quiet": keep
             # the last good items and flag it, so a transient bot-wall never
-            # reads as "site has no articles". Only a genuinely clean empty
-            # feed (no items AND none cached before) is stored as empty.
-            zero_new = not s.get("error") and not s.get("items") and had_items
+            # reads as "site has no articles". On a FIRST fetch, only a real
+            # feed with no entries yet (feed_version set) is a clean empty feed.
+            zero_new = is_zero_parse_suspicious(s, had_items)
             if s.get("error") or zero_new:
                 entry: CacheEntry = {
                     "key": s["crawl_root"],
@@ -1223,7 +1254,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[5/6] picked {len(picks)} articles")
     for p in picks:
         print(f"      - [{p['source']}] {p['title'][:90]}")
-    zero = [s["name"] for s in sources if s["items"] and not s["picks"]]
+    zero = zero_pick_source_names(sources)
     if zero:
         print(f"      zero picks ({len(zero)}): {', '.join(zero[:8])}{' …' if len(zero) > 8 else ''}")
     print(f"[6/6] report -> {report_path.relative_to(ROOT)}")

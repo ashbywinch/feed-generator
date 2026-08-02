@@ -136,8 +136,14 @@ def test_setup_fails_fast_on_empty_opml(monkeypatch: Any, cfg: Any) -> None:
 
 
 def test_setup_fails_fast_when_seed_produces_zero_topics(monkeypatch: Any, cfg: Any) -> None:
-    """FR-1/FR-2 setup: topics seed of zero -> abort before persisting blacklist."""
-    seen: dict[str, Any] = {}
+    """FR-1/FR-2 setup: a zero topics seed must not leave a blacklist behind.
+
+    Blacklist is persisted and verified FIRST (r13 fix), then topics are
+    seeded; a zero-seed rolls the blacklist back so setup leaves NO partial
+    state (previously topics were seeded before the blacklist was verified,
+    so a failed blacklist write left topics persisted despite the refusal).
+    """
+    saved: list[set[str]] = []
     monkeypatch.setattr(engine_mod, "parse_opml", lambda path: ({"sub.com"}, []))
 
     class M(FakeMemory):
@@ -145,12 +151,35 @@ def test_setup_fails_fast_when_seed_produces_zero_topics(monkeypatch: Any, cfg: 
             return 0
 
         def save_blacklist(self, domains: set[str]) -> int:
-            seen["called"] = True
-            return 0
+            saved.append(set(domains))
+            self._blacklist = set(domains)  # mirror the real write for the verify step
+            return len(domains)
 
     engine = _engine(monkeypatch, cfg, memory_cls=M)
     assert engine.setup() == 1
-    assert "called" not in seen  # blacklist must not be persisted after zero-seed
+    assert saved == [{"sub.com"}, set()]  # blacklist written, then rolled back to empty
+    assert engine._memory.blacklist() == set()  # no partial blacklist left behind
+
+
+def test_setup_does_not_seed_topics_when_blacklist_write_fails(monkeypatch: Any, cfg: Any) -> None:
+    """FR-1/FR-2 setup (r13): when the blacklist write does not stick, topics
+    must NOT have been seeded — setup is atomic, no partial state."""
+    seen: dict[str, Any] = {}
+    monkeypatch.setattr(engine_mod, "parse_opml", lambda path: ({"sub.com"}, []))
+
+    class M(FakeMemory):
+        def save_blacklist(self, domains: set[str]) -> int:
+            seen["blacklist"] = True
+            return len(domains)  # reports success but does NOT persist (no self._blacklist update)
+
+        def seed_topics(self, assignment: dict[str, Any]) -> int:
+            seen["seeded"] = True
+            return 1
+
+    engine = _engine(monkeypatch, cfg, memory_cls=M)
+    assert engine.setup() == 1
+    assert seen.get("blacklist") is True  # write was attempted
+    assert "seeded" not in seen  # topics NOT seeded after a failed blacklist write
 
 
 def test_setup_fails_fast_when_blacklist_write_incomplete(monkeypatch: Any, cfg: Any) -> None:

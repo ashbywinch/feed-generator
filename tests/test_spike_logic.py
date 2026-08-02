@@ -330,9 +330,9 @@ def test_eval_story_load_picked_urls_handles_torn_lines(tmp_path: Any, monkeypat
 def test_zero_pick_sources_excludes_eval_failed() -> None:
     """A source whose evaluation failed must NOT count as a valid zero-pick."""
     # Real sources shaped like the pipeline builds them
-    ok_zero = {"items": [1], "picks": [], "eval_error": ""}  # genuine zero-pick
-    eval_failed = {"items": [1], "picks": [], "eval_error": "router timeout"}  # not a zero-pick
-    picked = {"items": [1], "picks": [1], "eval_error": ""}  # has picks
+    ok_zero = {"name": "A", "items": [1], "picks": [], "eval_error": ""}  # genuine zero-pick
+    eval_failed = {"name": "B", "items": [1], "picks": [], "eval_error": "router timeout"}  # not a zero-pick
+    picked = {"name": "C", "items": [1], "picks": [1], "eval_error": ""}  # has picks
     sources = [ok_zero, eval_failed, picked]
     assert ws.count_zero_pick_sources(sources) == 1  # only the genuine zero-pick counts
 
@@ -376,6 +376,37 @@ def test_first_seen_new_item_keeps_fetch_time() -> None:
     new_items = [{"url": "https://x/u", "title": "U", "published": None, "undated": True, "first_seen": fetch_time}]
     merged = ws.preserve_first_seen(new_items, old_items)
     assert merged[0]["first_seen"] == fetch_time  # new item: fetch time is correct
+
+
+def test_zero_pick_source_names_excludes_eval_failed() -> None:
+    """Console zero-picks list must not count eval failures as valid zero-picks."""
+    ws = _load_spike("weekly_selection")
+    ok_zero = {"name": "A", "items": [1], "picks": [], "eval_error": ""}
+    failed = {"name": "B", "items": [1], "picks": [], "eval_error": "router timeout"}
+    picked = {"name": "C", "items": [1], "picks": [1]}
+    assert ws.zero_pick_source_names([ok_zero, failed, picked]) == ["A"]
+
+
+# --- weekly_selection: zero-parse on first fetch is a bot-wall, not empty (r13) ---
+
+
+def test_zero_parse_suspicious_on_first_fetch_when_not_a_feed() -> None:
+    """A first-fetch 200 that parses to zero entries is a bot-wall/redirect —
+    unless the payload is a REAL feed with no entries yet (feed version set).
+    Previously the zero-parse guard only fired when items were cached before,
+    so a first-fetch bot-wall was stored as a clean empty feed and read as a
+    genuine 'nothing worth surfacing' outcome.
+    """
+    ws = _load_spike("weekly_selection")
+    # HTML bot-wall/redirect on first fetch: no feed version -> suspicious
+    assert ws.is_zero_parse_suspicious({"items": [], "feed_version": ""}, had_items=False) is True
+    # Genuinely empty feed (real markup, zero entries) -> NOT suspicious
+    assert ws.is_zero_parse_suspicious({"items": [], "feed_version": "rss20"}, had_items=False) is False
+    # Previously-cached feed goes quiet -> suspicious regardless of markup
+    assert ws.is_zero_parse_suspicious({"items": [], "feed_version": "rss20"}, had_items=True) is True
+    # Real items or a fetch error -> not a zero-parse case
+    assert ws.is_zero_parse_suspicious({"items": [1]}, had_items=False) is False
+    assert ws.is_zero_parse_suspicious({"error": "boom", "items": []}, had_items=False) is False
 
 
 # --- weekly_selection: undated items age out of the window (r10) -----------
@@ -464,6 +495,43 @@ def test_story_slice_returns_empty_and_reports_missing_subarea() -> None:
     assert missing == ""  # no angles found
     # After the fix: the run should log/report the miss rather than proceed silently.
     assert ws.story_slice(story, "exact-name") != ""
+
+
+# --- eval_queries: mechanical gate bounds never deadlock generation (r13) ---
+
+
+def test_query_bounds_small_topic_no_lower_bound_deadlock() -> None:
+    """A topic with fewer subareas than MIN_QUERIES must be able to pass.
+
+    The prompt mandates EXACTLY one query per subarea; a 3-subarea topic can
+    therefore only produce 3 queries, but the gate demanded MIN_QUERIES=5 —
+    refresh could never persist. Bounds must track the real subarea count.
+    """
+    eq = _load_spike("eval_queries")
+    subareas = ["A", "B", "C"]
+    lo, hi = eq.query_bounds(subareas)
+    assert lo <= 3 <= hi  # exactly one query per subarea fits the bounds
+
+
+def test_query_bounds_tolerates_extra_queries() -> None:
+    """The prompt allows 'strong subareas may get two'; the gate must accept
+    a small number of extra queries beyond one-per-subarea (r13)."""
+    eq = _load_spike("eval_queries")
+    subareas = ["A", "B", "C", "D", "E", "F", "G", "H"]
+    lo, hi = eq.query_bounds(subareas)
+    assert lo <= 8 <= hi  # one per subarea fits
+    # two queries for one strong subarea (9 total) also fits
+    assert lo <= 9 <= hi
+
+
+def test_mechanical_check_uses_query_bounds() -> None:
+    """mechanical_check accepts the bounds query_bounds computes — the gate
+    and the generator agree on what a valid set looks like (r13)."""
+    eq = _load_spike("eval_queries")
+    subareas = ["A", "B", "C"]
+    lo, hi = eq.query_bounds(subareas)
+    failures = eq.mechanical_check(["q1 a", "q2 b", "q3 c"], lo, hi)
+    assert failures == []
 
 
 # --- eval_queries: strict bool parsing of LLM judgments (r10) ---------------
