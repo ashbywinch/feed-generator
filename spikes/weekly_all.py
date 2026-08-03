@@ -248,7 +248,13 @@ def run_all(
             listing, sources = spec.listing, spec.sources
             generated = approved = False
             if spec.needs_sources:
-                approved, _iterations = generate_fn(spec.topic)
+                try:
+                    approved, _iterations = generate_fn(spec.topic)
+                except Exception:
+                    # ONE immediate retry: generation failures are stochastic
+                    # (router errors, non-JSON prose); a fresh attempt has a
+                    # good chance. Bounded — a second failure fails the topic.
+                    approved, _iterations = generate_fn(spec.topic)
                 generated = True
                 listing, sources, _slug = load_list_fn(spec.topic["name"])
                 if listing is None:

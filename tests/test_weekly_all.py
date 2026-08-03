@@ -417,3 +417,71 @@ def test_run_all_generation_without_usable_list_fails(tmp_path: Path) -> None:
     assert result.ok is False
     assert "no usable list" in result.error
     assert ran == []  # selection never ran against an empty listing
+
+
+def test_run_all_retries_generation_once_then_selects(tmp_path: Path) -> None:
+    """A stochastic generation failure (router error, non-JSON prose) gets ONE
+    immediate retry; on success the topic proceeds to selection normally."""
+    attempts: list[str] = []
+    ran: list[str] = []
+
+    def flaky_generate(t: dict[str, Any]) -> tuple[bool, int]:
+        attempts.append(t["name"])
+        if len(attempts) == 1:
+            raise RuntimeError("router 400: label empty or too long")  # transient
+        return True, 2
+
+    def fake_run(t, listing, sources, slug, out, *, limiter=None):
+        ran.append(slug)
+        return {"picked": 3, "slug": slug}
+
+    def fake_load(topic_name: str, discovery_dir: Path | None = None) -> tuple[Any, list[Any], str]:
+        return {"topic": topic_name}, [{"name": "s"}], "03-x"
+
+    plan = wa.Plan(
+        to_run=[
+            wa.RunSpec(
+                topic=_topic("X"),
+                slug="03-x",
+                listing={},
+                sources=[],
+                out=_out(tmp_path),
+                needs_sources=True,
+            )
+        ],
+        fresh=[],
+    )
+    (result,) = wa.run_all(plan, workers=1, run_topic_fn=fake_run, generate_fn=flaky_generate, load_list_fn=fake_load)
+
+    assert len(attempts) == 2  # exactly one retry
+    assert result.ok and result.generated_sources and result.picked == 3
+    assert ran == ["03-x"]
+
+
+def test_run_all_generation_fails_after_retry(tmp_path: Path) -> None:
+    """A persistently failing generation is NOT retried forever: two attempts
+    total, then the topic fails and the batch continues."""
+    attempts: list[str] = []
+
+    def always_fail(t: dict[str, Any]) -> tuple[bool, int]:
+        attempts.append(t["name"])
+        raise RuntimeError("EXA_API_KEY missing")
+
+    plan = wa.Plan(
+        to_run=[
+            wa.RunSpec(
+                topic=_topic("X"),
+                slug="03-x",
+                listing={},
+                sources=[],
+                out=_out(tmp_path),
+                needs_sources=True,
+            )
+        ],
+        fresh=[],
+    )
+    (result,) = wa.run_all(plan, workers=1, run_topic_fn=lambda *a, **k: None, generate_fn=always_fail)
+
+    assert len(attempts) == 2  # bounded retry, not a loop
+    assert result.ok is False
+    assert "EXA_API_KEY" in result.error

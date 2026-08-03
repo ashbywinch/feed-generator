@@ -218,8 +218,9 @@ def _agent_chat(
                 messages.append(
                     {
                         "role": "user",
-                        "content": "Your previous response was not valid JSON. "
-                        "Respond again with STRICT JSON only — nothing else.",
+                        "content": "Your previous response was NOT valid JSON (explanatory prose or truncation "
+                        "is rejected). Reply with ONLY a single JSON object — no explanations, no commentary, "
+                        "no markdown, no preamble.",
                     }
                 )
                 continue
