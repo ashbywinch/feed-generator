@@ -183,15 +183,15 @@ and FR-9 cache compaction is the yearly maintenance that keeps it small).
 
 ## Implementation order
 
-1. `spikes/weekly_all.py`: `WEEKLY_TOPICS` filter in `plan_runs` (test-first).
-2. `spikes/topic_rotation.py` + date-rotation test.
-3. Runner run records (`spikes/state/runs/`) + `make admin` rendering.
-4. `signalflow/deploy.py`: Cloudflare Pages Direct Upload adapter (test-first,
+1. ✅ `spikes/weekly_all.py`: `WEEKLY_TOPICS` filter in `plan_runs` (test-first) — done.
+2. ✅ `spikes/topic_rotation.py` + date-rotation test — done (fixed per-weekday schedule, see Nightly rotation).
+3. ⏳ Runner run records (`spikes/state/runs/`) + `make admin` rendering.
+4. ⏳ `signalflow/deploy.py`: Cloudflare Pages Direct Upload adapter (test-first,
    fake http) — replaces the Netlify adapter.
-5. R2 bucket + rclone filters in the workflow; CF Pages project + Access
+5. ⏳ R2 bucket + rclone filters in the workflow; CF Pages project + Access
    policy (or basic-auth Pages Function).
-6. `.github/workflows/weekly.yml` + secrets + feedly.opml secret.
-7. Verify: `workflow_dispatch` run → rclone pull/push round-trips state, admin
+6. ⏳ `.github/workflows/weekly.yml` + secrets + feedly.opml secret.
+7. ⏳ Verify: `workflow_dispatch` run → rclone pull/push round-trips state, admin
    page shows the night's 2 topics, feed XML updates, second consecutive night
    is cheap (cached).
 
