@@ -99,7 +99,8 @@ medium
 5. infrastructure policy procurement reform
 
 ## News vs analysis
-{'news': 'constructionnews.co.uk, newcivilengineer.com, constructionmanagement.co.uk, insidehousing.co.uk, insideconstruction.com, pbctoday.co.uk', 'analysis': 'copper8.com, bricks-bytes.com, constructingexcellence.org.uk, institute.global, brookings.edu, ukgbc.org, designingbuildings.co.uk'}
+news: constructionnews.co.uk, newcivilengineer.com, constructionmanagement.co.uk, insidehousing.co.uk, insideconstruction.com, pbctoday.co.uk
+analysis: copper8.com, bricks-bytes.com, constructingexcellence.org.uk, institute.global, brookings.edu, ukgbc.org, designingbuildings.co.uk
 
 ## Notes
 Subarea map covers construction economics, project delivery/megaprojects, engineering structures, building standards & safety regulation, urban form & planning policy, housing supply, infrastructure policy (UK/global), and materials/industry data. Excluded per user: Construction Physics, Bad British Architecture, Notes on Growth (badbritisharchitecture.blogspot.com, constructionphysics.substack.com, samdumitriu.com) plus transport-operations and energy-generation (own topics). Sources verified via check_url where feeds confirmed (constructionnews, newcivilengineer, insidehousing, constructingexcellence, constructionmanagement, designingbuildings, london.gov.uk, ukgbc, structuremag, copper8); others grounded in web_search. Paywalled/portal sources (ENR, ICE, istructe, bcis, compassinternational, brookings, institute.global) point crawl_root at section/index endpoints since full feeds are bot-blocked or absent. Source-type mix: trade press, data/registry, academic/journal, professional body, regulator, think tank, independent blog, reference — exceeds the 4-type minimum.

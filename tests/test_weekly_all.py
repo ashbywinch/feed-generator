@@ -543,3 +543,32 @@ def test_run_all_redacts_keys_from_error_and_traceback(tmp_path: Path, monkeypat
 
     assert "sekrit-key-abc" not in result.error
     assert "sekrit-key-abc" not in capsys.readouterr().out  # logged traceback redacted too
+
+
+def test_require_opml_if_generating(tmp_path: Path) -> None:
+    """Source-list generation parses feedly.opml for the exclusion set — a
+    missing OPML must abort once as a setup error, not fail N topics inside
+    workers (FR-1 fail-fast)."""
+    gen = wa.Plan(
+        to_run=[
+            wa.RunSpec(
+                topic=_topic("X"),
+                slug="03-x",
+                listing={},
+                sources=[],
+                out=_out(tmp_path),
+                needs_sources=True,
+            )
+        ],
+        fresh=[],
+    )
+    no_gen = wa.Plan(
+        to_run=[wa.RunSpec(topic=_topic("Y"), slug="01-y", listing={}, sources=[], out=_out(tmp_path))],
+        fresh=[],
+    )
+    opml = tmp_path / "feedly.opml"
+    msg = wa.require_opml_if_generating(gen, opml)
+    assert msg is not None and "feedly.opml" in msg
+    opml.write_text("<?xml version='1.0'?><opml/>", encoding="utf-8")
+    assert wa.require_opml_if_generating(gen, opml) is None
+    assert wa.require_opml_if_generating(no_gen, tmp_path / "missing.opml") is None  # no generation: no need

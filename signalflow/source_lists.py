@@ -756,6 +756,14 @@ def slug_for(topic_name: str, topics: list[dict[str, Any]]) -> str:
     return f"{idx:02d}-{kebab}"
 
 
+def _field_text(value: Any) -> str:
+    """Render a listing field as prose — dicts (gate-flagged, kept best-effort)
+    become key: value lines, never a Python repr."""
+    if isinstance(value, dict):
+        return "\n".join(f"{k}: {v}" for k, v in value.items())
+    return str(value or "")
+
+
 def render_markdown(record: dict[str, Any]) -> str:
     lines = [f"# {record['topic']} — Discovery Source List", ""]
     lines.append(
@@ -793,10 +801,10 @@ def render_markdown(record: dict[str, Any]) -> str:
         lines.append(f"{i}. {q}")
     lines.append("")
     lines.append("## News vs analysis")
-    lines.append(str(record.get("news_vs_analysis", "")))
+    lines.append(_field_text(record.get("news_vs_analysis", "")))
     lines.append("")
     lines.append("## Notes")
-    lines.append(str(record.get("notes", "")))
+    lines.append(_field_text(record.get("notes", "")))
     lines.append("")
     lines.append("## Review record")
     for f in record.get("review_record", {}).get("findings", []):

@@ -1124,7 +1124,15 @@ def _fake_source() -> dict[str, Any]:
 def _run_topic_fixture(tmp_path: Any, monkeypatch: Any) -> dict[str, Any]:
     """Wire run_topic with fake fetch/eval/caches so the REAL pipeline body
     (window, verdict mirroring, picks, history, per-topic writes) runs without
-    network or LLM. Returns everything assertions need."""
+    network or LLM. Returns everything assertions need.
+
+    DI note (deviation from coding-standards.md "never monkeypatch global
+    state"): run_topic's shared caches (FEEDS_PATH, VERDICTS_PATH,
+    PICKS_HISTORY_PATH, loaders) are MODULE-LEVEL BY CONTRACT — concurrent
+    topics in one process share them via APPEND_LOCK; injecting them per-call
+    would change the threading model under test. Only the IO boundaries are
+    faked; the pipeline body is the real code.
+    """
     import json as _json
 
     topic = _fake_topic()

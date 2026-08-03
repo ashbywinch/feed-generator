@@ -280,22 +280,33 @@ def test_build_site_writes_feed_and_page(tmp_path: Path) -> None:
     assert built == [("02-test", 1)]
 
 
-def test_build_site_skips_missing_story_or_empty_picks(tmp_path: Path) -> None:
-    picks_dir, stories_dir, feeds = _site_fixture(tmp_path)
-    (stories_dir / "02-test.json").unlink()  # no story -> feed body has no long-read link
-    orphan_picks = tmp_path / "orphan"
-    orphan_picks.mkdir()
-    (orphan_picks / "03-x.json").write_text(
-        json.dumps({"generated_at": NOW.isoformat(), "topic": "X", "slug": "03-x", "picks": []}),
-        encoding="utf-8",
-    )
+def test_build_site_skips_missing_story_or_empty_picks(tmp_path: Path, capsys) -> None:
+    picks_dir, stories_dir, feeds = _site_fixture(tmp_path)  # 02-test has picks
     site = tmp_path / "site2"
     built = build_site(
-        picks_dir=orphan_picks,
-        stories_dir=tmp_path / "stories2",
-        feeds_path=tmp_path / "no-feeds.jsonl",
+        picks_dir=picks_dir,
+        stories_dir=tmp_path / "stories2",  # no story for 02-test
+        feeds_path=feeds,
         site_dir=site,
         base_url="https://signalflow.local",
     )
-    assert built == []  # nothing buildable: no story, and empty picks are skipped
+    assert built == []  # nothing buildable: story missing -> feed body would dangle
     assert not site.exists()
+    out = capsys.readouterr().out
+    assert "no story" in out  # picks WITHOUT a story is a state error — surfaced, not silent
+
+    # empty picks are skipped silently (intentional — a quiet week is not an error)
+    orphan = tmp_path / "orphan"
+    orphan.mkdir()
+    (orphan / "03-x.json").write_text(
+        json.dumps({"generated_at": NOW.isoformat(), "topic": "X", "slug": "03-x", "picks": []}),
+        encoding="utf-8",
+    )
+    build_site(
+        picks_dir=orphan,
+        stories_dir=tmp_path / "stories2",
+        feeds_path=tmp_path / "no-feeds.jsonl",
+        site_dir=tmp_path / "site3",
+        base_url="https://signalflow.local",
+    )
+    assert "no story" not in capsys.readouterr().out

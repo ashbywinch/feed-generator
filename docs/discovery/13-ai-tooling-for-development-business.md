@@ -94,7 +94,8 @@ How development teams really adopt AI tooling — workflow changes, productivity
 5. AI pair programming productivity measurement
 
 ## News vs analysis
-{'news': 'github.blog, thenewstack.io, infoq.com, future.a16z.com, platformer.news', 'analysis': 'simonwillison.net, latent.space, huyenchip.com, lilianweng.github.io, eugeneyan.com, matt-rickard.com, sebastianraschka.com, stratechery.com'}
+news: github.blog, thenewstack.io, infoq.com, future.a16z.com, platformer.news
+analysis: simonwillison.net, latent.space, huyenchip.com, lilianweng.github.io, eugeneyan.com, matt-rickard.com, sebastianraschka.com, stratechery.com
 
 ## Notes
 Sources cover all 7 subareas identified: coding assistants, business agents, tool landscape/adoption, open-source/open-weights, frontier tooling, dev infrastructure, and AI-in-SE practice. All domains verified to resolve and serve feeds (or have crawl_root endpoints noted for bot-protected/vendor sites). Policy-like sources map to vendor/think-tank commentary for this fast-moving space. Excluded as subscribed: ghuntley.com and zoltanbourne.substack.com. OpenAlex API and GitHub API are used as crawl endpoints for academic and OSS discovery respectively. For bot-protected vendor domains (openai.com, anthropic docs, ai.google.dev), the engine should rely on feed-verified secondary sources.

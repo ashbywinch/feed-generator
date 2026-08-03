@@ -89,7 +89,8 @@ good
 5. open data digital public services UK transparency
 
 ## News vs analysis
-{'news': ['publictechnology.net', 'theregister.com', 'govinsider.asia', 'gds.blog.gov.uk', 'cddo.blog.gov.uk'], 'analysis': ['instituteforgovernment.org.uk', 'theodi.org', 'chosen-path.org', 'stateofdigitalpublishing.com']}
+news: ['publictechnology.net', 'theregister.com', 'govinsider.asia', 'gds.blog.gov.uk', 'cddo.blog.gov.uk']
+analysis: ['instituteforgovernment.org.uk', 'theodi.org', 'chosen-path.org', 'stateofdigitalpublishing.com']
 
 ## Notes
 UK-centric per the topic's `in` scope (DWP/HMRC/GDS/design systems). Subscribed blog.gov.uk domains (GDS platforms, Policy Lab, user research, department digital teams) are blacklisted; the GDS main blog and CDDO blog are distinct non-blacklisted domains and are retained as core signals. Trade press falls back to free headline feeds (crawl_root given) for paywalled articles. Topic's 'out' boundaries respected: no party politics or general public-services commentary.

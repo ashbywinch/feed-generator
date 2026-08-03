@@ -167,6 +167,26 @@ def ensure_per_topic_picks(topic_name: str, slug: str, picks_dir: Path, legacy_p
     return True
 
 
+def require_opml_if_generating(plan: Plan, opml_path: Path) -> str | None:
+    """Fail-fast check: source-list generation parses feedly.opml (exclusion
+    set), so a missing OPML must abort ONCE as a setup error — not fail every
+    needs-sources topic inside its worker (FR-1). Returns the error message,
+    or None when nothing blocks.
+    """
+    if not any(spec.needs_sources for spec in plan.to_run):
+        return None
+    if not opml_path.exists():
+        try:
+            shown = opml_path.relative_to(ROOT)
+        except ValueError:
+            shown = opml_path  # outside the repo (test tmp dirs)
+        return (
+            f"missing {shown} — required for source-list generation "
+            "(the exclusion set); see AGENTS.md (never commit it)"
+        )
+    return None
+
+
 def plan_runs(
     topics: list[dict[str, Any]],
     *,
@@ -351,6 +371,11 @@ def main(argv: list[str] | None = None) -> int:
     if not plan.to_run:
         print(f"nothing to regenerate — {len(plan.fresh)} topics fresh")
         return 0
+
+    setup_error = require_opml_if_generating(plan, ROOT / "feedly.opml")
+    if setup_error is not None:
+        print(f"FATAL: {setup_error}")
+        return 1
 
     limiter = RateLimiter(EVAL_INTERVAL)  # ONE limiter shared by all worker threads
     results = run_all(plan, workers=WORKERS, limiter=limiter)

@@ -57,7 +57,8 @@ adequate
 5. leadership management academic research
 
 ## News vs analysis
-{'news': 'blog.pragmaticengineer.com', 'analysis': 'sloanreview.mit.edu, hbr.org, lethain.com, review.firstround.com, www.aom.org'}
+news: blog.pragmaticengineer.com
+analysis: sloanreview.mit.edu, hbr.org, lethain.com, review.firstround.com, www.aom.org
 
 ## Notes
 Initial discovery list (no prior round). Excluded all blacklisted domains (feed.podbean.com, feeds.feedburner.com, longform.asmartbear.com, makemeacto.substack.com, medium.com, qaspire.com, ravi-mehta.com, slack.engineering). Boundary kept clean: no HR compliance, no generic career-advice columns. Source-type mix = independent blog (4), newsletter (3), journal (3), podcast (1), academic (1), API/registry (1) — well above the ≥4 minimum. Bot-protection notes: lethain.com and hbr.org resolve but block feed probes; hbr.org should use a headline-feed fallback, lethain.com is pointed at its /feeds/ endpoint. manager-tools.com blocks feed probes — treat as podcast endpoint via an aggregator. Two verified feeds at review.firstround.com/glossary/rss/ and engineeringleadership.tech/index.xml. OpenAlex API (api.openalex.org) is the reliable crawl endpoint for academic sources.

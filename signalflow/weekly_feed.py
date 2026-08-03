@@ -237,6 +237,7 @@ def build_site(
             continue  # a quiet week yields no feed (an empty feed helps no one)
         story_path = stories_dir / f"{slug}.json"
         if not story_path.exists():
+            print(f"      WARNING: {slug} has {len(picks)} picks but no story file — feed skipped (state error)")
             continue  # no background long read -> the feed body would dangle
         try:
             story = json.loads(story_path.read_text(encoding="utf-8"))
