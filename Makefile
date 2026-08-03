@@ -1,5 +1,5 @@
 # Makefile for feed-generator (SignalFlow)
-.PHONY: help setup run smoke topics spike spike-bg spike-logs spike-stop spike-weekly spike-weekly-bg spike-weekly-logs spike-weekly-stop spike-weekly-all spike-weekly-all-bg spike-weekly-all-logs spike-weekly-all-stop feeds eval-story eval-queries refresh-queries topic-sources topic-sources-bg topic-sources-logs topic-sources-stop lint lint-github typecheck test coverage format clean
+.PHONY: help setup run smoke topics spike spike-bg spike-logs spike-stop spike-weekly spike-weekly-bg spike-weekly-logs spike-weekly-stop spike-weekly-all spike-weekly-all-bg spike-weekly-all-logs spike-weekly-all-stop feeds deploy eval-story eval-queries refresh-queries topic-sources topic-sources-bg topic-sources-logs topic-sources-stop lint lint-github typecheck test coverage format clean
 
 PYTHON := .venv/bin/python
 UV := $(shell command -v uv 2>/dev/null || echo $(HOME)/.local/bin/uv)
@@ -31,6 +31,7 @@ help:
 	@echo "  ${GREEN}make spike-weekly-all-logs${NC} Tail the background weekly-all log"
 	@echo "  ${GREEN}make spike-weekly-all-stop${NC} Stop the background weekly-all spike"
 	@echo "  ${GREEN}make feeds${NC}        Build per-topic RSS feeds + story pages into spikes/output/site/"
+	@echo "  ${GREEN}make deploy${NC}       Deploy the site to Netlify (skipped until DEPLOY_TOKEN + NETLIFY_SITE_ID)"
 	@echo "  ${GREEN}make eval-story${NC}   Eval: can the story contextualize fresh articles"
 	@echo "  ${GREEN}make eval-queries${NC}  Eval: are discovery queries global + well-formed"
 	@echo "  ${GREEN}make refresh-queries${NC} Regenerate discovery queries via prompt (eval-gated, persists)"
@@ -122,6 +123,9 @@ spike-weekly-all-stop:
 
 feeds: setup
 	@$(UV) run --env-file .env python spikes/build_feeds.py
+
+deploy: setup
+	@$(UV) run --env-file .env python spikes/deploy_site.py
 
 eval-story: setup
 	@$(UV) run --env-file .env python spikes/eval_story.py

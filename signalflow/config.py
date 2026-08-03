@@ -68,6 +68,7 @@ class Config:
     # Publishing
     publish_target: str = "netlify"
     deploy_token: str = ""
+    netlify_site_id: str = ""
 
     @classmethod
     def from_env(cls) -> Config:
@@ -135,4 +136,5 @@ class Config:
             site_base_url=os.environ.get("SITE_BASE_URL", "https://signalflow.local"),
             publish_target=os.environ.get("PUBLISH_TARGET", "netlify"),
             deploy_token=os.environ.get("DEPLOY_TOKEN", ""),
+            netlify_site_id=os.environ.get("NETLIFY_SITE_ID", ""),
         )

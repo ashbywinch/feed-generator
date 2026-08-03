@@ -110,6 +110,17 @@ def test_weekly_runner_env_overrides(monkeypatch):
     assert cfg2.site_base_url == "https://feeds.example.com"
 
 
+def test_deploy_env_overrides(monkeypatch):
+    """Netlify deploy wiring: site id surfaces as env, empty by default (local-only)."""
+    for var in ("OPENCODE_GO_API_KEY", "OPENCODE_GO_BASE_URL", "GOOGLE_API_KEY", "NETLIFY_SITE_ID"):
+        monkeypatch.delenv(var, raising=False)
+    cfg = Config.from_env_optional()
+    assert cfg.netlify_site_id == ""
+    monkeypatch.setenv("NETLIFY_SITE_ID", "abc-123")
+    cfg2 = Config.from_env_optional()
+    assert cfg2.netlify_site_id == "abc-123"
+
+
 def test_defaults_are_prd_values(cfg):
     assert cfg.sim_high == 0.82
     assert cfg.sim_low == 0.65
