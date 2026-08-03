@@ -284,6 +284,36 @@ def test_setup_rolls_back_blacklist_when_seed_raises(cfg: Any) -> None:
     assert engine._memory.blacklist() == set()
 
 
+def test_setup_drops_topics_removed_from_curated_set(cfg: Any) -> None:
+    """Re-running setup after a topic is removed from the curated set must drop
+    it — seed_topics only upserts, so a stale topic would keep being discovered
+    and published (r17 suggestion)."""
+
+    def _parse(path: Any) -> Any:
+        return {"sub.com"}, []
+
+    class M(FakeMemory):
+        def seed_topics(self, assignment: dict[str, Any]) -> int:
+            # real Memory.seed_topics UPSERTS — rows absent from the assignment
+            # survive, which is exactly why setup must clear_topics first (r17)
+            known = {t["name"] for t in self._topics}
+            for name in assignment["topics"]:
+                if name not in known:
+                    self._topics.append({"name": name})
+            return len(assignment["topics"])
+
+        def clear_topics(self) -> None:
+            self._topics = []
+
+    engine = _engine(cfg, memory_cls=M, parse_opml=_parse, load_topics=engine_mod.load_topics)
+    # simulate a previous setup that stored an extra topic no longer curated
+    cast(Any, engine._memory).set_topics([{"name": "stale-topic"}])
+    assert engine.setup() == 0
+    names = {t["name"] for t in engine._memory.topics()}
+    assert "stale-topic" not in names  # removed from the curated set -> dropped
+    assert names  # current curated topics remain
+
+
 def test_setup_shrink_guard_uses_config_ratio(cfg: Any) -> None:
     """FR-1/FR-2 setup: the shrink threshold comes from Config, not a hardcoded 0.5."""
     seen: dict[str, Any] = {}

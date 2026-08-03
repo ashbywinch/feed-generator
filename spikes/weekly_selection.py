@@ -259,6 +259,16 @@ def normalize_url(url: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(kept), parts.fragment))
 
 
+def parse_feed_date(t: Any) -> datetime | None:
+    """feedparser's date tuple -> aware datetime; malformed/partial values
+    (feedparser emits 0 for missing fields) fall back to None so ONE bad entry
+    never aborts the whole source fetch (r17 suggestion)."""
+    try:
+        return datetime(*t[:6], tzinfo=UTC)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
 def fetch_feed(source: Source) -> Source:
     """Fetch one source's feed; items carry {url, title, summary, published, undated}.
 
@@ -305,7 +315,7 @@ def fetch_feed(source: Source) -> Source:
             for attr in ("published_parsed", "updated_parsed"):
                 t = getattr(entry, attr, None)
                 if t:
-                    published = datetime(*t[:6], tzinfo=UTC)
+                    published = parse_feed_date(t)
                     break
             source["items"].append(
                 {
@@ -404,9 +414,8 @@ digest's Observed Event bullet.
     data = llm.chat_json(prompt, max_tokens=LLM_MAX_TOKENS)
     if not isinstance(data, dict):
         data = {}  # malformed output: every item is "missing" -> the retry path below handles all
-    verdicts: dict[str, dict[str, Any]] = {
-        v["url"]: v for v in data.get("verdicts", []) if isinstance(v, dict) and v.get("url")
-    }
+    raw_verdicts = data.get("verdicts") or []  # {"verdicts": null} -> [] (r17)
+    verdicts: dict[str, dict[str, Any]] = {v["url"]: v for v in raw_verdicts if isinstance(v, dict) and v.get("url")}
     missing = [it for it in items if it["url"] not in verdicts]
     if missing:
         # The model occasionally omits items; give it ONE focused retry on

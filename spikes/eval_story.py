@@ -267,6 +267,8 @@ def held_out_articles(
             if it.get("published"):
                 try:
                     pub = datetime.fromisoformat(it["published"])
+                    if pub.tzinfo is None:
+                        pub = pub.replace(tzinfo=UTC)  # legacy naive write: assume UTC (r17)
                 except ValueError:
                     pub = None
                 if pub is not None and pub < cutoff:

@@ -161,7 +161,7 @@ def parse_bool(value: Any) -> bool:
 # char right after the period, which never happens (dead alternative).
 GEO_ANCHORS = re.compile(
     r"\b(GB|UK|Britain|British|England|Wales|Scotland|N\.Ireland|"
-    + r"Ofgem|NESO|Elexon|National Grid|NEMO|DESNZ|ERCOT|FERC|CAISO)\b|"
+    + r"Ofgem|NESO|Elexon|National Grid|NEMO|DESNZ|ERCOT|FERC|CAISO|CfD)\b|"
     + r"U\.K\.(?!\w)",
     re.IGNORECASE,
 )

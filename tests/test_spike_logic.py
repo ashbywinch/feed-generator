@@ -239,6 +239,37 @@ def test_evaluate_source_still_missing_event_demotes() -> None:
     assert verdicts[0]["approved"] is False  # demoted: a digest bullet must not be empty
 
 
+def test_evaluate_source_handles_verdicts_null() -> None:
+    """An LLM returning {"verdicts": null} (e.g. at token limits) must take the
+    missing-verdict retry path, NOT raise TypeError and lose the whole source
+    (r17 finding)."""
+
+    class NullVerdictsLLM:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def chat_json(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+            self.calls += 1
+            if self.calls == 1:
+                return {"verdicts": None}  # malformed: null, not a list
+            return {
+                "verdicts": [
+                    {"url": "https://x/1", "approved": False, "reason": "", "thesis": "", "empirical_event": ""}
+                ]
+            }
+
+    class Limiter:
+        def wait(self) -> None:
+            pass
+
+    source = {"name": "S", "subarea": "sub", "subareas": ["sub"]}
+    topic = {"name": "T", "description": "d", "in": "i", "out": "o"}
+    verdicts = ws.evaluate_source(
+        source, [{"url": "https://x/1", "title": "T", "summary": "s"}], topic, NullVerdictsLLM(), Limiter(), ""
+    )
+    assert len(verdicts) == 1  # the retry produced the verdict; no crash, no source loss
+
+
 # --- weekly_selection: report renders eval_error distinctly (r4) -----------
 
 
@@ -557,6 +588,40 @@ def test_held_out_sample_window_matches_recency(monkeypatch: Any) -> None:
     assert "https://x/out" not in urls  # outside it — must be excluded
 
 
+def test_held_out_sample_handles_naive_timestamps() -> None:
+    """A legacy cache line with a NAIVE published timestamp must not crash the
+    eval with naive-vs-aware TypeError — same _aware treatment the weekly
+    pipeline applies (r17 finding)."""
+    ev = _load_spike("eval_story")
+    cutoff = datetime.now(UTC) - timedelta(days=ev.RECENCY_DAYS)
+    feeds = {
+        "a": {
+            "source": "test-source-naive",
+            "items": [
+                {
+                    "url": "https://x/naive",
+                    "title": "Naive",
+                    "summary": "s",
+                    "published": (cutoff + timedelta(days=1)).isoformat().replace("+00:00", ""),
+                }
+            ],
+        }
+    }
+    got = ev.held_out_articles(feeds, set(), {"pending": []})
+    assert any(i["url"] == "https://x/naive" for i in got)  # included, no crash
+
+
+def test_geo_anchors_catch_uk_mechanisms() -> None:
+    """CfD/RAB are UK-specific contract/funding instruments — a query naming
+    them is jurisdiction-anchored and must fail the mechanical gate (r17
+    finding: the regenerated set shipped 'CfD auction results' queries that
+    only the LLM gate caught)."""
+    eq = _load_spike("eval_queries")
+    assert eq.GEO_ANCHORS.search("CfD auction results renewable energy policy") is not None
+    assert eq.GEO_ANCHORS.search("nuclear new-build economics RAB CfD SMR") is not None
+    assert eq.GEO_ANCHORS.search("floating offshore wind auction results") is None  # generic: fine
+
+
 # --- weekly_selection: undated items age out of the window (r10) -----------
 
 
@@ -615,6 +680,17 @@ def test_naive_cached_timestamps_handled_safely() -> None:
     }
     assert ws.is_item_in_window(naive_old, cutoff) is False  # naive, seen before window
     assert ws.is_item_in_window(naive_fresh, cutoff) is True  # naive, within window
+
+
+def test_parse_feed_date_guards_malformed_tuples() -> None:
+    """A malformed/partial feedparser date tuple must yield None, not raise —
+    one bad entry must not abort the entire source fetch (r17 suggestion)."""
+    good = (2026, 8, 2, 10, 30, 0, 0, 0, 0)
+    bad_zero = (0, 0, 0, 0, 0, 0, 0, 0, 0)  # feedparser's all-missing sentinel
+    bad_month = (2026, 13, 40, 99, 99, 99, 0, 0, 0)  # out-of-range
+    assert ws.parse_feed_date(good) == datetime(2026, 8, 2, 10, 30, tzinfo=UTC)
+    assert ws.parse_feed_date(bad_zero) is None
+    assert ws.parse_feed_date(bad_month) is None
 
 
 def test_render_story_markdown_skips_malformed_angles() -> None:

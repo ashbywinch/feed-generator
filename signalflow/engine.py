@@ -100,6 +100,7 @@ class Engine:
             print("FATAL: exclusion-set write incomplete — refusing to complete setup (no partial blacklist)")
             return 1
         try:
+            self._memory.clear_topics()  # a re-run must drop topics removed from the curated set
             seeded = self._seed_from_curated()
         except Exception as exc:  # noqa: BLE001 — a seed crash must not leave a partial setup
             self._memory.save_blacklist(previous)  # roll back: no partial setup
