@@ -1,0 +1,317 @@
+{
+  "topic": "Geopolitics & Military Strategy",
+  "status": "needs-human",
+  "iterations": 5,
+  "approved_at": "2026-08-03",
+  "subareas": [
+    {
+      "name": "Strategy, Doctrine & Force Structure",
+      "coverage": "Core doctrine evolution, force structure decisions, strategic concepts for great-power competition.",
+      "sources": [
+        {
+          "name": "Modern War Institute (West Point)",
+          "domain": "mwi.westpoint.edu",
+          "type": "academic/journal",
+          "why": "Operational doctrine, force-structure and lessons-learned analyses from the US Army's professional military education site.",
+          "confidence": "high",
+          "crawl_root": "https://mwi.westpoint.edu/feed"
+        }
+      ]
+    },
+    {
+      "name": "Unmanned / Autonomous Systems & Drones",
+      "coverage": "UAV/drone warfare, loitering munitions, counter-UAS, AI-enabled autonomy, swarms.",
+      "sources": [
+        {
+          "name": "The War Zone (The Drive)",
+          "domain": "thedrive.com",
+          "type": "trade press",
+          "why": "High-density reporting on drone programs, autonomous systems, and loitering munitions developments.",
+          "confidence": "high",
+          "crawl_root": "https://thedrive.com/feed"
+        },
+        {
+          "name": "Breaking Defense",
+          "domain": "breakingdefense.com",
+          "type": "trade press",
+          "why": "Coverage of unmanned/AI defense programs, acquisition, and force modernisation tied to drone and autonomous systems.",
+          "confidence": "high",
+          "crawl_root": "https://breakingdefense.com/feed/"
+        }
+      ]
+    },
+    {
+      "name": "Defense Industrial Base & Procurement",
+      "coverage": "Industrial capacity, munitions production, supply chains, procurement/acquisition policy, European rearmament.",
+      "sources": [
+        {
+          "name": "Center for Strategic and International Studies (CSIS)",
+          "domain": "csis.org",
+          "type": "think tank",
+          "why": "Leading analysis of defense industrial capacity, munitions sufficiency, and procurement sustainability.",
+          "confidence": "high",
+          "crawl_root": "https://csis.org/rss.xml"
+        },
+        {
+          "name": "European Council on Foreign Relations",
+          "domain": "ecfr.eu",
+          "type": "think tank",
+          "why": "European rearmament, defense procurement, and EU-level industrial strategy amid great-power rivalry.",
+          "confidence": "high",
+          "crawl_root": "https://ecfr.eu/feed"
+        }
+      ]
+    },
+    {
+      "name": "Great-Power Competition & Geopolitics",
+      "coverage": "US-China-Russia strategic rivalry, alliance dynamics, escalation, regional strategic contests.",
+      "sources": [
+        {
+          "name": "War on the Rocks",
+          "domain": "warontherocks.com",
+          "type": "independent blog",
+          "why": "Flagship strategic-analysis outlet covering great-power competition, alliances, and military strategy.",
+          "confidence": "high",
+          "crawl_root": "https://warontherocks.com/feed"
+        },
+        {
+          "name": "Center for European Policy Analysis (CEPA)",
+          "domain": "cepa.org",
+          "type": "think tank",
+          "why": "Euro-Atlantic security, Russia and China competition, and transatlantic defense policy.",
+          "confidence": "high",
+          "crawl_root": "https://cepa.org/feed"
+        },
+        {
+          "name": "Atlantic Council",
+          "domain": "atlanticcouncil.org",
+          "type": "think tank",
+          "why": "Great-power competition, transatlantic defense, and strategic-track policy analysis.",
+          "confidence": "high",
+          "crawl_root": "https://www.atlanticcouncil.org/feed/"
+        }
+      ]
+    },
+    {
+      "name": "Military History & Strategic Analysis",
+      "coverage": "Historical doctrine/lessons, case-study strategy analysis (matches 'in': strategic analysis incl. military history).",
+      "sources": []
+    },
+    {
+      "name": "Regional & Thematic Conflict Analysis",
+      "coverage": "Russia-Ukraine, Indo-Pacific, Middle East operations; tactical and strategic assessments.",
+      "sources": [
+        {
+          "name": "Australian Strategic Policy Institute (The Strategist)",
+          "domain": "aspistrategist.org.au",
+          "type": "think tank",
+          "why": "Indo-Pacific strategic and military analysis, including regional force structure and competition.",
+          "confidence": "high",
+          "crawl_root": "https://aspistrategist.org.au/feed"
+        },
+        {
+          "name": "Hudson Institute",
+          "domain": "hudson.org",
+          "type": "think tank",
+          "why": "Great-power competition and military modernisation studies with strong China/Russia focus.",
+          "confidence": "high",
+          "crawl_root": "https://hudson.org/rss.xml"
+        }
+      ]
+    },
+    {
+      "name": "Law of Armed Conflict & Military Ethics",
+      "coverage": "Law of war, targeting, JAG commentary, rules of engagement; complements strategy analysis.",
+      "sources": [
+        {
+          "name": "Lieber Institute (West Point)",
+          "domain": "lieber.westpoint.edu",
+          "type": "academic/journal",
+          "why": "Authoritative law-of-armed-conflict commentary relevant to targeting and modern warfare.",
+          "confidence": "high",
+          "crawl_root": "https://lieber.westpoint.edu/feed"
+        }
+      ]
+    },
+    {
+      "name": "Air, Space & Missile Power",
+      "coverage": "Air/space force structure, missile defense, standoff weapons.",
+      "sources": [
+        {
+          "name": "Air & Space Forces Magazine",
+          "domain": "airandspaceforces.com",
+          "type": "trade press",
+          "why": "Air, space, and missile forces force structure, programs, and doctrine.",
+          "confidence": "high",
+          "crawl_root": "https://airandspaceforces.com/feed"
+        },
+        {
+          "name": "Joint Air Power Competence Centre",
+          "domain": "japcc.org",
+          "type": "think tank",
+          "why": "NATO-aligned analysis of joint airpower, integrated air and missile defense doctrine.",
+          "confidence": "high",
+          "crawl_root": "https://japcc.org/feed"
+        }
+      ]
+    },
+    {
+      "name": "Naval / Maritime Power",
+      "sources": [
+        {
+          "name": "Center for International Maritime Security (CIMSEC)",
+          "domain": "cimsec.org",
+          "type": "independent blog",
+          "why": "Maritime strategy, naval force structure, seapower doctrine and fleet-competition analysis by serving and former naval strategists.",
+          "confidence": "high",
+          "crawl_root": "https://cimsec.org/feed"
+        },
+        {
+          "name": "USNI News / Proceedings (Naval Institute)",
+          "domain": "news.usni.org",
+          "type": "trade press",
+          "why": "Authoritative naval force-structure, shipbuilding industrial base, maritime strategy and fleet-operations reporting.",
+          "confidence": "high",
+          "crawl_root": "https://news.usni.org/feed"
+        },
+        {
+          "name": "Sea Power Magazine (Navy League)",
+          "domain": "seapowermagazine.org",
+          "type": "trade press",
+          "why": "US Navy/Marine Corps force structure, shipbuilding programs and maritime industrial-base coverage.",
+          "confidence": "high",
+          "crawl_root": "https://seapowermagazine.org/feed"
+        }
+      ]
+    },
+    {
+      "name": "Cyber Warfare & Operations",
+      "sources": [
+        {
+          "name": "The CyberWire",
+          "domain": "thecyberwire.com",
+          "type": "podcast/newsletter",
+          "why": "Defense-oriented cyber operations, military-cyber force structure and state cyber-operations reporting with a strong daily podcast (CyberWire Daily).",
+          "confidence": "high",
+          "crawl_root": "https://thecyberwire.com/feeds/rss.xml"
+        },
+        {
+          "name": "CyberScoop",
+          "domain": "cyberscoop.com",
+          "type": "trade press",
+          "why": "Cyber-warfare doctrine, military-cyber command operations and national-security cyber-policy reporting.",
+          "confidence": "high",
+          "crawl_root": "https://cyberscoop.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Nuclear Strategy & Deterrence",
+      "sources": [
+        {
+          "name": "Nuclear Threat Initiative (NTI)",
+          "domain": "nti.org",
+          "type": "think tank",
+          "why": "Nuclear deterrence, force posture, nonproliferation and great-power arms-control analysis with primary-source transparency data.",
+          "confidence": "high",
+          "crawl_root": "https://nti.org/feed"
+        },
+        {
+          "name": "CSIS Missile Threat",
+          "domain": "missilethreat.csis.org",
+          "type": "data/registry",
+          "why": "Structured database and analysis of global missile/nuclear delivery systems and deterrence postures.",
+          "confidence": "high",
+          "crawl_root": "https://missilethreat.csis.org/feed"
+        }
+      ]
+    },
+    {
+      "name": "Defense Policy & Strategy",
+      "sources": [
+        {
+          "name": "Brookings Institution — Foreign Policy & Defense",
+          "domain": "brookings.edu",
+          "type": "think tank",
+          "why": "First-class policy subarea: defense budgets, national-security strategy, deterrence policy and Pentagon decision-making.",
+          "confidence": "high",
+          "crawl_root": "https://www.brookings.edu/feed/"
+        }
+      ]
+    }
+  ],
+  "registries": [
+    {
+      "name": "OpenAlex",
+      "domain": "api.openalex.org",
+      "type": "data/registry",
+      "why": "Open bibliometric API to crawl academic literature on strategy, doctrine, drones, and industrial base bypassing bot-blocked journal HTML.",
+      "confidence": "high",
+      "crawl_root": "https://api.openalex.org/works?filter=primary_topic.id:"
+    },
+    {
+      "name": "IISS Military Balance",
+      "domain": "iiss.org",
+      "type": "data/registry",
+      "why": "Annual authoritative force-structure and defense-spending data for all countries.",
+      "confidence": "high",
+      "crawl_root": "https://www.iiss.org/publications/the-military-balance/"
+    },
+    {
+      "name": "SIPRI Arms Transfers & Military Expenditure",
+      "domain": "sipri.org",
+      "type": "data/registry",
+      "why": "Structured data on global military expenditure, arms transfers, and production - core empirical backbone for industrial-base analysis.",
+      "confidence": "high",
+      "crawl_root": "https://www.sipri.org/databases"
+    },
+    {
+      "name": "ACLED Armed Conflict Location & Event Data",
+      "domain": "acleddata.com",
+      "type": "data/registry",
+      "why": "Structured conflict-event dataset for tracking empirical operational events across theatres.",
+      "confidence": "high",
+      "crawl_root": "https://acleddata.com/data-export-tool/"
+    },
+    {
+      "name": "RAND National Security Research Division",
+      "domain": "rand.org",
+      "type": "think tank",
+      "why": "Comprehensive defense and strategy research; notable for force-structure and strategy studies.",
+      "confidence": "high"
+    },
+    {
+      "name": "Center for Naval Analyses",
+      "domain": "cna.org",
+      "type": "data/registry",
+      "why": "Data-driven military analysis including fleet architecture, readiness, and force-structure modeling.",
+      "confidence": "high"
+    },
+    {
+      "name": "Janes Defense Intelligence",
+      "domain": "janes.com",
+      "type": "data/registry",
+      "why": "Structured defense procurement and platform data worldwide.",
+      "confidence": "high"
+    }
+  ],
+  "queries": [
+    "defense industrial base capacity munitions production",
+    "unmanned autonomous systems force structure doctrine",
+    "great power competition military strategy analysis",
+    "European rearmament defense procurement industrial strategy",
+    "military history lessons learned doctrine analysis"
+  ],
+  "news_vs_analysis": "analysis",
+  "notes": "Topic is squarely in the strategic/analytical lane: sources selected for doctrine, industrial base, great-power competition, and military-history analysis rather than partisan or punditry current events. 'out' exclusions (partisan politics, non-strategic current-events punditry) respected — War on the Rocks, The War Zone, and Breaking Defense are included only for their strategic/defense-program coverage, not general news. All sources verified via check_url DNS/feed probe; bot-blocked or HTML-only domains (CSBA, IISS, SIPRI, ACLED, RAND, CNA, Janes, Defense One) are marked with crawl_root pointing at feed endpoints or primary-page hubs. Academic journals (Elsevier/Nature) are handled via the OpenAlex API registry rather than bot-blocked HTML. Feeds confirmed for: mwi.westpoint.edu, csbaonline (feed endpoint noted), warontherocks.com, csis.org, breakingdefense.com, ecfr.eu, aspistrategist.org.au, airandspaceforces.com, cepa.org, lieber.westpoint.edu, thedrive.com, atlanticcouncil.org, hudson.org, japcc.org, rusi.org.",
+  "review_record": {
+    "findings": [
+      {
+        "severity": "major",
+        "area": "crawlability",
+        "issue": "no feed found at thecyberwire.com (homepage returned HTML without a feed link)",
+        "suggestion": "set crawl_root to the real feed URL or remove"
+      }
+    ]
+  }
+}

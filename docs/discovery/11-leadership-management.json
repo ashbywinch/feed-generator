@@ -1,0 +1,142 @@
+{
+  "topic": "Leadership / Management",
+  "status": "needs-human",
+  "iterations": 2,
+  "approved_at": "2026-08-03",
+  "subareas": [
+    {
+      "name": "Coaching & management practice",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "First Round Review",
+          "domain": "review.firstround.com",
+          "type": "independent blog",
+          "why": "Deep practitioner essays on coaching, 1:1s, radical candor, feedback, and behavioral management practice from working managers and VCs.",
+          "confidence": "high",
+          "crawl_root": "https://review.firstround.com/glossary/rss/"
+        }
+      ]
+    },
+    {
+      "name": "Org design",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "MIT Sloan Management Review",
+          "domain": "sloanreview.mit.edu",
+          "type": "journal",
+          "why": "Research-informed articles on organizational structure, operating models, hybrid work, and org design decisions.",
+          "confidence": "high",
+          "crawl_root": "https://sloanreview.mit.edu/feed"
+        }
+      ]
+    },
+    {
+      "name": "Scaling engineering teams",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "The Pragmatic Engineer",
+          "domain": "blog.pragmaticengineer.com",
+          "type": "newsletter",
+          "why": "High-density breakdowns of how Big Tech scales engineering teams, management layers, and leadership at scale.",
+          "confidence": "high",
+          "crawl_root": "https://blog.pragmaticengineer.com/feed"
+        },
+        {
+          "name": "Engineering Leadership",
+          "domain": "engineeringleadership.tech",
+          "type": "independent blog",
+          "why": "Practical field notes on scaling teams, org change, and engineering leadership transitions.",
+          "confidence": "high",
+          "crawl_root": "https://engineeringleadership.tech/index.xml"
+        },
+        {
+          "name": "The Engineering Manager",
+          "domain": "theengineeringmanager.substack.com",
+          "type": "newsletter",
+          "why": "Newsletter on the craft of engineering management: staffing, promotion paths, and team scaling.",
+          "confidence": "high",
+          "crawl_root": "https://theengineeringmanager.substack.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Product & engineering leadership thinking",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Product & Leadership",
+          "domain": "productandleadership.substack.com",
+          "type": "newsletter",
+          "why": "Focused essays on the intersection of product management and leadership practice.",
+          "confidence": "high",
+          "crawl_root": "https://productandleadership.substack.com/feed"
+        },
+        {
+          "name": "Product at Scale",
+          "domain": "productatscale.substack.com",
+          "type": "newsletter",
+          "why": "Newsletter on scaling product organizations, team topology, and product leadership cadence.",
+          "confidence": "high",
+          "crawl_root": "https://productatscale.substack.com/feed"
+        },
+        {
+          "name": "Customer Obsessed Engineering (Zac Beckman)",
+          "domain": "blog.bosslogic.com",
+          "type": "independent blog",
+          "why": "Essays on engineering leadership, customer-centric team design, and building high-performing product teams.",
+          "confidence": "medium",
+          "crawl_root": "https://blog.bosslogic.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Academic & research base",
+      "coverage": "adequate",
+      "sources": [
+        {
+          "name": "Academy of Management",
+          "domain": "www.aom.org",
+          "type": "academic/journal",
+          "why": "Top scholarly journals (AMJ, AMR) on management and organizational theory — first-principles research foundation.",
+          "confidence": "high",
+          "crawl_root": "https://www.aom.org/feed/"
+        }
+      ]
+    }
+  ],
+  "registries": [
+    {
+      "name": "OpenAlex",
+      "domain": "api.openalex.org",
+      "type": "academic API",
+      "why": "Open scholarly metadata API for discovering research on leadership, org design, and management — bypasses bot-protected journal HTML.",
+      "confidence": "high",
+      "crawl_root": "https://api.openalex.org/works?search=leadership+organizational+design"
+    }
+  ],
+  "queries": [
+    "engineering leadership organizational design",
+    "scaling engineering teams management structure",
+    "product leadership team topology",
+    "coaching management feedback practice",
+    "leadership management academic research"
+  ],
+  "news_vs_analysis": {
+    "news": "blog.pragmaticengineer.com",
+    "analysis": "sloanreview.mit.edu, hbr.org, lethain.com, review.firstround.com, www.aom.org"
+  },
+  "notes": "Initial discovery list (no prior round). Excluded all blacklisted domains (feed.podbean.com, feeds.feedburner.com, longform.asmartbear.com, makemeacto.substack.com, medium.com, qaspire.com, ravi-mehta.com, slack.engineering). Boundary kept clean: no HR compliance, no generic career-advice columns. Source-type mix = independent blog (4), newsletter (3), journal (3), podcast (1), academic (1), API/registry (1) — well above the ≥4 minimum. Bot-protection notes: lethain.com and hbr.org resolve but block feed probes; hbr.org should use a headline-feed fallback, lethain.com is pointed at its /feeds/ endpoint. manager-tools.com blocks feed probes — treat as podcast endpoint via an aggregator. Two verified feeds at review.firstround.com/glossary/rss/ and engineeringleadership.tech/index.xml. OpenAlex API (api.openalex.org) is the reliable crawl endpoint for academic sources.",
+  "review_record": {
+    "findings": [
+      {
+        "severity": "major",
+        "area": "schema",
+        "issue": "news_vs_analysis is not a string",
+        "suggestion": ""
+      }
+    ]
+  }
+}

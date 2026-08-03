@@ -1,0 +1,298 @@
+{
+  "topic": "Transit",
+  "status": "approved",
+  "iterations": 6,
+  "approved_at": "2026-08-03",
+  "subareas": [
+    {
+      "name": "Rail operations & investment",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Railway Gazette International",
+          "domain": "railwaygazette.com",
+          "type": "trade press",
+          "why": "Leading global rail industry journal: operations, signalling, rolling stock and rail investment news.",
+          "confidence": "high",
+          "crawl_root": "https://railwaygazette.com/feed"
+        },
+        {
+          "name": "Railway-News",
+          "domain": "railway-news.com",
+          "type": "trade press",
+          "why": "High-density rail industry news and innovation coverage (signalling, fleets, infrastructure).",
+          "confidence": "high",
+          "crawl_root": "https://railway-news.com/feed"
+        },
+        {
+          "name": "Trains",
+          "domain": "trains.com",
+          "type": "trade press",
+          "why": "Passenger rail news, congestion-tolling rulings and US rail operations coverage.",
+          "confidence": "high",
+          "crawl_root": "https://trains.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Bus operations & policy",
+      "coverage": "medium",
+      "sources": [
+        {
+          "name": "Mass Transit",
+          "domain": "masstransitmag.com",
+          "type": "trade press",
+          "why": "Bus and transit agency operations, procurement and reauthorization news.",
+          "confidence": "high",
+          "crawl_root": "https://masstransitmag.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D"
+        },
+        {
+          "name": "ETSC — European Transport Safety Council",
+          "domain": "etsc.eu",
+          "type": "think tank",
+          "why": "EU-level transport safety and bus/guided-transit policy analysis; adds international bus-policy breadth beyond the US-centric Mass Transit.",
+          "confidence": "medium",
+          "crawl_root": "https://etsc.eu/feed"
+        }
+      ]
+    },
+    {
+      "name": "Freight & logistics",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "FreightWaves",
+          "domain": "freightwaves.com",
+          "type": "independent blog",
+          "why": "Freight, rail and logistics market news; rail freight round-ups and rate data.",
+          "confidence": "high",
+          "crawl_root": "https://freightwaves.com/feed"
+        },
+        {
+          "name": "Transport Topics",
+          "domain": "ttnews.com",
+          "type": "trade press",
+          "why": "Trucking and freight logistics industry news and policy.",
+          "confidence": "high",
+          "crawl_root": "https://ttnews.com/rss.xml"
+        }
+      ]
+    },
+    {
+      "name": "AV regulation & rollout",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "TechCrunch Mobility",
+          "domain": "mobility.techcrunch.com",
+          "type": "newsletter",
+          "why": "Robotaxi and autonomous vehicle regulation, rollouts and industry moves.",
+          "confidence": "high",
+          "crawl_root": "https://rss.beehiiv.com/feeds/1F3DKgorPt.xml"
+        },
+        {
+          "name": "The Driverless Digest",
+          "domain": "thedriverlessdigest.com",
+          "type": "newsletter",
+          "why": "Focused newsletter on autonomous-vehicle regulation, deployment milestones and industry moves; second AV source alongside TechCrunch Mobility to clear the 2+ bar.",
+          "confidence": "medium",
+          "crawl_root": "https://thedriverlessdigest.com/feed"
+        },
+        {
+          "name": "Along for the Ride (Alex Roy)",
+          "domain": "alongfortheride.substack.com",
+          "type": "newsletter",
+          "why": "Independent AV/robotaxi analysis and commentary on regulation, rollouts and operations, adding a distinct analytical voice to the AV subarea.",
+          "confidence": "medium",
+          "crawl_root": "https://alongfortheride.substack.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Congestion pricing & road charging",
+      "coverage": "medium",
+      "sources": [
+        {
+          "name": "Brookings — Transportation & Infrastructure",
+          "domain": "brookings.edu",
+          "type": "think tank",
+          "why": "Policy institution publishing on congestion pricing, tolling revenue and urban road-charging programs; canonical single instance retained here to eliminate the exact-duplicate row previously shared with Transport policy & governance.",
+          "confidence": "high",
+          "crawl_root": "https://www.brookings.edu/feed/"
+        },
+        {
+          "name": "Reason Foundation — Transportation",
+          "domain": "reason.org",
+          "type": "think tank",
+          "why": "Prolific research and commentary on priced managed lanes, tolling revenue and urban congestion-pricing programs; strong empirical grounding for road-charging subarea.",
+          "confidence": "high",
+          "crawl_root": "https://reason.org/feed"
+        },
+        {
+          "name": "Tax Foundation",
+          "domain": "taxfoundation.org",
+          "type": "think tank",
+          "why": "Quantitative analysis of congestion-pricing schemes (e.g. NYC tolling revenue, traffic-tax impacts) supplying the fiscal/economic dimension of road-charging policy.",
+          "confidence": "high",
+          "crawl_root": "https://taxfoundation.org/feed"
+        }
+      ]
+    },
+    {
+      "name": "Transport policy & governance",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "The Transport Politic",
+          "domain": "thetransportpolitic.com",
+          "type": "academic/journal",
+          "why": "First-principles analysis of transport policy, funding and political economy of transit.",
+          "confidence": "high",
+          "crawl_root": "https://thetransportpolitic.com/feed"
+        },
+        {
+          "name": "Transport for America",
+          "domain": "t4america.org",
+          "type": "think tank",
+          "why": "Policy analysis and advocacy on federal transit and surface transportation investment.",
+          "confidence": "high",
+          "crawl_root": "https://t4america.org/feed"
+        }
+      ]
+    },
+    {
+      "name": "Transit innovation & technology",
+      "coverage": "medium",
+      "sources": [
+        {
+          "name": "Streetsblog USA",
+          "domain": "usa.streetsblog.org",
+          "type": "independent blog",
+          "why": "High-density coverage of transit innovation, active transport, street/network design thinking and municipal mobility programs; reconciles the news_vs_analysis note that already named it but omitted it from the list.",
+          "confidence": "high",
+          "crawl_root": "https://usa.streetsblog.org/feed"
+        },
+        {
+          "name": "CoMotion NEWS",
+          "domain": "comotion.substack.com",
+          "type": "newsletter",
+          "why": "Mobility and urban-tech newsletter covering robotaxi rollouts, micromobility, and transit innovation policy — fits the London Reconnections-style innovation angle.",
+          "confidence": "medium",
+          "crawl_root": "https://comotion.substack.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Independent transit commentary & analysis",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Human Transit",
+          "domain": "humantransit.org",
+          "type": "independent blog",
+          "why": "Jarrett Walker's professional blog on transit network design and service planning.",
+          "confidence": "high",
+          "crawl_root": "https://humantransit.org/feed"
+        },
+        {
+          "name": "The Urbanist",
+          "domain": "theurbanist.org",
+          "type": "independent blog",
+          "why": "Transit, urban policy and land-use-transportation integration analysis.",
+          "confidence": "high",
+          "crawl_root": "https://theurbanist.org/feed"
+        },
+        {
+          "name": "The SoCal Transiteer",
+          "domain": "socaltransiteer.substack.com",
+          "type": "newsletter",
+          "why": "Independent transit commentary on operations, service and policy.",
+          "confidence": "medium",
+          "crawl_root": "https://socaltransiteer.substack.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Rail & transit advocacy",
+      "coverage": "medium",
+      "sources": [
+        {
+          "name": "NARP",
+          "domain": "narprail.org",
+          "type": "advocacy",
+          "why": "National Association of Railroad Passengers: passenger rail funding and legislative news.",
+          "confidence": "medium",
+          "crawl_root": "https://narprail.org/feed"
+        }
+      ]
+    },
+    {
+      "name": "registries",
+      "sources": [
+        {
+          "name": "Office of Rail and Road (ORR)",
+          "domain": "orr.gov.uk",
+          "type": "data/registry",
+          "why": "UK rail and road economic regulator: safety, track-access, network and market-owning data feed — international regulatory breadth for the rail operations subarea.",
+          "confidence": "high",
+          "crawl_root": "https://orr.gov.uk/rss.xml"
+        }
+      ]
+    }
+  ],
+  "registries": [
+    {
+      "name": "FTA National Transit Database",
+      "domain": "transit.dot.gov",
+      "type": "data/registry",
+      "why": "US federal transit agency data and standards program.",
+      "confidence": "high",
+      "crawl_root": "https://www.transit.dot.gov/ntd"
+    },
+    {
+      "name": "APTA",
+      "domain": "apta.com",
+      "type": "industry association",
+      "why": "American Public Transportation Association press releases and survey data.",
+      "confidence": "high",
+      "crawl_root": "https://www.apta.com/news-publications/press-releases/"
+    }
+  ],
+  "queries": [
+    "National Transit Database rail ridership statistics",
+    "congestion pricing program tolling revenue data",
+    "autonomous vehicle deployment permit safety regulator",
+    "rail infrastructure investment fleet procurement signalling contract",
+    "transit funding formula surface transportation reauthorization"
+  ],
+  "news_vs_analysis": "Trade press (Railway Gazette, Railway-News, Trains, Mass Transit, Transport Topics) and newsletters (TechCrunch Mobility) carry the daily empirical news; independent blogs (Human Transit, Streetsblog, The Urbanist) and academic/policy sources (The Transport Politic, T4America) carry first-principles analysis. Ratio roughly 60/40 news-to-analysis, weighted toward high-density operational and regulatory feed.",
+  "notes": "All included feed domains verified to resolve and serve RSS via check_url. transit.dot.gov, apta.com and transportation.gov are bot-blocked/no-feed registries with crawl_root set to relevant sections. enotrans.org and transitcenter.org verified but excluded due to stale (>90 day) feeds. Excluded user's subscribed sources (londonreconnections.blogspot.com, selfdrivinginsights.substack.com, freewheeling.info). Subarea breadth matches roughly the range a top transit podcast (e.g., a rail/bus/AV/policy lineup) would cover.",
+  "review_record": {
+    "findings": [
+      {
+        "severity": "minor",
+        "area": "Subarea completeness",
+        "issue": "Several implied Transit subareas are only covered indirectly rather than named: transit fleet electrification, high-speed/intercity rail, and micromobility/active transport. Streetsblog touches active transport and rail sources touch HSR, but none is an explicit subarea of its own.",
+        "suggestion": "Consider adding a dedicated 'electrification & sustainable fleets' subarea (or folding it into Rail/Bus operations) and an explicit active-transport subarea to match a top transit podcast's episode range."
+      },
+      {
+        "severity": "minor",
+        "area": "Subarea coverage (2+ bar)",
+        "issue": "'Rail & transit advocacy' has only a single source (NARP), below the 2+ source bar that the task expects for well-covered subareas.",
+        "suggestion": "Add a second advocacy source (e.g. Rail Passengers / TransitCenter-style advocates) or merge this subarea into 'Transport policy & governance' where coverage is already strong."
+      },
+      {
+        "severity": "minor",
+        "area": "Type accuracy",
+        "issue": "The Transport Politic is classified as 'academic/journal', but it is an independent policy blog (first-principles analysis, single-author), not a peer-reviewed academic journal.",
+        "suggestion": "Re-type The Transport Politic as 'independent blog' or 'policy analysis' to keep the type taxonomy accurate and preserve the true distinct-type count."
+      },
+      {
+        "severity": "minor",
+        "area": "Boundaries / source fit",
+        "issue": "TechCrunch Mobility is largely marketed on EV/vehicle-tech news, which borders on the out-of-scope 'EV consumer content' category. Its inclusion is justified only for the AV/robotaxi regulation angle.",
+        "suggestion": "Crawl/scope TechCrunch Mobility to its AV/robotaxi regulation and deployment coverage and confirm its RSS feed's top items on this topic are not dominated by EV-consumer content."
+      }
+    ]
+  }
+}

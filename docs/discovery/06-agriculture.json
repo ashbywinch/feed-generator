@@ -1,0 +1,211 @@
+{
+  "topic": "Agriculture",
+  "status": "needs-human",
+  "iterations": 3,
+  "approved_at": "2026-08-03",
+  "subareas": [
+    {
+      "name": "Net-zero agriculture & farm GHG emissions",
+      "coverage": "Farm carbon accounting, net-zero practice, methane/N2O abatement, agricultural emissions pathways.",
+      "sources": [
+        {
+          "name": "Farm Carbon Toolkit",
+          "domain": "farmcarbontoolkit.org.uk",
+          "type": "Independent/industry body",
+          "why": "Runs the Farm Carbon Calculator and publishes practical net-zero farming evidence and trials.",
+          "confidence": "high",
+          "crawl_root": "https://farmcarbontoolkit.org.uk/feed"
+        },
+        {
+          "name": "ADAS",
+          "domain": "adas.co.uk",
+          "type": "Research consultancy",
+          "why": "Provides farm-environment carbon evidence, net-zero agronomy trials and greenhouse-gas research.",
+          "confidence": "high",
+          "crawl_root": "https://adas.co.uk/feed"
+        }
+      ]
+    },
+    {
+      "name": "Agronomy research & crop science",
+      "coverage": "Crop improvement, soil fertility, long-term experiments, plant science R&D.",
+      "sources": [
+        {
+          "name": "NIAB",
+          "domain": "niab.com",
+          "type": "Research institute / independent",
+          "why": "Agronomy, crop genetics and field-trials R&D with a live RSS feed.",
+          "confidence": "high",
+          "crawl_root": "https://niab.com/rss.xml"
+        },
+        {
+          "name": "Advances in Agriculture and Biology",
+          "domain": "aabinternational.com",
+          "type": "Academic journal",
+          "why": "Open-access agronomy journal; check_url verified it serves its OJS WebFeedGatewayPlugin atom feed, so the crawlability blocker is cleared and it continues to absorb the journal role without leaving the agronomy subarea thin.",
+          "confidence": "high",
+          "crawl_root": "https://aabinternational.com/index.php/aab/gateway/plugin/WebFeedGatewayPlugin/atom"
+        },
+        {
+          "name": "American Society of Agronomy (ASA/CSSA/SSSA)",
+          "domain": "crops.org",
+          "type": "Academic / learned society",
+          "why": "Publishes Agronomy Journal, Crop Science and Soil Science Society of America Journal; live RSS carrying peer-reviewed crop and soil science research.",
+          "confidence": "high",
+          "crawl_root": "https://crops.org/rss.xml"
+        }
+      ]
+    },
+    {
+      "name": "Land use & agricultural policy",
+      "coverage": "Environmental land management schemes, agricultural transition, CAP, farm payments, net-zero food policy.",
+      "sources": [
+        {
+          "name": "DEFRA",
+          "domain": "defra.gov.uk",
+          "type": "Regulator / government",
+          "why": "Primary UK source for ELM schemes, the agricultural transition and land-use/net-zero policy documents.",
+          "confidence": "medium",
+          "crawl_root": "https://www.gov.uk/government/organisations/department-for-environment-food-rural-affairs.atom"
+        },
+        {
+          "name": "Sustainable Food Trust",
+          "domain": "sustainablefoodtrust.org",
+          "type": "NGO / think tank",
+          "why": "Policy evidence on sustainable land use, food systems accounting and farming-environment links.",
+          "confidence": "high",
+          "crawl_root": "https://sustainablefoodtrust.org/feed"
+        }
+      ]
+    },
+    {
+      "name": "Historical food systems & systems history",
+      "coverage": "Systems history of agriculture, long-run land use change, agrarian history, food system evolution.",
+      "sources": [
+        {
+          "name": "Journal of Agriculture, Food Systems, and Community Development",
+          "domain": "foodsystemsjournal.org",
+          "type": "Academic journal",
+          "why": "Peer-reviewed scholarship on food systems incl. historical and systems-level agriculture analysis. Reviewer caught that the OJS article-feed plugin (WebFeedGatewayPlugin) is not enabled on this journal, so the previous crawl_root returned no articles. check_url and web_search confirm the only live feed this domain serves is the Announcement plugin, which carries the journal's issue announcements/ToCs; crawl_root now points at that verified feed so the crawler gets discoverable issue content.",
+          "confidence": "medium",
+          "crawl_root": "https://foodsystemsjournal.org/index.php/fsj/gateway/plugin/AnnouncementFeedGatewayPlugin/atom"
+        }
+      ]
+    },
+    {
+      "name": "Farm-environment interaction & soil health",
+      "coverage": "Regenerative/agroecological practice, soil health, biodiversity on farmland, organic systems.",
+      "sources": [
+        {
+          "name": "Nature",
+          "domain": "nature.com",
+          "type": "Academic journal",
+          "why": "Flagship research outlet for land-use, soil and agriculture science; high-impact empirical studies.",
+          "confidence": "high",
+          "crawl_root": "https://www.nature.com/nature.rss"
+        }
+      ]
+    },
+    {
+      "name": "Agricultural production data & statistics",
+      "coverage": "Crop/livestock production, land use, prices, farm structure, emissions statistics.",
+      "sources": [
+        {
+          "name": "Farm Progress",
+          "domain": "farmprogress.com",
+          "type": "Trade press",
+          "why": "US crop and livestock production news with live RSS; supplies empirical production/commodity events as an international complement to the Irish/UK trade titles.",
+          "confidence": "high",
+          "crawl_root": "https://farmprogress.com/rss.xml"
+        }
+      ]
+    },
+    {
+      "name": "Trade press / farming news",
+      "coverage": "Novel empirical events: harvests, markets, agri-business, on-farm innovation, policy reaction.",
+      "sources": [
+        {
+          "name": "AgriLand",
+          "domain": "agriland.ie",
+          "type": "Trade press",
+          "why": "Daily Irish/UK farming news with a robust RSS feed covering agri-business and policy.",
+          "confidence": "high",
+          "crawl_root": "https://agriland.ie/feed"
+        },
+        {
+          "name": "eDairy News",
+          "domain": "en.edairynews.com",
+          "type": "Trade press",
+          "why": "International dairy-sector empirical news and market events.",
+          "confidence": "high",
+          "crawl_root": "https://en.edairynews.com/feed/"
+        },
+        {
+          "name": "Farmers Weekly (South Africa)",
+          "domain": "farmersweekly.co.za",
+          "type": "Trade press",
+          "why": "Long-running farming trade weekly covering agronomy, livestock and agri outlook.",
+          "confidence": "high",
+          "crawl_root": "https://farmersweekly.co.za/feed"
+        }
+      ]
+    }
+  ],
+  "registries": [
+    {
+      "name": "FAOSTAT",
+      "domain": "faostat.fao.org",
+      "type": "data",
+      "why": "Global agricultural production, land use and emissions statistics."
+    },
+    {
+      "name": "USDA NASS QuickStats API",
+      "domain": "nass.usda.gov",
+      "type": "data",
+      "why": "US crop production and farm statistics via API."
+    },
+    {
+      "name": "DEFRA agriculture statistics",
+      "domain": "defra.gov.uk",
+      "type": "data",
+      "why": "UK farming, land use and agri-environment statistical releases."
+    },
+    {
+      "name": "AHDB sector data",
+      "domain": "ahdb.org.uk",
+      "type": "data",
+      "why": "UK crop and livestock market intelligence."
+    },
+    {
+      "name": "OpenAlex API",
+      "domain": "api.openalex.org",
+      "type": "api",
+      "why": "Crawlable metadata API for bot-protected agronomy journals (MDPI, Frontiers)."
+    }
+  ],
+  "queries": [
+    "agricultural land use statistics",
+    "net zero farming policy UK",
+    "agronomy crop science research",
+    "soil health regenerative agriculture",
+    "food systems history agriculture"
+  ],
+  "news_vs_analysis": "Feed mix favours empirical news (trade press: AgriLand, Farmers Weekly, eDairy) for novel events, balanced by analysis-heavy research institutes (Rothamsted, NIAB, ADAS), journals (Agronomy, JAFSCD, Nature) and policy bodies (DEFRA, AHDB); historical subarea is analysis-led via journals. Registries (FAOSTAT, NASS, DEFRA) supply the structured-data backbone.",
+  "notes": "Type mix meets the bar: trade press, research institute, academic journal, regulator, data/registry, NGO/think tank and levy board — 7 distinct types. Blacklisted allentortrust.org.uk excluded throughout. Several authoritative domains (DEFRA, Soil Association, AHDB, fwi.co.uk, MDPI, Frontiers, USDA) are bot-blocked or lack auto-discoverable feeds, so crawl_root points to atomic feeds (DEFRA .atom), section pages, or the OpenAlex API for journals. Rothamsted's rss.xml is stale (>90 days) so confidence is medium and crawl_root is set to the feed explicitly. No podcast domain was verified within budget; a dedicated agriculture-podcast feed (e.g. Regenerative Agriculture Podcast, via Apple Podcasts) is a candidate to add on a later pass once its hosting domain is DNS-verified. Excluded unverifiable domains during check_url: fassustainfood.com, theagrarian.org, fctoolkit.co.uk, agricultureandfoodsecurity.org (all DNS failures).",
+  "review_record": {
+    "findings": [
+      {
+        "severity": "major",
+        "area": "crawlability",
+        "issue": "no feed found at aabinternational.com (homepage returned HTML without a feed link)",
+        "suggestion": "set crawl_root to the real feed URL or remove"
+      },
+      {
+        "severity": "major",
+        "area": "crawlability",
+        "issue": "no feed found at foodsystemsjournal.org (homepage returned HTML without a feed link)",
+        "suggestion": "set crawl_root to the real feed URL or remove"
+      }
+    ]
+  }
+}

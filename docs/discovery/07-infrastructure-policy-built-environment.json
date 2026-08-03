@@ -1,0 +1,280 @@
+{
+  "topic": "Infrastructure & Policy (built environment)",
+  "status": "needs-human",
+  "iterations": 3,
+  "approved_at": "2026-08-03",
+  "subareas": [
+    {
+      "name": "Construction economics & costs",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Construction News",
+          "domain": "constructionnews.co.uk",
+          "type": "trade press",
+          "why": "UK construction commercial news: tender prices, cost inflation, contractor insolvencies — core construction economics.",
+          "confidence": "high",
+          "crawl_root": "https://constructionnews.co.uk/feed"
+        },
+        {
+          "name": "BCIS (Building Cost Information Service)",
+          "domain": "bcis.co.uk",
+          "type": "data/registry",
+          "why": "Authoritative construction cost and tender-price index data (Tender Price Index, cost forecasts) — hard economics data series.",
+          "confidence": "high",
+          "crawl_root": "https://www.bcis.co.uk/insight"
+        }
+      ]
+    },
+    {
+      "name": "Project delivery & megaprojects",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "New Civil Engineer",
+          "domain": "newcivilengineer.com",
+          "type": "trade press",
+          "why": "Engineering and construction delivery: HS2, tunnels, Sizewell, major scheme delivery and risk — core megaproject news.",
+          "confidence": "high",
+          "crawl_root": "https://newcivilengineer.com/feed"
+        },
+        {
+          "name": "Construction Management (CM)",
+          "domain": "constructionmanagement.co.uk",
+          "type": "trade press",
+          "why": "Project delivery, procurement models, construction leadership and building projects.",
+          "confidence": "high",
+          "crawl_root": "https://constructionmanagement.co.uk/feed"
+        },
+        {
+          "name": "The Construction Index",
+          "domain": "theconstructionindex.co.uk",
+          "type": "trade press",
+          "why": "Daily UK construction output, tender prices, contract awards and project-intelligence data — empirical delivery markers for infrastructure policy and project pipeline.",
+          "confidence": "high",
+          "crawl_root": "https://theconstructionindex.co.uk/feeds/news.xml"
+        }
+      ]
+    },
+    {
+      "name": "Engineering structures (bridges, tunnels, dams, buildings)",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "STRUCTURE Magazine",
+          "domain": "structuremag.org",
+          "type": "academic/journal",
+          "why": "Structural engineering journal — structural design, failures, new building and bridge engineering.",
+          "confidence": "high",
+          "crawl_root": "https://structuremag.org/feed"
+        },
+        {
+          "name": "Construction Week",
+          "domain": "constructionweekonline.com",
+          "type": "trade press",
+          "why": "International construction and engineering-structures news: towers, bridges, structural delivery and project risk.",
+          "confidence": "high",
+          "crawl_root": "https://constructionweekonline.com/feed"
+        },
+        {
+          "name": "Global Construction Review",
+          "domain": "globalconstructionreview.com",
+          "type": "trade press",
+          "why": "Civil engineering megaprojects and structures worldwide: bridges, tunnels, dams, major-scheme delivery and cost risk.",
+          "confidence": "high",
+          "crawl_root": "https://globalconstructionreview.com/feed"
+        },
+        {
+          "name": "ITSTIME (Italian Steel Structures)",
+          "domain": "itstime.it",
+          "type": "academic/journal",
+          "why": "International steel-structures and steel-construction journal — structural steel design, connections and research.",
+          "confidence": "medium",
+          "crawl_root": "https://www.itstime.it/w/feed/"
+        }
+      ]
+    },
+    {
+      "name": "Building standards, safety & regulation",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Planning & Building Control Today (PBCToday)",
+          "domain": "pbctoday.co.uk",
+          "type": "trade press",
+          "why": "Building regulations, building safety reform, fire safety and compliance news — regulatory subarea.",
+          "confidence": "high",
+          "crawl_root": "https://www.pbctoday.co.uk/news/feed/"
+        },
+        {
+          "name": "Building Safety Regulator (GOV.UK campaign)",
+          "domain": "buildingsafety.campaign.gov.uk",
+          "type": "regulator",
+          "why": "The UK building safety regulator's own news — building control, gateway approvals, building safety policy.",
+          "confidence": "medium",
+          "crawl_root": "https://buildingsafety.campaign.gov.uk/"
+        },
+        {
+          "name": "Planning Portal Blog",
+          "domain": "blog.planningportal.co.uk",
+          "type": "trade press",
+          "why": "Building control digitalisation, planning gateway, building regulations commentary.",
+          "confidence": "high",
+          "crawl_root": "https://blog.planningportal.co.uk/feed/"
+        }
+      ]
+    },
+    {
+      "name": "Urban form, land value & planning policy",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Designing Buildings Wiki",
+          "domain": "designingbuildings.co.uk",
+          "type": "reference/data",
+          "why": "Encyclopaedic reference on building, planning and construction terms and policy changes — dense structured knowledge.",
+          "confidence": "high",
+          "crawl_root": "https://designingbuildings.co.uk/w/index.php?title=Special:RecentChanges&amp;feed=atom"
+        },
+        {
+          "name": "Greater London Authority",
+          "domain": "london.gov.uk",
+          "type": "data/registry",
+          "why": "London planning policy, infrastructure, housing data — dense urban-form and policy feed.",
+          "confidence": "high",
+          "crawl_root": "https://london.gov.uk/rss.xml"
+        }
+      ]
+    },
+    {
+      "name": "Housing supply & construction delivery",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Inside Housing",
+          "domain": "insidehousing.co.uk",
+          "type": "trade press",
+          "why": "Housing delivery, building safety, social housing construction and policy — housing supply subarea.",
+          "confidence": "high",
+          "crawl_root": "https://insidehousing.co.uk/Syndication/DF.cfm?f=6&ft=10"
+        },
+        {
+          "name": "Copper8",
+          "domain": "copper8.com",
+          "type": "independent blog",
+          "why": "Independent analysis of construction productivity, delivery models and built-asset performance — first-principles commentary.",
+          "confidence": "high",
+          "crawl_root": "https://www.copper8.com/feed/"
+        }
+      ]
+    },
+    {
+      "name": "Infrastructure policy (UK & global)",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Constructing Excellence",
+          "domain": "constructingexcellence.org.uk",
+          "type": "think tank",
+          "why": "UK construction industry performance, productivity benchmarks and policy collaboration.",
+          "confidence": "high",
+          "crawl_root": "https://constructingexcellence.org.uk/feed"
+        },
+        {
+          "name": "Institute for Government",
+          "domain": "instituteforgovernment.org.uk",
+          "type": "think tank",
+          "why": "Analysis of the Planning and Infrastructure Bill, project-delivery machinery and government infrastructure policy machinery.",
+          "confidence": "high",
+          "crawl_root": "https://instituteforgovernment.org.uk/rss"
+        },
+        {
+          "name": "Brookings",
+          "domain": "brookings.edu",
+          "type": "think tank",
+          "why": "US infrastructure investment and project-delivery policy research — international policy subarea.",
+          "confidence": "high",
+          "crawl_root": "https://www.brookings.edu/feed/"
+        },
+        {
+          "name": "UK Green Building Council",
+          "domain": "ukgbc.org",
+          "type": "think tank",
+          "why": "Built environment sustainability and policy (net-zero buildings, embodied carbon) — policy subarea.",
+          "confidence": "high",
+          "crawl_root": "https://ukgbc.org/feed"
+        }
+      ]
+    },
+    {
+      "name": "Materials, skills & industry data",
+      "coverage": "medium",
+      "sources": [
+        {
+          "name": "Bricks & Bytes",
+          "domain": "bricks-bytes.com",
+          "type": "independent blog",
+          "why": "Independent daily analysis of construction delivery constraints: permits, people and power — first-principles.",
+          "confidence": "high",
+          "crawl_root": "https://bricks-bytes.com/feed/"
+        }
+      ]
+    }
+  ],
+  "registries": [
+    {
+      "name": "ONS Construction & Housing Statistics",
+      "domain": "ons.gov.uk",
+      "type": "data/registry",
+      "why": "Official UK construction output, new orders and housing starts statistics — authoritative empirical data.",
+      "confidence": "high",
+      "crawl_root": "https://www.ons.gov.uk/businessindustryandtrade/constructionindustry"
+    },
+    {
+      "name": "BCIS construction cost indices",
+      "domain": "bcis.co.uk",
+      "type": "data/registry",
+      "why": "Tender Price Index and rebuilding cost data — structural cost series for construction economics.",
+      "confidence": "high",
+      "crawl_root": "https://www.bcis.co.uk/"
+    },
+    {
+      "name": "OpenAlex API (academic engineering literature)",
+      "domain": "api.openalex.org",
+      "type": "academic/journal",
+      "why": "Open scholarly API for construction-engineering academic papers and reviews — avoids paywalled journal HTML.",
+      "confidence": "high",
+      "crawl_root": "https://api.openalex.org/works?filter=concepts.id:C127182176"
+    },
+    {
+      "name": "Construction Leadership Council",
+      "domain": "constructionleadershipcouncil.co.uk",
+      "type": "think tank",
+      "why": "UK government-industry construction council — policy reports and industrial strategy deliverables.",
+      "confidence": "high",
+      "crawl_root": "https://www.constructionleadershipcouncil.co.uk/"
+    }
+  ],
+  "queries": [
+    "construction cost tender price index",
+    "megaproject delivery cost overrun UK infrastructure",
+    "building safety regulation BSR planning gateway",
+    "construction productivity materials demand UK",
+    "infrastructure policy procurement reform"
+  ],
+  "news_vs_analysis": {
+    "news": "constructionnews.co.uk, newcivilengineer.com, constructionmanagement.co.uk, insidehousing.co.uk, insideconstruction.com, pbctoday.co.uk",
+    "analysis": "copper8.com, bricks-bytes.com, constructingexcellence.org.uk, institute.global, brookings.edu, ukgbc.org, designingbuildings.co.uk"
+  },
+  "notes": "Subarea map covers construction economics, project delivery/megaprojects, engineering structures, building standards & safety regulation, urban form & planning policy, housing supply, infrastructure policy (UK/global), and materials/industry data. Excluded per user: Construction Physics, Bad British Architecture, Notes on Growth (badbritisharchitecture.blogspot.com, constructionphysics.substack.com, samdumitriu.com) plus transport-operations and energy-generation (own topics). Sources verified via check_url where feeds confirmed (constructionnews, newcivilengineer, insidehousing, constructingexcellence, constructionmanagement, designingbuildings, london.gov.uk, ukgbc, structuremag, copper8); others grounded in web_search. Paywalled/portal sources (ENR, ICE, istructe, bcis, compassinternational, brookings, institute.global) point crawl_root at section/index endpoints since full feeds are bot-blocked or absent. Source-type mix: trade press, data/registry, academic/journal, professional body, regulator, think tank, independent blog, reference — exceeds the 4-type minimum.",
+  "review_record": {
+    "findings": [
+      {
+        "severity": "major",
+        "area": "schema",
+        "issue": "news_vs_analysis is not a string",
+        "suggestion": ""
+      }
+    ]
+  }
+}
