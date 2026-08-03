@@ -224,7 +224,10 @@ def render_story_text(story: dict[str, Any], topic_name: str) -> str:
     if story.get("overview"):
         lines.append(str(story["overview"]))
         lines.append("")
-    for subarea, sec_lines in sorted(story.get("angles", {}).items()):
+    angles = story.get("angles", {})
+    if not isinstance(angles, dict):
+        angles = {}  # corrupt story: mechanical_check reports it; render must not crash (r20)
+    for subarea, sec_lines in sorted(angles.items()):
         lines.append(f"## {subarea}")
         lines.append("")
         for x in sec_lines:
@@ -240,18 +243,22 @@ def render_story_text(story: dict[str, Any], topic_name: str) -> str:
 
 
 def held_out_articles(
-    feeds_cache: dict[str, dict[str, Any]], picked_urls: set[str], story: dict[str, Any]
+    feeds_cache: dict[str, dict[str, Any]],
+    picked_urls: set[str],
+    story: dict[str, Any],
+    recency_days: int | None = None,
 ) -> list[Item]:
     """Held-out articles: GLOBAL fixtures always, then feed articles up to the cap.
 
     The fixtures guarantee the eval tests non-UK placement every run; the feed
     articles add the current week's real coverage. Feed articles are excluded if
-    they were the story's own evidence (picks/pending).
+    they were the story's own evidence (picks/pending). `recency_days` is
+    injectable (DI over patching) — defaults to the Config window.
     """
     story_urls = {e.get("url") for e in story.get("pending", [])}
     out: list[Item] = [dict(f) for f in GLOBAL_FIXTURES]
     seen_sources = {f["source"] for f in GLOBAL_FIXTURES}
-    cutoff = datetime.now(UTC) - timedelta(days=RECENCY_DAYS)
+    cutoff = datetime.now(UTC) - timedelta(days=recency_days if recency_days is not None else RECENCY_DAYS)
     for feed in feeds_cache.values():
         for it in feed.get("items", []):
             if len(out) >= MAX_EVAL_ARTICLES:
@@ -433,6 +440,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
+            print(f"      WARNING: {path.name}: unparseable JSON — skipped (root cause hidden otherwise)")
             continue
         if data.get("topic") == topic["name"]:
             slug = path.stem

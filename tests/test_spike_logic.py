@@ -551,12 +551,12 @@ def test_mechanical_check_fails_malformed_section() -> None:
     assert any("Bad" in f and "malformed" in f for f in failures)
 
 
-def test_held_out_sample_window_matches_recency(monkeypatch: Any) -> None:
+def test_held_out_sample_window_matches_recency() -> None:
     """The held-out sampler must window on RECENCY_DAYS, not a hardcoded 7,
     or the eval can pass on a window that no longer matches production
-    selection when RECENCY_DAYS is changed (r16 finding)."""
+    selection when RECENCY_DAYS is changed (r16 finding). The window is an
+    injectable param (DI over patching, r20)."""
     ev = _load_spike("eval_story")
-    monkeypatch.setattr(ev, "RECENCY_DAYS", 14)
     cutoff = datetime.now(UTC) - timedelta(days=14)
     feeds = {
         "a": {
@@ -578,7 +578,7 @@ def test_held_out_sample_window_matches_recency(monkeypatch: Any) -> None:
             ],
         }
     }
-    got = ev.held_out_articles(feeds, set(), {"pending": []})
+    got = ev.held_out_articles(feeds, set(), {"pending": []}, recency_days=14)
     urls = [i["url"] for i in got]
     assert "https://x/band" in urls  # within the CONFIGURED window (14d), not a hardcoded 7d
     assert "https://x/out" not in urls  # outside it — must be excluded
@@ -749,6 +749,40 @@ def test_parse_feed_date_guards_malformed_tuples() -> None:
     assert ws.parse_feed_date(good) == datetime(2026, 8, 2, 10, 30, tzinfo=UTC)
     assert ws.parse_feed_date(bad_zero) is None
     assert ws.parse_feed_date(bad_month) is None
+
+
+def test_render_story_text_guards_non_dict_angles() -> None:
+    """A corrupt story with non-dict angles must render without AttributeError —
+    mechanical_check already flags it; the render must fail cleanly (r20)."""
+    ev = _load_spike("eval_story")
+    story = {"overview": "x" * 60, "angles": ["not", "a", "dict"], "open_questions": []}
+    text = ev.render_story_text(story, "T")  # must not raise
+    assert "Area Story" in text  # rendered without the corrupt angles section
+
+
+def test_load_source_list_warns_on_corrupt_discovery_json(tmp_path: Any, capsys: Any) -> None:
+    """An unparseable discovery JSON must be surfaced (WARNING), not silently
+    skipped as if the file were absent (r20 finding — never swallow errors)."""
+    ws = _load_spike("weekly_selection")
+    (tmp_path / "bad.json").write_text("{not valid json", encoding="utf-8")
+    listing, sources, slug = ws.load_source_list("T", discovery_dir=tmp_path)
+    assert listing is None  # no parseable listing for T
+    captured = capsys.readouterr().out.lower()
+    assert "bad.json" in captured and ("skip" in captured or "warn" in captured or "unparseable" in captured)
+
+
+def test_load_jsonl_skips_keyless_lines(tmp_path: Any) -> None:
+    """A JSON-valid line without the key field (foreign/partial entry) must be
+    skipped with the corrupt count, not abort the run with KeyError (r20)."""
+    cache = tmp_path / "weekly_feeds.jsonl"
+    cache.write_text(
+        json.dumps({"key": "ok", "items": []})
+        + "\n"
+        + json.dumps({"url": "no-key-field"})  # valid JSON, not a cache record
+        + "\n"
+    )
+    got = ws.load_feeds(path=cache)
+    assert set(got) == {"ok"}
 
 
 def test_render_story_markdown_skips_malformed_angles() -> None:

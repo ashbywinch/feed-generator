@@ -154,6 +154,9 @@ def _load_jsonl(path: Path) -> dict[str, dict[str, Any]]:
         except json.JSONDecodeError:
             skipped += 1  # torn tail line from a crash; that work is redone
             continue
+        if not isinstance(entry, dict) or "key" not in entry:
+            skipped += 1  # valid JSON but not a cache record (r20) — skip, don't abort the run
+            continue
         out[entry["key"]] = entry
     if skipped:
         print(f"      WARNING: {path.name}: skipped {skipped} corrupt line(s) — work will be redone")
@@ -852,6 +855,7 @@ def load_source_list(
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
+            print(f"      WARNING: {path.name}: unparseable JSON — skipped (root cause hidden otherwise)")
             continue
         if data.get("topic") == topic_name:
             listing = data
