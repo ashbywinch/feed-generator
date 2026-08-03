@@ -1121,17 +1121,12 @@ def _fake_source() -> dict[str, Any]:
     }
 
 
-def _run_topic_fixture(tmp_path: Any, monkeypatch: Any) -> dict[str, Any]:
+def _run_topic_fixture(tmp_path: Any) -> dict[str, Any]:
     """Wire run_topic with fake fetch/eval/caches so the REAL pipeline body
     (window, verdict mirroring, picks, history, per-topic writes) runs without
-    network or LLM. Returns everything assertions need.
-
-    DI note (deviation from coding-standards.md "never monkeypatch global
-    state"): run_topic's shared caches (FEEDS_PATH, VERDICTS_PATH,
-    PICKS_HISTORY_PATH, loaders) are MODULE-LEVEL BY CONTRACT — concurrent
-    topics in one process share them via APPEND_LOCK; injecting them per-call
-    would change the threading model under test. Only the IO boundaries are
-    faked; the pipeline body is the real code.
+    network or LLM — via run_topic's DI seams (injected *_fn / *_path params),
+    never by patching module state (coding-standards.md). Returns everything
+    assertions need, including the `inject` kwargs dict.
     """
     import json as _json
 
@@ -1182,30 +1177,37 @@ def _run_topic_fixture(tmp_path: Any, monkeypatch: Any) -> dict[str, Any]:
         "open_questions": ["q?"],
         "pending": [],
     }
-    feeds_path = tmp_path / "feeds.jsonl"
-    verdicts_path = tmp_path / "verdicts.jsonl"
-    history_path = tmp_path / "picks_history.jsonl"
-    monkeypatch.setattr(ws, "load_feeds", lambda: {})
-    monkeypatch.setattr(ws, "load_verdicts", lambda story_version, slug_, path=None: {})
-    monkeypatch.setattr(ws, "load_picked_urls", lambda: set())
-    monkeypatch.setattr(ws, "load_story", lambda slug_: story)
-    monkeypatch.setattr(ws, "save_story", lambda slug_, s: None)
-    monkeypatch.setattr(ws, "fetch_feed", fake_fetch_feed)
-    monkeypatch.setattr(ws, "evaluate_source", fake_evaluate_source)
-    monkeypatch.setattr(ws, "FEEDS_PATH", feeds_path)
-    monkeypatch.setattr(ws, "VERDICTS_PATH", verdicts_path)
-    monkeypatch.setattr(ws, "PICKS_HISTORY_PATH", history_path)
-    return {"topic": topic, "listing": listing, "slug": slug, "sources": [source], "story": story, "json": _json}
+    inject: dict[str, Any] = {
+        "feeds_path": tmp_path / "feeds.jsonl",
+        "verdicts_path": tmp_path / "verdicts.jsonl",
+        "picks_history_path": tmp_path / "picks_history.jsonl",
+        "load_feeds_fn": lambda: {},
+        "load_verdicts_fn": lambda story_version, slug_, path=None: {},
+        "load_picked_urls_fn": lambda: set(),
+        "load_story_fn": lambda slug_: story,
+        "save_story_fn": lambda slug_, s: None,
+        "fetch_feed_fn": fake_fetch_feed,
+        "evaluate_source_fn": fake_evaluate_source,
+    }
+    return {
+        "topic": topic,
+        "listing": listing,
+        "slug": slug,
+        "sources": [source],
+        "story": story,
+        "inject": inject,
+        "json": _json,
+    }
 
 
-def test_run_topic_writes_per_topic_picks_and_report(tmp_path: Any, monkeypatch: Any) -> None:
-    fx = _run_topic_fixture(tmp_path, monkeypatch)
+def test_run_topic_writes_per_topic_picks_and_report(tmp_path: Any) -> None:
+    fx = _run_topic_fixture(tmp_path)
     out = ws.TopicOut(
         picks_path=tmp_path / "picks" / "01-test-topic.json",
         report_path=tmp_path / "reports" / "weekly_report_01-test-topic.md",
         story_md_path=tmp_path / "story_01-test-topic.md",
     )  # no legacy_picks_path: multi-topic mode
-    summary = ws.run_topic(fx["topic"], fx["listing"], fx["sources"], fx["slug"], out)
+    summary = ws.run_topic(fx["topic"], fx["listing"], fx["sources"], fx["slug"], out, **fx["inject"])
 
     assert summary["slug"] == "01-test-topic"
     assert summary["picked"] == 2
@@ -1241,8 +1243,8 @@ def test_run_topic_writes_per_topic_picks_and_report(tmp_path: Any, monkeypatch:
     assert not (tmp_path / "weekly_picks.json").exists()  # no legacy write in multi-topic mode
 
 
-def test_run_topic_legacy_single_file_only_when_configured(tmp_path: Any, monkeypatch: Any) -> None:
-    fx = _run_topic_fixture(tmp_path, monkeypatch)
+def test_run_topic_legacy_single_file_only_when_configured(tmp_path: Any) -> None:
+    fx = _run_topic_fixture(tmp_path)
     legacy = tmp_path / "weekly_picks.json"
     out = ws.TopicOut(
         picks_path=tmp_path / "picks" / "01-test-topic.json",
@@ -1250,18 +1252,18 @@ def test_run_topic_legacy_single_file_only_when_configured(tmp_path: Any, monkey
         story_md_path=tmp_path / "story_01-test-topic.md",
         legacy_picks_path=legacy,
     )
-    ws.run_topic(fx["topic"], fx["listing"], fx["sources"], fx["slug"], out)
+    ws.run_topic(fx["topic"], fx["listing"], fx["sources"], fx["slug"], out, **fx["inject"])
     assert legacy.exists()  # single-topic CLI runs keep the legacy file
     payload = fx["json"].loads(legacy.read_text(encoding="utf-8"))
     assert payload["topic"] == "Test Topic"
     assert len(payload["picks"]) == 2
 
 
-def test_run_topic_cross_topic_claim_dedups_shared_urls(tmp_path: Any, monkeypatch: Any) -> None:
+def test_run_topic_cross_topic_claim_dedups_shared_urls(tmp_path: Any) -> None:
     """Two topics sharing a source can approve the same URL in one run — the
     in-run claim set must drop the duplicate from the SECOND topic so it never
     lands in two feeds (FR-9: never surface the same item twice)."""
-    fx = _run_topic_fixture(tmp_path, monkeypatch)
+    fx = _run_topic_fixture(tmp_path)
     claims: set[str] = set()
     claim_lock = threading.Lock()
     out1 = ws.TopicOut(
@@ -1274,14 +1276,51 @@ def test_run_topic_cross_topic_claim_dedups_shared_urls(tmp_path: Any, monkeypat
         report_path=tmp_path / "r2.md",
         story_md_path=tmp_path / "s2.md",
     )
-    ws.run_topic(fx["topic"], fx["listing"], fx["sources"], "01-a", out1, claims=claims, claim_lock=claim_lock)
-    ws.run_topic(fx["topic"], fx["listing"], fx["sources"], "02-b", out2, claims=claims, claim_lock=claim_lock)
+    ws.run_topic(
+        fx["topic"], fx["listing"], fx["sources"], "01-a", out1, claims=claims, claim_lock=claim_lock, **fx["inject"]
+    )
+    ws.run_topic(
+        fx["topic"], fx["listing"], fx["sources"], "02-b", out2, claims=claims, claim_lock=claim_lock, **fx["inject"]
+    )
 
     p1 = fx["json"].loads(out1.picks_path.read_text(encoding="utf-8"))["picks"]
     p2 = fx["json"].loads(out2.picks_path.read_text(encoding="utf-8"))["picks"]
     assert len(p1) == 2  # first topic keeps its picks
     assert p2 == []  # second topic: every URL already claimed this run
     assert claims == {"https://fake.example/1", "https://fake.example/2"}
+
+
+def test_run_topic_uses_injected_shared_limiter(tmp_path: Any) -> None:
+    """The multi-topic runner passes ONE shared limiter; run_topic must USE it
+    (regression: an internal RateLimiter(...) construction used to overwrite
+    the injected one, silently disabling the global pacing contract)."""
+    fx = _run_topic_fixture(tmp_path)
+    seen: list[Any] = []
+    inject = dict(fx["inject"])
+
+    def fake_seed(
+        slug_: str, topic_: dict[str, Any], listing_: dict[str, Any], llm_: Any, limiter_: Any
+    ) -> dict[str, Any]:
+        seen.append(limiter_)
+        return {
+            "version": 1,
+            "updated_at": "",
+            "overview": "o",
+            "angles": {"Sub A": ["a"]},
+            "open_questions": [],
+            "pending": [],
+        }
+
+    inject["seed_story_fn"] = fake_seed
+    inject["load_story_fn"] = lambda slug_: {}  # no angles -> seed path runs
+    shared = threading.Lock()  # stand-in: any distinguishable object
+    out = ws.TopicOut(
+        picks_path=tmp_path / "picks" / "01-test-topic.json",
+        report_path=tmp_path / "r.md",
+        story_md_path=tmp_path / "s.md",
+    )
+    ws.run_topic(fx["topic"], fx["listing"], fx["sources"], fx["slug"], out, limiter=shared, **inject)
+    assert seen == [shared]  # seed got the SAME object, not a fresh RateLimiter
 
 
 if __name__ == "__main__":

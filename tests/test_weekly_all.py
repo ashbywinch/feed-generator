@@ -12,7 +12,6 @@ import importlib.util
 import json
 import sys
 import threading
-import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -210,18 +209,35 @@ def test_plan_runs_weekly_topics_empty_subset_runs_nothing(tmp_path: Path) -> No
     assert plan.to_run == [] and plan.fresh == []
 
 
+def test_plan_runs_no_list_slug_uses_full_topic_list(tmp_path: Path) -> None:
+    """A rotation night filters topics BEFORE planning — the no-list slug must
+    still come from slug_for over the FULL topic list (matching persist()),
+    not the filtered subset, or picks/story land under the wrong number and
+    the verdict cache splits (e.g. 01-transit vs the canonical 08-transit)."""
+    (tmp_path / "picks").mkdir()
+    topics = [_topic("Alpha"), _topic("Transit")]  # full list: Transit -> 02-transit
+    loader = _fake_loader({"Alpha": ({"topic": "Alpha"}, [{"name": "s"}], "01-alpha")})  # Transit: no list
+    plan = _plan(tmp_path, topics, loader, weekly_topics=["Transit"])
+    assert [s.slug for s in plan.to_run] == ["02-transit"]  # full-list index, not 01
+    assert plan.to_run[0].needs_sources is True
+
+
 # --- execution --------------------------------------------------------------
 
 
-def _recording_runner(results: list[tuple[str, str]], active: list[int], lock: threading.Lock, delay: float = 0.05):
-    """Fake run_topic that records (slug, error) and tracks concurrent active."""
+def _recording_runner(results: list[tuple[str, str]], active: list[int], lock: threading.Lock):
+    """Fake run_topic that records (slug, error) and tracks concurrent active.
+
+    No wall-clock: workers complete immediately; concurrency is bounded by the
+    executor, so peak is deterministic for workers=1 and the latch test below
+    handles the workers=3 case with a blocking event.
+    """
 
     def fake(topic, listing, sources, slug, out, *, limiter=None, **kwargs):
         with lock:
             active[0] += 1
             peak[0] = max(peak[0], active[0])
         try:
-            time.sleep(delay)
             results.append((slug, ""))
             return {"picked": 1, "slug": slug}
         finally:
@@ -252,16 +268,34 @@ def test_run_all_runs_every_stale_topic(tmp_path: Path) -> None:
 
 
 def test_run_all_caps_concurrency_at_workers(tmp_path: Path) -> None:
+    """At most WEEKLY_WORKERS topics run at once — proven with a blocking latch
+    (deterministic), not wall-clock: all 3 workers must be inside the critical
+    section simultaneously while the 4th cannot have started."""
     out = ws.TopicOut(picks_path=tmp_path / "p.json", report_path=tmp_path / "r.md", story_md_path=tmp_path / "s.md")
     plan = wa.Plan(to_run=[_run_spec(f"0{i}", out) for i in range(6)], fresh=[])
-    results: list[tuple[str, str]] = []
+    release = threading.Event()
     active: list[int] = [0]
+    peak: list[int] = [0]
     lock = threading.Lock()
-    fake, peak = _recording_runner(results, active, lock)
 
-    wa.run_all(plan, workers=3, run_topic_fn=fake)
-    assert peak[0] == 3  # never more than WEEKLY_WORKERS topics at once
-    assert len(results) == 6  # …and none were starved
+    def fake(topic, listing, sources, slug, out, *, limiter=None, **kwargs):
+        with lock:
+            active[0] += 1
+            peak[0] = max(peak[0], active[0])
+        release.wait(timeout=10)  # hold every worker until the test releases them
+        with lock:
+            active[0] -= 1
+        return {"picked": 1, "slug": slug}
+
+    thread = threading.Thread(target=lambda: wa.run_all(plan, workers=3, run_topic_fn=fake))
+    thread.start()
+    while active[0] < 3 and release.wait(timeout=0.01):  # latch: wait until the pool fills
+        pass
+    assert active[0] == 3  # exactly WORKERS held at once
+    assert peak[0] == 3  # never more
+    release.set()
+    thread.join(timeout=10)
+    assert not thread.is_alive()
 
 
 def test_run_all_workers_one_serializes(tmp_path: Path) -> None:
@@ -273,7 +307,8 @@ def test_run_all_workers_one_serializes(tmp_path: Path) -> None:
     fake, peak = _recording_runner(results, active, lock)
 
     wa.run_all(plan, workers=1, run_topic_fn=fake)
-    assert peak[0] == 1  # serialized: no overlap
+    assert peak[0] == 1  # serialized: no overlap (structural with max_workers=1)
+    assert len(results) == 2
 
 
 def test_run_all_failure_isolated(tmp_path: Path) -> None:
@@ -543,6 +578,25 @@ def test_run_all_redacts_keys_from_error_and_traceback(tmp_path: Path, monkeypat
 
     assert "sekrit-key-abc" not in result.error
     assert "sekrit-key-abc" not in capsys.readouterr().out  # logged traceback redacted too
+
+
+def test_run_all_redacts_all_keys_not_just_llm(tmp_path: Path, monkeypatch: Any, capsys: Any) -> None:
+    """Exception text can embed ANY configured key — redact the full secret set
+    (LLM, Exa, Google), not just the LLM key."""
+
+    def boom(t, listing, sources, slug, out, *, limiter=None, **kwargs):
+        raise RuntimeError("exa rejected exa-key-xyz")
+
+    monkeypatch.setattr(wa, "LLM_KEY", "")
+    monkeypatch.setattr(wa, "EXA_KEY", "exa-key-xyz")
+    plan = wa.Plan(
+        to_run=[wa.RunSpec(topic=_topic("X"), slug="03-x", listing={}, sources=[], out=_out(tmp_path))],
+        fresh=[],
+    )
+    (result,) = wa.run_all(plan, workers=1, run_topic_fn=boom)
+
+    assert "exa-key-xyz" not in result.error
+    assert "exa-key-xyz" not in capsys.readouterr().out
 
 
 def test_require_opml_if_generating(tmp_path: Path) -> None:

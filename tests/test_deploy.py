@@ -19,7 +19,7 @@ from signalflow.config import Config
 from signalflow.deploy import DEPLOY_URL, deploy_site, zip_site
 
 
-def _cfg(deploy_token: str = "", netlify_site_id: str = "") -> Config:
+def _cfg(deploy_token: str = "", netlify_site_id: str = "", site_base_url: str = "https://feeds.example.com") -> Config:
     return Config(
         llm_key="k",
         llm_base="https://router/v1",
@@ -29,6 +29,7 @@ def _cfg(deploy_token: str = "", netlify_site_id: str = "") -> Config:
         exa_key="x",
         deploy_token=deploy_token,
         netlify_site_id=netlify_site_id,
+        site_base_url=site_base_url,
     )
 
 
@@ -71,6 +72,22 @@ def test_zip_site_excludes_hidden_files(tmp_path: Path) -> None:
         assert ".env" not in zf.namelist()
 
 
+def test_zip_site_excludes_nested_hidden_directories(tmp_path: Path) -> None:
+    """Files inside hidden directories (site/.git/HEAD, site/.secrets/token)
+    must never be uploaded either — any hidden path component is excluded."""
+    site = _site(tmp_path)
+    hidden = site / ".git"
+    hidden.mkdir()
+    (hidden / "HEAD").write_text("ref", encoding="utf-8")
+    (site / ".secrets" / "token").parent.mkdir(parents=True)
+    (site / ".secrets" / "token").write_text("t", encoding="utf-8")
+    with zipfile.ZipFile(io.BytesIO(zip_site(site))) as zf:
+        names = set(zf.namelist())
+    assert ".git/HEAD" not in names
+    assert ".secrets/token" not in names
+    assert "feeds/01-x.xml" in names  # visible files still ship
+
+
 def test_deploy_site_skipped_without_credentials(tmp_path: Path, capsys) -> None:
     def boom(*args: Any, **kwargs: Any) -> Any:
         raise AssertionError("http must not be called without credentials")
@@ -102,3 +119,21 @@ def test_deploy_site_propagates_http_errors(tmp_path: Path) -> None:
 
     with pytest.raises(requests.HTTPError):
         deploy_site(_cfg(deploy_token="t", netlify_site_id="s"), _site(tmp_path), http_post=failing_post)
+
+
+def test_deploy_site_refuses_placeholder_base_url(tmp_path: Path, capsys) -> None:
+    """Publishing with the default SITE_BASE_URL placeholder would ship broken
+    absolute URLs (FR-7: 'reachable at a public URL') — refuse instead."""
+
+    def boom(url: str, **kwargs: Any) -> Any:
+        raise AssertionError("http must not be called with the placeholder base URL")
+
+    assert (
+        deploy_site(
+            _cfg(deploy_token="t", netlify_site_id="s", site_base_url="https://signalflow.local"),
+            _site(tmp_path),
+            http_post=boom,
+        )
+        is None
+    )
+    assert "placeholder" in capsys.readouterr().out

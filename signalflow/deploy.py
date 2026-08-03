@@ -29,14 +29,16 @@ DEPLOY_URL = "https://api.netlify.com/api/v1/sites/{site_id}/deploys"
 def zip_site(site_dir: Path) -> bytes:
     """Site directory -> zip bytes, files at the zip root (no nesting).
 
-    Hidden files (dotfiles) are excluded: a stray .env or state file in the
-    site dir must never be uploaded with the deploy.
+    Hidden paths are excluded — any component starting with '.', not just the
+    basename: a stray .env OR a file inside .git/.secrets must never be
+    uploaded with the deploy.
     """
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for path in sorted(site_dir.rglob("*")):
-            if path.is_file() and not path.name.startswith("."):
-                zf.write(path, path.relative_to(site_dir).as_posix())
+            rel = path.relative_to(site_dir)
+            if path.is_file() and not any(part.startswith(".") for part in rel.parts):
+                zf.write(path, rel.as_posix())
     return buf.getvalue()
 
 
@@ -53,6 +55,12 @@ def deploy_site(
     """
     if not cfg.deploy_token or not cfg.netlify_site_id:
         print("      deploy: skipped (no DEPLOY_TOKEN / NETLIFY_SITE_ID) — site is local-only; see docs/prd.md FR-7")
+        return None
+    if cfg.site_base_url == "https://signalflow.local":
+        print(
+            "      deploy: refused — SITE_BASE_URL is still the placeholder; publishing would ship "
+            "feeds whose absolute URLs point at a non-existent host (FR-7: reachable at a public URL)"
+        )
         return None
     url = DEPLOY_URL.format(site_id=cfg.netlify_site_id)
     files = {"files.zip": ("files.zip", zip_site(site_dir), "application/zip")}

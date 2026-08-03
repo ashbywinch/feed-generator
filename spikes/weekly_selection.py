@@ -55,6 +55,7 @@ import re
 import sys
 import threading
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -1045,6 +1046,18 @@ def run_topic(
     limiter: RateLimiter | None = None,
     claims: set[str] | None = None,
     claim_lock: threading.Lock | None = None,
+    feeds_path: Path | None = None,
+    verdicts_path: Path | None = None,
+    picks_history_path: Path | None = None,
+    load_feeds_fn: Callable[..., Any] = load_feeds,
+    load_verdicts_fn: Callable[..., Any] = load_verdicts,
+    load_picked_urls_fn: Callable[..., Any] = load_picked_urls,
+    load_story_fn: Callable[..., Any] = load_story,
+    save_story_fn: Callable[..., Any] = save_story,
+    seed_story_fn: Callable[..., Any] = seed_story,
+    fold_story_fn: Callable[..., Any] = fold_story,
+    fetch_feed_fn: Callable[..., Any] = fetch_feed,
+    evaluate_source_fn: Callable[..., Any] = evaluate_source,
 ) -> dict[str, Any]:
     """Run the weekly selection pipeline for ONE topic, writing per-topic outputs.
 
@@ -1059,33 +1072,39 @@ def run_topic(
     URL never lands in two feeds (FR-9: never surface the same item twice).
     Single-topic runs pass None and the gate is skipped.
 
+    The *_fn / *_path params are DI seams for tests (injected fakes + tmp
+    paths, per coding-standards.md DI-over-patching); defaults are the
+    module-level shared caches, so production behavior is unchanged.
+
     Returns the run summary dict (also rendered to the report).
     """
+    feeds_path = feeds_path or FEEDS_PATH
+    verdicts_path = verdicts_path or VERDICTS_PATH
+    picks_history_path = picks_history_path or PICKS_HISTORY_PATH
     print(f"[1/6] topic: {topic['name']} | {len(sources)} unique sources (from docs/discovery/)")
     if limiter is None:
         limiter = RateLimiter(EVAL_INTERVAL)
 
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    story = load_story(slug)
+    story = load_story_fn(slug)
     llm = LLM(CFG)
-    limiter = RateLimiter(EVAL_INTERVAL)
     if not story.get("angles"):
         # No story yet: generate the initial BIG-PICTURE story from the topic
         # boundary + subareas ONLY (no article/feed input — the story must not
         # be biased by any single crawl or outlet).
         print("      seeding initial area story from topic boundary (no article input) ...")
-        story = seed_story(slug, topic, listing, llm, limiter)
+        story = seed_story_fn(slug, topic, listing, llm, limiter)
         if story.get("angles"):
-            save_story(slug, story)
+            save_story_fn(slug, story)
             print(
                 f"      story seeded: v{story['version']} — "
                 + f"{sum(len(v) for v in story['angles'].values())} angles, "
                 + f"{len(story['open_questions'])} open questions"
             )
     story_version = int(story.get("version", 0))
-    feeds_cache = load_feeds()
-    verdicts_cache = load_verdicts(story_version, slug)
-    picked_urls = load_picked_urls()
+    feeds_cache = load_feeds_fn()
+    verdicts_cache = load_verdicts_fn(story_version, slug)
+    picked_urls = load_picked_urls_fn()
     if story_version:
         print(
             f"      story: v{story_version} ({story.get('updated_at', '')[:10]}) — "
@@ -1116,7 +1135,7 @@ def run_topic(
 
     print(f"[2/6] fetching {len(to_fetch)} feeds ({len(sources) - len(to_fetch)} from cache) ...")
     with ThreadPoolExecutor(max_workers=FETCH_WORKERS) as ex:
-        futures = [ex.submit(fetch_feed, s) for s in to_fetch]
+        futures = [ex.submit(fetch_feed_fn, s) for s in to_fetch]
         for fut in as_completed(futures):
             s = fut.result()
             old = feeds_cache.get(s["crawl_root"], {})
@@ -1156,7 +1175,7 @@ def run_topic(
                     f"      WARNING: {s['name']} feed exceeded {FEED_CAP_BYTES} bytes "
                     "— parsed partially (newest entries usually survive)"
                 )
-            _append_jsonl(FEEDS_PATH, entry)
+            _append_jsonl(feeds_path, entry)
             s["cached"] = entry
 
     # Window items to the last RECENCY_DAYS; exclude already-picked urls.
@@ -1213,11 +1232,11 @@ def run_topic(
     )
     if todo_total and story.get("pending"):
         print(f"      folding {len(story['pending'])} queued picks into story ...")
-        if fold_story(story, story["pending"], topic, llm, limiter):
+        if fold_story_fn(story, story["pending"], topic, llm, limiter):
             story["pending"] = []
-            save_story(slug, story)
+            save_story_fn(slug, story)
             story_version = int(story.get("version", 0))
-            verdicts_cache = load_verdicts(story_version, slug)
+            verdicts_cache = load_verdicts_fn(story_version, slug)
             print(f"      story now v{story_version} — verdict cache re-keyed")
         else:
             print("      story fold failed — pending picks kept for the next run")
@@ -1252,7 +1271,7 @@ def run_topic(
                         + f"{', '.join(missing_subs)} — judging without story context "
                         "(story angle names may have drifted from the discovery list)"
                     )
-                verdicts = evaluate_source(s, todo, topic, llm, limiter, "\n\n".join(x for x in slices if x))
+                verdicts = evaluate_source_fn(s, todo, topic, llm, limiter, "\n\n".join(x for x in slices if x))
             except Exception as exc:  # noqa: BLE001 — keep the run alive; cached verdicts still count
                 print(f"      evaluation failed for {s['name']}: {redact(str(exc))[:200]}")
                 s["eval_error"] = redact(str(exc))[:200]
@@ -1261,7 +1280,7 @@ def run_topic(
             for v in verdicts:
                 key = verdict_key(slug, s, v["url"])
                 _append_jsonl(
-                    VERDICTS_PATH,
+                    verdicts_path,
                     {"key": key, "slug": slug, "rev": PROMPT_REV, "story_ver": story_version, **v},
                 )
                 # Mirror into the in-memory cache: two sources in the SAME
@@ -1373,7 +1392,7 @@ def run_topic(
     # machine-readable picks file (a crash between the two must lose the picks
     # file, never the exclusion). Per-pick appends could interleave with a crash
     # and leave some URLs out of the history.
-    with APPEND_LOCK, PICKS_HISTORY_PATH.open("a", encoding="utf-8") as fh:
+    with APPEND_LOCK, picks_history_path.open("a", encoding="utf-8") as fh:
         lines = [
             json.dumps(
                 {
@@ -1395,7 +1414,7 @@ def run_topic(
     # with this run's queued picks (a crash before this point loses the fold,
     # never the exclusion).
     if picks:
-        save_story(slug, story)
+        save_story_fn(slug, story)
 
     payload = json.dumps(
         {"generated_at": summary["generated_at"], "topic": topic["name"], "slug": slug, "picks": picks},

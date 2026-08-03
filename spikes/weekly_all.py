@@ -48,6 +48,8 @@ RECENCY_DAYS = CFG.weekly_recency_days
 WORKERS = CFG.weekly_workers
 EVAL_INTERVAL = CFG.weekly_eval_interval
 LLM_KEY = os.environ.get("OPENCODE_GO_API_KEY", "")
+EXA_KEY = os.environ.get("EXA_API_KEY", "")
+GOOGLE_KEY = os.environ.get("GOOGLE_API_KEY", "")
 
 
 @dataclass(frozen=True)
@@ -204,6 +206,7 @@ def plan_runs(
     weekly_topics (the night's rotation subset, case-insensitive) restricts
     planning to those topics; freshness gating still applies within the subset.
     """
+    full_topics = topics  # slug_for must index the FULL list (matches source_lists.persist)
     if weekly_topics is not None:
         wanted = {name.lower() for name in weekly_topics}
         topics = [t for t in topics if t["name"].lower() in wanted]
@@ -213,8 +216,9 @@ def plan_runs(
         if listing is None:
             # No discovery source list yet: generate it, then select — the
             # topic is stale by definition (no list -> no picks). The slug
-            # must match source_lists.persist (slug_for over the same topics).
-            slug = slug_for(topic["name"], topics)
+            # must match source_lists.persist (slug_for over the FULL topic
+            # list — never the rotation-filtered subset).
+            slug = slug_for(topic["name"], full_topics)
             plan.to_run.append(
                 RunSpec(
                     topic=topic,
@@ -285,8 +289,9 @@ def run_all(
                     approved, _iterations = generate_fn(spec.topic, limiter=limiter)
                 except Exception as first_exc:  # noqa: BLE001 — retry below, but surface the first failure
                     message = str(first_exc)
-                    if LLM_KEY:
-                        message = message.replace(LLM_KEY, "***")
+                    for secret in (LLM_KEY, EXA_KEY, GOOGLE_KEY):
+                        if secret:
+                            message = message.replace(secret, "***")
                     print(f"      first generation attempt failed for {spec.topic['name']}, retrying: {message[:200]}")
                     # ONE immediate retry: generation failures are stochastic
                     # (router errors, non-JSON prose); a fresh attempt has a
@@ -317,9 +322,10 @@ def run_all(
         except Exception as exc:  # noqa: BLE001 — keep the batch alive; log, don't swallow
             tb = traceback.format_exc()
             message = str(exc)
-            if LLM_KEY:
-                tb = tb.replace(LLM_KEY, "***")
-                message = message.replace(LLM_KEY, "***")  # keys can appear in exception text
+            for secret in (LLM_KEY, EXA_KEY, GOOGLE_KEY):
+                if secret:
+                    tb = tb.replace(secret, "***")
+                    message = message.replace(secret, "***")  # any key can appear in exception text
             print(f"      TRACEBACK for {spec.topic['name']}:\n{tb}")
             return RunResult(slug=spec.slug, topic=spec.topic["name"], ok=False, error=message[:300])
 
