@@ -332,6 +332,9 @@ def test_config_infra_defaults(monkeypatch: Any, cfg: Any) -> None:
     assert env_cfg.weekly_fetch_workers == 6
     assert env_cfg.weekly_feed_cap_bytes == 500_000
     assert env_cfg.llm_max_tokens == 4096
+
+
+def test_setup_restores_topics_when_seed_raises(cfg: Any) -> None:
     """A seed crash after clear_topics() must restore the previously stored
     topics — otherwise the recurring run aborts with 'no topics stored' and
     prior curated strategies are lost (r19 finding/suggestion)."""

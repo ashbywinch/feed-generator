@@ -167,6 +167,7 @@ Pipeline: load topic boundary + source list → fetch feeds (TTL'd cache, stale-
 - **Query-store sync**: the engine's `discovery.py` reads queries from the topics table `strategy_json` (currently seeded empty), while `refresh-queries` writes `docs/discovery/*.json`. The engine stage must load queries from the discovery docs (or seed `strategy_json` from them) so the global query set actually runs.
 - **Scheduling**: the recurring run (FR-8) executes BOTH FR-3 discovery tiers and the FR-9 feed-selection stage from the stored strategies — one cadence, default daily, configurable to weekly (`RECURRING_CRON`). There is no separate weekly engine run; the spike's "weekly" window (`RECENCY_DAYS`, default 7) applies to the feed-selection stage inside the recurring run. If daily runs surface too little new content, the whole run is set weekly (config-only, user decision).
 - **Config**: `RECENCY_DAYS`, `MAX_PICKS_PER_SOURCE`, `MAX_ITEMS_PER_SOURCE`, eval thresholds move from spike constants into `signalflow/config.py` env surface.
+- **Cache compaction (engine stage)**: the spike's feed/verdict/pick caches are append-only JSONL that re-read fully each run — fine for a spike, unbounded at a daily recurring cadence. The engine stage must compact per key (rewrite keeping the latest line per key) or move to a keyed store before FR-9 goes live.
 - **Eval gates in the loop**: `make eval-story` / `make eval-queries` are manual pre-merge gates (LLM/network); they are not in CI, which stays deterministic.
 
 ## Non-Functional Requirements
