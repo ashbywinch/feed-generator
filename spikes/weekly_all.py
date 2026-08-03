@@ -5,8 +5,9 @@ Regenerates every topic whose last weekly selection is NOT fresh — no
 per-topic picks file (or matching legacy single-file) with generated_at inside
 RECENCY_DAYS. At most WEEKLY_WORKERS topics run at a time (3 by default),
 sharing ONE RateLimiter so parallel topics can never burst past the global LLM
-pacing quota. Topics without a docs/discovery/{slug}.json are skipped and
-reported (FR-9: they cannot be feed-selected until make topic-sources runs).
+pacing quota. Topics without a docs/discovery/{slug}.json get their source
+list generated first (the make topic-sources flow: generate -> gates ->
+review until approval), then the weekly selection runs on it.
 
 Run: make spike-weekly-all   (WEEKLY_WORKERS=3 default)
 """
@@ -30,6 +31,7 @@ import spikes.weekly_selection as ws  # noqa: E402  (sys.path bootstrap above)
 from signalflow.config import Config  # noqa: E402
 from signalflow.env import load_env  # noqa: E402
 from signalflow.ratelimit import RateLimiter  # noqa: E402
+from signalflow.source_lists import slug_for  # noqa: E402
 from signalflow.topics import load_topics  # noqa: E402
 
 load_env(ROOT / ".env")
@@ -47,22 +49,26 @@ EVAL_INTERVAL = CFG.weekly_eval_interval
 
 @dataclass(frozen=True)
 class RunSpec:
-    """One stale topic ready to run: everything run_topic needs + its outputs."""
+    """One stale topic ready to run: everything run_topic needs + its outputs.
+
+    needs_sources: the topic has no docs/discovery list yet — the worker
+    generates one (make-topic-sources flow) before running selection.
+    """
 
     topic: dict[str, Any]
     slug: str
     listing: dict[str, Any]
     sources: list[dict[str, Any]]
     out: ws.TopicOut
+    needs_sources: bool = False
 
 
 @dataclass(frozen=True)
 class Plan:
-    """Classification of every topic: what to run, what to skip, and why."""
+    """Classification of every topic: what to run and what is already fresh."""
 
     to_run: list[RunSpec] = field(default_factory=list)
     fresh: list[tuple[str, str]] = field(default_factory=list)  # (topic name, slug)
-    no_list: list[str] = field(default_factory=list)  # topic names, no discovery list
 
 
 @dataclass
@@ -72,6 +78,8 @@ class RunResult:
     ok: bool
     error: str = ""
     picked: int = 0
+    generated_sources: bool = False
+    sources_approved: bool = False
 
 
 # --- freshness --------------------------------------------------------------
@@ -113,6 +121,14 @@ def is_topic_fresh(
 
 
 # --- planning ---------------------------------------------------------------
+
+
+def _topic_out(picks_dir: Path, slug: str) -> ws.TopicOut:
+    return ws.TopicOut(
+        picks_path=picks_dir / f"{slug}.json",
+        report_path=OUT_DIR / f"weekly_report_{slug}.md",
+        story_md_path=OUT_DIR / f"story_{slug}.md",
+    )
 
 
 def _load_payload(path: Path | None) -> dict[str, Any] | None:
@@ -163,7 +179,20 @@ def plan_runs(
     for topic in topics:
         listing, sources, slug = load_list(topic["name"], discovery_dir)
         if listing is None:
-            plan.no_list.append(topic["name"])
+            # No discovery source list yet: generate it, then select — the
+            # topic is stale by definition (no list -> no picks). The slug
+            # must match source_lists.persist (slug_for over the same topics).
+            slug = slug_for(topic["name"], topics)
+            plan.to_run.append(
+                RunSpec(
+                    topic=topic,
+                    slug=slug,
+                    listing={},
+                    sources=[],
+                    out=_topic_out(picks_dir, slug),
+                    needs_sources=True,
+                )
+            )
             continue
         per_topic = _load_payload(picks_dir / f"{slug}.json")
         legacy = legacy_payload if legacy_payload is not None else _load_payload(legacy_picks_path)
@@ -171,17 +200,7 @@ def plan_runs(
             plan.fresh.append((topic["name"], slug))
             continue
         plan.to_run.append(
-            RunSpec(
-                topic=topic,
-                slug=slug,
-                listing=listing,
-                sources=sources,
-                out=ws.TopicOut(
-                    picks_path=picks_dir / f"{slug}.json",
-                    report_path=OUT_DIR / f"weekly_report_{slug}.md",
-                    story_md_path=OUT_DIR / f"story_{slug}.md",
-                ),
-            )
+            RunSpec(topic=topic, slug=slug, listing=listing, sources=sources, out=_topic_out(picks_dir, slug))
         )
     return plan
 
@@ -189,24 +208,58 @@ def plan_runs(
 # --- execution --------------------------------------------------------------
 
 
+def generate_sources(topic: dict[str, Any]) -> tuple[bool, int]:
+    """Generate + persist a topic's discovery source list (make-topic-sources flow).
+
+    Mirrors `python -m signalflow sources <topic>`: generate -> gates -> review
+    until approval (MAX_ITER rounds), then persist docs/discovery/{slug}.json.
+    Returns (approved, iterations) — a needs-human list is still persisted and
+    usable; only a hard failure raises.
+    """
+    from signalflow.source_lists import generate_topic_sources, persist
+
+    listing, verdict, iterations, _searches = generate_topic_sources(topic, CFG, ROOT / "feedly.opml")
+    persist(topic["name"], listing, verdict, iterations)
+    return bool(verdict.get("approved")), iterations
+
+
 def run_all(
     plan: Plan,
     *,
     workers: int = 3,
     run_topic_fn: Callable[..., Any] = ws.run_topic,
+    generate_fn: Callable[..., Any] = generate_sources,
+    load_list_fn: Callable[..., Any] = ws.load_source_list,
     limiter: RateLimiter | None = None,
 ) -> list[RunResult]:
     """Run every stale topic, at most `workers` at a time; failures isolated.
 
-    One topic's exception must never kill the batch: it is captured into its
+    A topic without a discovery list generates its sources first (writes
+    docs/discovery/{slug}.json), then reloads the list and selects. One
+    topic's exception must never kill the batch: it is captured into its
     RunResult and the remaining topics still run (and still count).
     """
     results: list[RunResult] = []
 
     def worker(spec: RunSpec) -> RunResult:
         try:
-            summary = run_topic_fn(spec.topic, spec.listing, spec.sources, spec.slug, spec.out, limiter=limiter)
-            return RunResult(slug=spec.slug, topic=spec.topic["name"], ok=True, picked=int(summary.get("picked", 0)))
+            listing, sources = spec.listing, spec.sources
+            generated = approved = False
+            if spec.needs_sources:
+                approved, _iterations = generate_fn(spec.topic)
+                generated = True
+                listing, sources, _slug = load_list_fn(spec.topic["name"])
+                if listing is None:
+                    raise RuntimeError(f"source list generation produced no usable list for {spec.topic['name']!r}")
+            summary = run_topic_fn(spec.topic, listing, sources, spec.slug, spec.out, limiter=limiter)
+            return RunResult(
+                slug=spec.slug,
+                topic=spec.topic["name"],
+                ok=True,
+                picked=int(summary.get("picked", 0)),
+                generated_sources=generated,
+                sources_approved=approved,
+            )
         except Exception as exc:  # noqa: BLE001 — keep the batch alive; log, don't swallow
             return RunResult(slug=spec.slug, topic=spec.topic["name"], ok=False, error=str(exc)[:300])
 
@@ -247,20 +300,22 @@ def main(argv: list[str] | None = None) -> int:
         n = len(payload.get("picks", [])) if payload else 0
         ts = ((payload or {}).get("generated_at") or "?")[:10]
         print(f"[skip] {name} — fresh (last selection {ts}, {n} picks)")
-    for name in plan.no_list:
-        print(f"[skip] {name} — no discovery source list (run `make topic-sources TOPIC=...`)")
     for spec in plan.to_run:
-        print(f"[run ] {spec.topic['name']} — stale, queued ({len(plan.to_run)} topics, {WORKERS} at a time)")
+        if spec.needs_sources:
+            print(f"[gen ] {spec.topic['name']} — no source list, generating then selecting ({WORKERS} at a time)")
+        else:
+            print(f"[run ] {spec.topic['name']} — stale, queued ({len(plan.to_run)} topics, {WORKERS} at a time)")
 
     if not plan.to_run:
-        print(f"nothing to regenerate — {len(plan.fresh)} fresh, {len(plan.no_list)} without source lists")
+        print(f"nothing to regenerate — {len(plan.fresh)} topics fresh")
         return 0
 
     limiter = RateLimiter(EVAL_INTERVAL)  # ONE limiter shared by all worker threads
     results = run_all(plan, workers=WORKERS, limiter=limiter)
     for r in results:
         if r.ok:
-            print(f"      {r.topic} ({r.slug}): ok — {r.picked} picks")
+            src = f", sources generated (approved={r.sources_approved})" if r.generated_sources else ""
+            print(f"      {r.topic} ({r.slug}): ok — {r.picked} picks{src}")
         else:
             print(f"      {r.topic} ({r.slug}): FAILED — {r.error}")
     failed = [r for r in results if not r.ok]

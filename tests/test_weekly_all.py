@@ -148,12 +148,17 @@ def test_plan_runs_classifies_fresh_stale_and_no_list(tmp_path: Path) -> None:
     plan = _plan(tmp_path, [fresh_topic, stale_topic, no_list_topic], loader)
 
     assert plan.fresh == [("Fresh Topic", "01-fresh")]
-    assert plan.no_list == ["No List Topic"]
-    assert [spec.slug for spec in plan.to_run] == ["02-stale"]
-    spec = plan.to_run[0]
-    assert spec.topic is stale_topic
-    assert spec.out.picks_path == tmp_path / "picks" / "02-stale.json"
-    assert spec.out.legacy_picks_path is None  # multi-topic: never the single file
+    assert [spec.slug for spec in plan.to_run] == ["02-stale", "03-no-list-topic"]
+    stale, no_list = plan.to_run
+    assert stale.topic is stale_topic
+    assert stale.needs_sources is False
+    assert stale.out.picks_path == tmp_path / "picks" / "02-stale.json"
+    assert stale.out.legacy_picks_path is None  # multi-topic: never the single file
+    # No discovery list: still queued — sources are generated before selection.
+    assert no_list.topic is no_list_topic
+    assert no_list.needs_sources is True
+    assert no_list.slug == "03-no-list-topic"  # slug_for numbering matches persist()
+    assert no_list.out.picks_path == tmp_path / "picks" / "03-no-list-topic.json"
 
 
 def test_plan_runs_legacy_file_makes_topic_fresh(tmp_path: Path) -> None:
@@ -194,7 +199,7 @@ def _run_spec(slug: str, out: Any) -> Any:
 
 def test_run_all_runs_every_stale_topic(tmp_path: Path) -> None:
     out = ws.TopicOut(picks_path=tmp_path / "p.json", report_path=tmp_path / "r.md", story_md_path=tmp_path / "s.md")
-    plan = wa.Plan(to_run=[_run_spec(f"0{i}", out) for i in range(3)], fresh=[], no_list=[])
+    plan = wa.Plan(to_run=[_run_spec(f"0{i}", out) for i in range(3)], fresh=[])
     results: list[tuple[str, str]] = []
     active: list[int] = [0]
     lock = threading.Lock()
@@ -209,7 +214,7 @@ def test_run_all_runs_every_stale_topic(tmp_path: Path) -> None:
 
 def test_run_all_caps_concurrency_at_workers(tmp_path: Path) -> None:
     out = ws.TopicOut(picks_path=tmp_path / "p.json", report_path=tmp_path / "r.md", story_md_path=tmp_path / "s.md")
-    plan = wa.Plan(to_run=[_run_spec(f"0{i}", out) for i in range(6)], fresh=[], no_list=[])
+    plan = wa.Plan(to_run=[_run_spec(f"0{i}", out) for i in range(6)], fresh=[])
     results: list[tuple[str, str]] = []
     active: list[int] = [0]
     lock = threading.Lock()
@@ -222,7 +227,7 @@ def test_run_all_caps_concurrency_at_workers(tmp_path: Path) -> None:
 
 def test_run_all_workers_one_serializes(tmp_path: Path) -> None:
     out = ws.TopicOut(picks_path=tmp_path / "p.json", report_path=tmp_path / "r.md", story_md_path=tmp_path / "s.md")
-    plan = wa.Plan(to_run=[_run_spec(f"0{i}", out) for i in range(2)], fresh=[], no_list=[])
+    plan = wa.Plan(to_run=[_run_spec(f"0{i}", out) for i in range(2)], fresh=[])
     results: list[tuple[str, str]] = []
     active: list[int] = [0]
     lock = threading.Lock()
@@ -240,7 +245,7 @@ def test_run_all_failure_isolated(tmp_path: Path) -> None:
             raise RuntimeError("router exploded")
         return {"picked": 2, "slug": slug}
 
-    plan = wa.Plan(to_run=[_run_spec("00", out), _run_spec("01", out), _run_spec("02", out)], fresh=[], no_list=[])
+    plan = wa.Plan(to_run=[_run_spec("00", out), _run_spec("01", out), _run_spec("02", out)], fresh=[])
     out_results = wa.run_all(plan, workers=3, run_topic_fn=flaky)
 
     by_slug = {r.slug: r for r in out_results}
@@ -251,7 +256,7 @@ def test_run_all_failure_isolated(tmp_path: Path) -> None:
 
 
 def test_run_all_empty_plan_no_calls(tmp_path: Path) -> None:
-    plan = wa.Plan(to_run=[], fresh=[], no_list=[])
+    plan = wa.Plan(to_run=[], fresh=[])
     called: list[str] = []
 
     def fake(topic, listing, sources, slug, out, *, limiter=None):
@@ -296,3 +301,119 @@ def test_ensure_per_topic_picks_ignores_other_topics_legacy(tmp_path: Path) -> N
     legacy.write_text(json.dumps(_payload(NOW.isoformat(), topic="Topic B")), encoding="utf-8")
     assert wa.ensure_per_topic_picks("Topic A", "00-topic-a", picks_dir, legacy) is False
     assert not (picks_dir / "00-topic-a.json").exists()
+
+
+# --- source generation for topics without discovery lists -------------------
+
+
+def _out(tmp_path: Path) -> Any:
+    return ws.TopicOut(picks_path=tmp_path / "p.json", report_path=tmp_path / "r.md", story_md_path=tmp_path / "s.md")
+
+
+def test_run_all_generates_sources_before_selecting(tmp_path: Path) -> None:
+    """A topic without a discovery list gets sources generated, then the fresh
+    listing (reloaded from disk) is selected — in order, in the same worker."""
+    calls: list[str] = []
+    topic = _topic("No List Topic")
+
+    def fake_generate(t: dict[str, Any]) -> tuple[bool, int]:
+        calls.append(f"generate:{t['name']}")
+        return True, 3  # approved after 3 iterations
+
+    def fake_load(topic_name: str, discovery_dir: Path | None = None) -> tuple[Any, list[Any], str]:
+        if topic_name == "No List Topic":
+            return {"topic": topic_name, "subareas": []}, [{"name": "s"}], "03-no-list-topic"
+        return None, [], ""
+
+    def fake_run(t, listing, sources, slug, out, *, limiter=None):
+        calls.append(f"select:{slug}:{bool(listing)}:{len(sources)}")
+        return {"picked": 4, "slug": slug}
+
+    plan = wa.Plan(
+        to_run=[
+            wa.RunSpec(
+                topic=topic,
+                slug="03-no-list-topic",
+                listing={},
+                sources=[],
+                out=_out(tmp_path),
+                needs_sources=True,
+            )
+        ],
+        fresh=[],
+    )
+    results = wa.run_all(plan, workers=1, run_topic_fn=fake_run, generate_fn=fake_generate, load_list_fn=fake_load)
+
+    (result,) = results
+    assert result.ok and result.generated_sources is True and result.sources_approved is True
+    assert result.picked == 4
+    # generation ran, THEN selection with the RELOADED (non-empty) listing
+    assert calls == ["generate:No List Topic", "select:03-no-list-topic:True:1"]
+
+
+def test_run_all_generation_failure_isolated(tmp_path: Path) -> None:
+    """One topic's source generation failing must not kill the batch."""
+    good = _topic("Good Topic")
+    bad = _topic("Bad Topic")
+
+    def fake_generate(t: dict[str, Any]) -> tuple[bool, int]:
+        if t["name"] == "Bad Topic":
+            raise RuntimeError("EXA_API_KEY missing")
+        return True, 1
+
+    def fake_run(t, listing, sources, slug, out, *, limiter=None):
+        return {"picked": 2, "slug": slug}
+
+    def fake_load(topic_name: str, discovery_dir: Path | None = None) -> tuple[Any, list[Any], str]:
+        return {"topic": topic_name}, [{"name": "s"}], "x"
+
+    plan = wa.Plan(
+        to_run=[
+            wa.RunSpec(topic=bad, slug="01-bad", listing={}, sources=[], out=_out(tmp_path), needs_sources=True),
+            wa.RunSpec(topic=good, slug="02-good", listing={}, sources=[], out=_out(tmp_path), needs_sources=True),
+        ],
+        fresh=[],
+    )
+    results = {
+        r.slug: r
+        for r in wa.run_all(plan, workers=2, run_topic_fn=fake_run, generate_fn=fake_generate, load_list_fn=fake_load)
+    }
+
+    assert results["01-bad"].ok is False and "EXA_API_KEY" in results["01-bad"].error
+    assert results["02-good"].ok is True and results["02-good"].picked == 2
+
+
+def test_run_all_generation_without_usable_list_fails(tmp_path: Path) -> None:
+    """Generation 'succeeds' but no list appears on disk -> the topic fails,
+    it must not select against an empty listing."""
+
+    def fake_generate(t: dict[str, Any]) -> tuple[bool, int]:
+        return False, 6  # never approved
+
+    ran: list[str] = []
+
+    def fake_run(t, listing, sources, slug, out, *, limiter=None):
+        ran.append(slug)
+        return {"picked": 0, "slug": slug}
+
+    def fake_load(topic_name: str, discovery_dir: Path | None = None) -> tuple[Any, list[Any], str]:
+        return None, [], ""  # nothing persisted
+
+    plan = wa.Plan(
+        to_run=[
+            wa.RunSpec(
+                topic=_topic("X"),
+                slug="03-x",
+                listing={},
+                sources=[],
+                out=_out(tmp_path),
+                needs_sources=True,
+            )
+        ],
+        fresh=[],
+    )
+    (result,) = wa.run_all(plan, workers=1, run_topic_fn=fake_run, generate_fn=fake_generate, load_list_fn=fake_load)
+
+    assert result.ok is False
+    assert "no usable list" in result.error
+    assert ran == []  # selection never ran against an empty listing
