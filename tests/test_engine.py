@@ -284,7 +284,54 @@ def test_setup_rolls_back_blacklist_when_seed_raises(cfg: Any) -> None:
     assert engine._memory.blacklist() == set()
 
 
-def test_setup_restores_topics_when_seed_raises(cfg: Any) -> None:
+def test_setup_restores_blacklist_when_write_raises(cfg: Any) -> None:
+    """A RAISING blacklist write (DB lock, disk full) must restore the previous
+    set and return 1 with a FATAL — not escape setup() as a raw traceback
+    (r21 finding)."""
+    saved: list[set[str]] = []
+
+    def _parse(path: Any) -> Any:
+        return {"sub.com"}, []
+
+    class M(FakeMemory):
+        _write_raises: bool = False
+
+        def blacklist(self) -> set[str]:
+            return self._blacklist
+
+        def save_blacklist(self, domains: set[str]) -> int:
+            saved.append(set(domains))
+            if self._write_raises:
+                self._write_raises = False  # the RESTORE write succeeds
+                raise RuntimeError("database is locked")
+            self._blacklist = set(domains)
+            return len(domains)
+
+    engine = _engine(cfg, memory_cls=M, parse_opml=_parse)
+    cast(Any, engine._memory)._blacklist = {"old.com"}  # last-good set
+    cast(Any, engine._memory)._write_raises = True
+    assert engine.setup() == 1
+    assert saved == [{"sub.com"}, {"old.com"}]  # attempted, then previous restored
+    assert engine._memory.blacklist() == {"old.com"}
+
+
+def test_config_infra_defaults(monkeypatch: Any, cfg: Any) -> None:
+    """FR-9 infra constants live on Config with env defaults (r21)."""
+    assert cfg.weekly_fetch_workers == 12
+    assert cfg.weekly_fetch_timeout == 12
+    assert cfg.weekly_feed_cap_bytes == 300_000
+    assert cfg.weekly_junk_title_markers == ("factsheet", "fact sheet")
+    assert cfg.llm_max_tokens == 8192
+    # env overrides reach the spikes via from_env_optional
+    monkeypatch.setenv("FETCH_WORKERS", "6")
+    monkeypatch.setenv("FEED_CAP_BYTES", "500000")
+    monkeypatch.setenv("LLM_MAX_TOKENS", "4096")
+    from signalflow.config import Config as Cfg
+
+    env_cfg = Cfg.from_env_optional()
+    assert env_cfg.weekly_fetch_workers == 6
+    assert env_cfg.weekly_feed_cap_bytes == 500_000
+    assert env_cfg.llm_max_tokens == 4096
     """A seed crash after clear_topics() must restore the previously stored
     topics — otherwise the recurring run aborts with 'no topics stored' and
     prior curated strategies are lost (r19 finding/suggestion)."""

@@ -55,6 +55,13 @@ class Config:
     eval_max_uncovered: int = 3  # queries eval: subareas a set may leave out
     # FR-8 recurring schedule (PRD config table; DAILY_CRON/WEEKLY_CRON merged)
     recurring_cron: str = "0 6 * * *"
+    # FR-9 spike infrastructure (r21: Config-never-hardcoded — thresholds and
+    # budgets live here with env defaults, one place for engine + spikes)
+    weekly_fetch_workers: int = 12
+    weekly_fetch_timeout: int = 12  # seconds
+    weekly_feed_cap_bytes: int = 300_000  # feed body cap; truncation flagged, never silent
+    weekly_junk_title_markers: tuple[str, ...] = ("factsheet", "fact sheet")  # boilerplate docs filtered pre-LLM
+    llm_max_tokens: int = 8192
     # Publishing
     publish_target: str = "netlify"
     deploy_token: str = ""
@@ -114,6 +121,13 @@ class Config:
             eval_query_slack=int(os.environ.get("EVAL_QUERY_SLACK", "2")),
             eval_max_uncovered=int(os.environ.get("EVAL_MAX_UNCOVERED", "3")),
             recurring_cron=os.environ.get("RECURRING_CRON", "0 6 * * *"),
+            weekly_fetch_workers=int(os.environ.get("FETCH_WORKERS", "12")),
+            weekly_fetch_timeout=int(os.environ.get("FETCH_TIMEOUT", "12")),
+            weekly_feed_cap_bytes=int(os.environ.get("FEED_CAP_BYTES", "300000")),
+            weekly_junk_title_markers=tuple(
+                m.strip() for m in os.environ.get("JUNK_TITLE_MARKERS", "factsheet,fact sheet").split(",") if m.strip()
+            ),
+            llm_max_tokens=int(os.environ.get("LLM_MAX_TOKENS", "8192")),
             publish_target=os.environ.get("PUBLISH_TARGET", "netlify"),
             deploy_token=os.environ.get("DEPLOY_TOKEN", ""),
         )

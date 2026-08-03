@@ -76,7 +76,7 @@ QUERY_SLACK = CFG.eval_query_slack  # extras beyond one-per-subarea (prompt: "st
 
 MAX_UNCOVERED = CFG.eval_max_uncovered  # subareas a query set may leave out and still pass
 EVAL_INTERVAL = CFG.weekly_eval_interval
-LLM_MAX_TOKENS = 8192
+LLM_MAX_TOKENS = CFG.llm_max_tokens
 
 # Coverage tokens are DERIVED from each subarea's name (distinctive words
 # minus generic stopwords), so the gate works for ANY topic — no per-topic

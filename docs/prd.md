@@ -285,6 +285,11 @@ CREATE TABLE IF NOT EXISTS feed_recommendations (
 | `PROMPT_REV` | 9 | FR-9 verdict-cache invalidation (bump on prompt change) |
 | `STORY_MAX_ANGLES` | 5 | FR-9 per-subarea story angle lines kept |
 | `STORY_MAX_QUESTIONS` | 8 | FR-9 open questions kept per topic |
+| `FETCH_WORKERS` | 12 | FR-9 feed-fetch concurrency |
+| `FETCH_TIMEOUT` | 12 | FR-9 feed-fetch timeout (s) |
+| `FEED_CAP_BYTES` | 300000 | FR-9 feed body cap (truncation flagged, never silent) |
+| `JUNK_TITLE_MARKERS` | `factsheet,fact sheet` | FR-9 boilerplate titles filtered pre-LLM |
+| `LLM_MAX_TOKENS` | 8192 | FR-9 LLM response cap |
 ## Decisions (recommendations; review before lock)
 
 | Question | Decision | Rationale |

@@ -13,6 +13,7 @@ construction: dedup L2 + URL-unique inserts mean a re-run emits no duplicates.
 
 from __future__ import annotations
 
+import contextlib
 import sys
 from typing import Any
 
@@ -89,15 +90,24 @@ class Engine:
             return 1
         # Persist + verify the exclusion set FIRST — a blacklist write that
         # doesn't stick must leave NOTHING behind (no topics seeded into a
-        # half-configured store). Then seed topics; a zero-seed rolls the
-        # blacklist back so setup is atomic in both failure directions.
-        self._memory.save_blacklist(known_domains)
-        if self._memory.blacklist() != known_domains:
-            # The failed write may have already wiped the stored set (partial
-            # DELETE+INSERT) — restore the last-good exclusion set so the
-            # recurring run keeps working, matching the zero-seed rollback.
-            self._memory.save_blacklist(previous)
-            print("FATAL: exclusion-set write incomplete — refusing to complete setup (no partial blacklist)")
+        # half-configured store). A RAISING write (DB lock, disk full) gets the
+        # same restore + FATAL, not a raw traceback (r21).
+        try:
+            self._memory.save_blacklist(known_domains)
+            if self._memory.blacklist() != known_domains:
+                # The failed write may have already wiped the stored set (partial
+                # DELETE+INSERT) — restore the last-good exclusion set so the
+                # recurring run keeps working, matching the zero-seed rollback.
+                self._memory.save_blacklist(previous)
+                print("FATAL: exclusion-set write incomplete — refusing to complete setup (no partial blacklist)")
+                return 1
+        except Exception as exc:  # noqa: BLE001 — a raising write must not escape setup()
+            with contextlib.suppress(Exception):  # a locked DB may fail the restore too (best effort)
+                self._memory.save_blacklist(previous)  # restore last-good set
+            print(
+                f"FATAL: exclusion-set write failed ({type(exc).__name__}) — "
+                "refusing to complete setup; previous blacklist restore attempted"
+            )
             return 1
         previous_topics: list[dict[str, Any]] = []
         try:
