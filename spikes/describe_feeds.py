@@ -15,13 +15,19 @@ import json
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import topic_elicitation_resumable as s  # noqa: E402
+from topic_elicitation_resumable import (  # noqa: E402  # pyright: ignore[reportImplicitRelativeImport]
+    OUT_DIR,
+    ROOT,
+    STATE_DIR,
+    sample_feed,
+)
 
-STATE = s.STATE_DIR
-OUT = s.OUT_DIR / "feed_descriptions.md"
+STATE = STATE_DIR
+OUT = OUT_DIR / "feed_descriptions.md"
 
 samples = {}
 for line in (STATE / "samples.jsonl").read_text().splitlines():
@@ -43,15 +49,20 @@ for url, reason in (assignment.get("flagged") or {}).items():
     wanted.setdefault(title, f"flagged: {reason[:60]}")
 
 
-def fetch(title: str) -> tuple[str, dict]:
+def fetch(title: str) -> tuple[str, dict[str, Any]]:
     e = samples.get(title)
     if not e:
         return title, {"url": "?", "folder": "?", "items": [], "error": "not in samples"}
-    f = s.sample_feed({"url": e["url"], "title": title, "folder": e.get("folder", "?")})
-    return title, {"url": e["url"], "folder": e.get("folder", "?"), "items": f.get("items", []), "error": f.get("error", "")}
+    f = sample_feed({"url": e["url"], "title": title, "folder": e.get("folder", "?")})
+    return title, {
+        "url": e["url"],
+        "folder": e.get("folder", "?"),
+        "items": f.get("items", []),
+        "error": f.get("error", ""),
+    }
 
 
-results: dict[str, dict] = {}
+results: dict[str, dict[str, Any]] = {}
 with ThreadPoolExecutor(max_workers=12) as ex:
     futures = [ex.submit(fetch, t) for t in wanted]
     for fut in as_completed(futures):
@@ -73,4 +84,4 @@ for title, tag in sorted(wanted.items(), key=lambda kv: kv[1]):
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text("\n".join(lines))
-print(f"described {len(wanted)} feeds -> {OUT.relative_to(s.ROOT)}")
+print(f"described {len(wanted)} feeds -> {OUT.relative_to(ROOT)}")

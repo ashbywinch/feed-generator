@@ -1,331 +1,339 @@
 {
-  "topic": "Grid & Net Zero economics",
-  "status": "needs-human",
-  "iterations": 4,
-  "approved_at": "2026-08-01",
-  "subareas": [
+ "topic": "Grid & Net Zero economics",
+ "status": "needs-human",
+ "iterations": 4,
+ "approved_at": "2026-08-01",
+ "subareas": [
+  {
+   "name": "Grid-scale batteries & storage",
+   "coverage": "strong",
+   "sources": [
     {
-      "name": "Grid-scale batteries & storage",
-      "coverage": "strong",
-      "sources": [
-        {
-          "name": "Energy-Storage.News",
-          "domain": "energy-storage.news",
-          "type": "trade press",
-          "why": "Dedicated global coverage of grid-scale battery and long-duration energy storage projects, project finance, deployments and storage economics. Correct hyphenated domain with a verified /feed.",
-          "confidence": "high",
-          "crawl_root": "https://energy-storage.news/feed"
-        },
-        {
-          "name": "Modo Energy",
-          "domain": "modoenergy.com",
-          "type": "data/analytics",
-          "why": "Industry-leading battery/grid data analytics platform; benchmark revenue, sizing and deployment analytics for UK batteries. Bot-protected, crawl via their public content feed or podcast endpoint.",
-          "confidence": "high",
-          "crawl_root": "https://modoenergy.com/transmission-podcast/feeds"
-        }
-      ]
+     "name": "Energy-Storage.News",
+     "domain": "energy-storage.news",
+     "type": "trade press",
+     "why": "Dedicated global coverage of grid-scale battery and long-duration energy storage projects, project finance, deployments and storage economics. Correct hyphenated domain with a verified /feed.",
+     "confidence": "high",
+     "crawl_root": "https://energy-storage.news/feed"
     },
     {
-      "name": "Grid connection queues & network charging",
-      "coverage": "strong",
-      "sources": [
-        {
-          "name": "Eigen Values (David Turver)",
-          "domain": "davidturver.substack.com",
-          "type": "independent blog",
-          "why": "Independent engineer analysing grid expansion, connection queues, and network bottlenecks for renewables in the UK.",
-          "confidence": "high",
-          "crawl_root": "https://davidturver.substack.com/feed"
-        },
-        {
-          "name": "Grid Capacity Intelligence",
-          "domain": "gridcapacityintelligence.substack.com",
-          "type": "newsletter",
-          "why": "Specialist newsletter on GB grid connection capacity, network constraints and available capacity data.",
-          "confidence": "medium",
-          "crawl_root": "https://gridcapacityintelligence.substack.com/feed"
-        }
-      ]
-    },
-    {
-      "name": "Ancillary services & frequency markets",
-      "coverage": "strong",
-      "sources": [
-        {
-          "name": "Elexon",
-          "domain": "elexon.co.uk",
-          "type": "regulator/data",
-          "why": "Balancing mechanism reporting service operator; publishes imbalance prices, BM data and market operational insight.",
-          "confidence": "high",
-          "crawl_root": "https://elexon.co.uk/feed"
-        }
-      ]
-    },
-    {
-      "name": "Interconnectors & market coupling",
-      "coverage": "adequate",
-      "sources": [
-        {
-          "name": "NESO (National Energy System Operator)",
-          "domain": "neso.energy",
-          "type": "data/registry",
-          "why": "GB system operator; publishes whole-systems data covering both transmission network constraints and distribution-level demand/connection data via its Data Portal, plus constraint reports, interconnector flows and balancing data. Verified public RSS feed at /rss.xml.",
-          "confidence": "high",
-          "crawl_root": "https://neso.energy/rss.xml"
-        },
-        {
-          "name": "Energy Monitor",
-          "domain": "energymonitor.ai",
-          "type": "newsletter/trade press",
-          "why": "Covers interconnectors, market integration and European power trading developments.",
-          "confidence": "high",
-          "crawl_root": "https://energymonitor.ai/feed"
-        }
-      ]
-    },
-    {
-      "name": "CfD auctions & capacity market (policy)",
-      "coverage": "strong",
-      "sources": [
-        {
-          "name": "Current News",
-          "domain": "current-news.co.uk",
-          "type": "trade press",
-          "why": "Dedicated UK energy policy news covering CfD Allocation Rounds, capacity market auctions, and DESNZ policy announcements.",
-          "confidence": "high",
-          "crawl_root": "https://evinfrastructurenews.com/rss.xml"
-        },
-        {
-          "name": "Electrical News",
-          "domain": "electricalnews.co.uk",
-          "type": "trade press",
-          "why": "UK energy sector trade news with strong coverage of CfD and capacity market outcomes and government energy policy.",
-          "confidence": "high",
-          "crawl_root": "https://electricalnews.co.uk/feed"
-        }
-      ]
-    },
-    {
-      "name": "Demand-side flexibility & electrification demand growth",
-      "coverage": "adequate",
-      "sources": [
-        {
-          "name": "GridBeyond",
-          "domain": "gridbeyond.com",
-          "type": "company/analytics blog",
-          "why": "Demand-side flexibility and grid balancing technology provider publishing market analytics on flexibility markets.",
-          "confidence": "medium",
-          "crawl_root": "https://gridbeyond.com/feed"
-        }
-      ]
-    },
-    {
-      "name": "Nuclear new-build economics (RAB, CfDs, SMRs)",
-      "coverage": "adequate",
-      "sources": [
-        {
-          "name": "Clean Energy Pipeline",
-          "domain": "cleanenergypipeline.com",
-          "type": "data/trade press",
-          "why": "Global clean energy deal tracking including nuclear new-build financing, SMR funding rounds and project pipelines.",
-          "confidence": "high",
-          "crawl_root": "https://cleanenergypipeline.com/feed"
-        },
-        {
-          "name": "Oxera",
-          "domain": "oxera.com",
-          "type": "think tank/consultancy",
-          "why": "Economic consultancy publishing rigorous analysis of RAB funding models, nuclear CfDs and network price controls.",
-          "confidence": "high",
-          "crawl_root": "https://oxera.com/feed"
-        }
-      ]
-    },
-    {
-      "name": "Storage beyond lithium-ion (CAES, thermal, gravity, flow)",
-      "coverage": "adequate",
-      "sources": [
-        {
-          "name": "LDES Council",
-          "domain": "ldescouncil.com",
-          "type": "industry association",
-          "why": "The Long Duration Energy Storage Council — the dedicated global body for LDES (CAES, thermal, gravity, flow) covering member deployments, emerging-technology announcements, hyperscale data-centre load and EU/GB LDES policy support. Verified RSS feed. Replaces the generic renewables source for this subarea.",
-          "confidence": "high",
-          "crawl_root": "https://ldescouncil.com/feed"
-        }
-      ]
-    },
-    {
-      "name": "Offshore wind",
-      "coverage": "adequate",
-      "sources": [
-        {
-          "name": "WindEurope",
-          "domain": "windeurope.org",
-          "type": "industry association/data",
-          "why": "European wind industry body publishing offshore wind market data, auction results and policy analysis.",
-          "confidence": "high",
-          "crawl_root": "https://windeurope.org/feed"
-        },
-        {
-          "name": "offshoreWIND.biz",
-          "domain": "offshorewind.biz",
-          "type": "trade press",
-          "why": "Dedicated global offshore wind trade publication covering project milestones, CfD/auction round outcomes, vessel and turbine supply-chain economics and transmission/farm build-out news. Verified RSS feed. Replaces the generic renewables source for this subarea.",
-          "confidence": "high",
-          "crawl_root": "https://offshorewind.biz/feed"
-        }
-      ]
-    },
-    {
-      "name": "Carbon markets / ETS & climate-economics data",
-      "coverage": "adequate",
-      "sources": [
-        {
-          "name": "Energy-Stats UK",
-          "domain": "energy-stats.uk",
-          "type": "data/analytics",
-          "why": "UK electricity statistics and carbon intensity data feed with daily generation and emissions tracking.",
-          "confidence": "high",
-          "crawl_root": "https://energy-stats.uk/feed"
-        }
-      ]
-    },
-    {
-      "name": "Regulation, market design & price controls",
-      "coverage": "strong",
-      "sources": [
-        {
-          "name": "Ofgem",
-          "domain": "ofgem.gov.uk",
-          "type": "regulator",
-          "why": "UK energy regulator publishing price control determinations, RIIO network settlements and retail price cap decisions.",
-          "confidence": "high",
-          "crawl_root": "https://ofgem.gov.uk/rss.xml"
-        }
-      ]
-    },
-    {
-      "name": "Distribution vs transmission & grid data analytics",
-      "coverage": "adequate",
-      "sources": [
-        {
-          "name": "NESO (National Energy System Operator)",
-          "domain": "neso.energy",
-          "type": "data/registry",
-          "why": "GB system operator; publishes whole-systems data covering both transmission network constraints and distribution-level demand/connection data via its Data Portal, plus constraint reports, interconnector flows and balancing data. Verified public RSS feed at /rss.xml.",
-          "confidence": "high",
-          "crawl_root": "https://neso.energy/rss.xml"
-        },
-        {
-          "name": "Energy-Stats UK",
-          "domain": "energy-stats.uk",
-          "type": "data/analytics",
-          "why": "Live GB electricity grid statistics including generation mix, demand and carbon intensity.",
-          "confidence": "high",
-          "crawl_root": "https://energy-stats.uk/feed"
-        }
-      ]
-    },
-    {
-      "name": "Hydrogen for power",
-      "coverage": "adequate",
-      "sources": [
-        {
-          "name": "Energy Monitor",
-          "domain": "energymonitor.ai",
-          "type": "newsletter/trade press",
-          "why": "Covers hydrogen-to-power policy, hydrogen production economics and power-sector decarbonisation pathways.",
-          "confidence": "high",
-          "crawl_root": "https://energymonitor.ai/feed"
-        },
-        {
-          "name": "Hydrogen Central",
-          "domain": "hydrogen-central.com",
-          "type": "trade/news",
-          "why": "Daily hydrogen industry news covering hydrogen-to-power projects, hydrogen production economics, government hydrogen programmes and power-sector decarbonisation. Verified feed.",
-          "confidence": "medium",
-          "crawl_root": "https://hydrogen-central.com/feed"
-        }
-      ]
+     "name": "Modo Energy",
+     "domain": "modoenergy.com",
+     "type": "data/analytics",
+     "why": "Industry-leading battery/grid data analytics platform; benchmark revenue, sizing and deployment analytics for UK batteries. Bot-protected, crawl via their public content feed or podcast endpoint.",
+     "confidence": "high",
+     "crawl_root": "https://modoenergy.com/transmission-podcast/feeds"
     }
-  ],
-  "registries": [
+   ]
+  },
+  {
+   "name": "Grid connection queues & network charging",
+   "coverage": "strong",
+   "sources": [
     {
-      "name": "Elexon Balancing Mechanism Reporting Service (BMRS)",
-      "domain": "bmrs.elexon.co.uk",
-      "type": "data/API",
-      "why": "Structured real-time and historic balancing mechanism, imbalance price and ancillary service data.",
-      "endpoint": "https://developer.data.elexon.co.uk/api-details",
-      "confidence": "high"
+     "name": "Eigen Values (David Turver)",
+     "domain": "davidturver.substack.com",
+     "type": "independent blog",
+     "why": "Independent engineer analysing grid expansion, connection queues, and network bottlenecks for renewables in the UK.",
+     "confidence": "high",
+     "crawl_root": "https://davidturver.substack.com/feed"
     },
     {
-      "name": "National Grid ESO Data Portal",
-      "domain": "nationalgrideso.com/data-portal",
-      "type": "data/registry",
-      "why": "Transmission network constraints, interconnector flows and system balancing data.",
-      "endpoint": "https://www.nationalgrideso.com/data-portal",
-      "confidence": "high"
-    },
-    {
-      "name": "Ofgem",
-      "domain": "ofgem.gov.uk",
-      "type": "regulator",
-      "why": "Price control determinations, RIIO settlements, and market design consultations.",
-      "confidence": "high"
-    },
-    {
-      "name": "LCCC CfD Counterparty",
-      "domain": "lccc.org.uk",
-      "type": "regulator/counterparty",
-      "why": "CfD auction results, strike prices, and scheme payment data.",
-      "confidence": "high"
-    },
-    {
-      "name": "OpenAlex",
-      "domain": "api.openalex.org",
-      "type": "academic/API",
-      "why": "Open scholarly index for peer-reviewed research on grid economics, storage tech and net-zero modelling (used as crawl endpoint for journal content).",
-      "confidence": "high"
-    },
-    {
-      "name": "Elexon Insights Data Platform",
-      "domain": "insights.elexon.co.uk",
-      "type": "data/registry",
-      "why": "Aggregated UK electricity generation and market insight dashboards.",
-      "confidence": "medium"
+     "name": "Grid Capacity Intelligence",
+     "domain": "gridcapacityintelligence.substack.com",
+     "type": "newsletter",
+     "why": "Specialist newsletter on GB grid connection capacity, network constraints and available capacity data.",
+     "confidence": "medium",
+     "crawl_root": "https://gridcapacityintelligence.substack.com/feed"
     }
-  ],
-  "queries": [
-    "GB grid connection queue statistics",
-    "UK CfD allocation round results strike prices",
-    "long-duration energy storage LDES project economics",
-    "ancillary services frequency response market GB prices",
-    "interconnector flows market coupling NEMO reports"
-  ],
-  "news_vs_analysis": "news",
-  "notes": "Modo Energy and National Grid ESO are core to the topic but are bot-protected; crawler should target their public data endpoints and podcast feed URLs rather than homepage. current-news.co.uk serves its feed via evinfrastructurenews.com/rss.xml. Elexon BMRS API is the definitive structured source for balancing data. LCCC uses lccc.org.uk (lccc.uk fails DNS). DESNZ content is accessible via gov.uk rather than desnz.gov.uk which fails DNS.",
-  "review_record": {
-    "findings": [
-      {
-        "severity": "minor",
-        "area": "duplicates",
-        "issue": "domain neso.energy also under 'Interconnectors & market coupling'",
-        "suggestion": "reuse across subareas is fine; exact duplicates are noise"
-      },
-      {
-        "severity": "minor",
-        "area": "duplicates",
-        "issue": "domain energy-stats.uk also under 'Carbon markets / ETS & climate-economics data'",
-        "suggestion": "reuse across subareas is fine; exact duplicates are noise"
-      },
-      {
-        "severity": "minor",
-        "area": "duplicates",
-        "issue": "domain energymonitor.ai also under 'Interconnectors & market coupling'",
-        "suggestion": "reuse across subareas is fine; exact duplicates are noise"
-      }
-    ]
+   ]
+  },
+  {
+   "name": "Ancillary services & frequency markets",
+   "coverage": "strong",
+   "sources": [
+    {
+     "name": "Elexon",
+     "domain": "elexon.co.uk",
+     "type": "regulator/data",
+     "why": "Balancing mechanism reporting service operator; publishes imbalance prices, BM data and market operational insight.",
+     "confidence": "high",
+     "crawl_root": "https://elexon.co.uk/feed"
+    }
+   ]
+  },
+  {
+   "name": "Interconnectors & market coupling",
+   "coverage": "adequate",
+   "sources": [
+    {
+     "name": "NESO (National Energy System Operator)",
+     "domain": "neso.energy",
+     "type": "data/registry",
+     "why": "GB system operator; publishes whole-systems data covering both transmission network constraints and distribution-level demand/connection data via its Data Portal, plus constraint reports, interconnector flows and balancing data. Verified public RSS feed at /rss.xml.",
+     "confidence": "high",
+     "crawl_root": "https://neso.energy/rss.xml"
+    },
+    {
+     "name": "Energy Monitor",
+     "domain": "energymonitor.ai",
+     "type": "newsletter/trade press",
+     "why": "Covers interconnectors, market integration and European power trading developments.",
+     "confidence": "high",
+     "crawl_root": "https://energymonitor.ai/feed"
+    }
+   ]
+  },
+  {
+   "name": "CfD auctions & capacity market (policy)",
+   "coverage": "strong",
+   "sources": [
+    {
+     "name": "Current News",
+     "domain": "current-news.co.uk",
+     "type": "trade press",
+     "why": "Dedicated UK energy policy news covering CfD Allocation Rounds, capacity market auctions, and DESNZ policy announcements.",
+     "confidence": "high",
+     "crawl_root": "https://evinfrastructurenews.com/rss.xml"
+    },
+    {
+     "name": "Electrical News",
+     "domain": "electricalnews.co.uk",
+     "type": "trade press",
+     "why": "UK energy sector trade news with strong coverage of CfD and capacity market outcomes and government energy policy.",
+     "confidence": "high",
+     "crawl_root": "https://electricalnews.co.uk/feed"
+    }
+   ]
+  },
+  {
+   "name": "Demand-side flexibility & electrification demand growth",
+   "coverage": "adequate",
+   "sources": [
+    {
+     "name": "GridBeyond",
+     "domain": "gridbeyond.com",
+     "type": "company/analytics blog",
+     "why": "Demand-side flexibility and grid balancing technology provider publishing market analytics on flexibility markets.",
+     "confidence": "medium",
+     "crawl_root": "https://gridbeyond.com/feed"
+    }
+   ]
+  },
+  {
+   "name": "Nuclear new-build economics (RAB, CfDs, SMRs)",
+   "coverage": "adequate",
+   "sources": [
+    {
+     "name": "Clean Energy Pipeline",
+     "domain": "cleanenergypipeline.com",
+     "type": "data/trade press",
+     "why": "Global clean energy deal tracking including nuclear new-build financing, SMR funding rounds and project pipelines.",
+     "confidence": "high",
+     "crawl_root": "https://cleanenergypipeline.com/feed"
+    },
+    {
+     "name": "Oxera",
+     "domain": "oxera.com",
+     "type": "think tank/consultancy",
+     "why": "Economic consultancy publishing rigorous analysis of RAB funding models, nuclear CfDs and network price controls.",
+     "confidence": "high",
+     "crawl_root": "https://oxera.com/feed"
+    }
+   ]
+  },
+  {
+   "name": "Storage beyond lithium-ion (CAES, thermal, gravity, flow)",
+   "coverage": "adequate",
+   "sources": [
+    {
+     "name": "LDES Council",
+     "domain": "ldescouncil.com",
+     "type": "industry association",
+     "why": "The Long Duration Energy Storage Council \u2014 the dedicated global body for LDES (CAES, thermal, gravity, flow) covering member deployments, emerging-technology announcements, hyperscale data-centre load and EU/GB LDES policy support. Verified RSS feed. Replaces the generic renewables source for this subarea.",
+     "confidence": "high",
+     "crawl_root": "https://ldescouncil.com/feed"
+    }
+   ]
+  },
+  {
+   "name": "Offshore wind",
+   "coverage": "adequate",
+   "sources": [
+    {
+     "name": "WindEurope",
+     "domain": "windeurope.org",
+     "type": "industry association/data",
+     "why": "European wind industry body publishing offshore wind market data, auction results and policy analysis.",
+     "confidence": "high",
+     "crawl_root": "https://windeurope.org/feed"
+    },
+    {
+     "name": "offshoreWIND.biz",
+     "domain": "offshorewind.biz",
+     "type": "trade press",
+     "why": "Dedicated global offshore wind trade publication covering project milestones, CfD/auction round outcomes, vessel and turbine supply-chain economics and transmission/farm build-out news. Verified RSS feed. Replaces the generic renewables source for this subarea.",
+     "confidence": "high",
+     "crawl_root": "https://offshorewind.biz/feed"
+    }
+   ]
+  },
+  {
+   "name": "Carbon markets / ETS & climate-economics data",
+   "coverage": "adequate",
+   "sources": [
+    {
+     "name": "Energy-Stats UK",
+     "domain": "energy-stats.uk",
+     "type": "data/analytics",
+     "why": "UK electricity statistics and carbon intensity data feed with daily generation and emissions tracking.",
+     "confidence": "high",
+     "crawl_root": "https://energy-stats.uk/feed"
+    }
+   ]
+  },
+  {
+   "name": "Regulation, market design & price controls",
+   "coverage": "strong",
+   "sources": [
+    {
+     "name": "Ofgem",
+     "domain": "ofgem.gov.uk",
+     "type": "regulator",
+     "why": "UK energy regulator publishing price control determinations, RIIO network settlements and retail price cap decisions.",
+     "confidence": "high",
+     "crawl_root": "https://ofgem.gov.uk/rss.xml"
+    }
+   ]
+  },
+  {
+   "name": "Distribution vs transmission & grid data analytics",
+   "coverage": "adequate",
+   "sources": [
+    {
+     "name": "NESO (National Energy System Operator)",
+     "domain": "neso.energy",
+     "type": "data/registry",
+     "why": "GB system operator; publishes whole-systems data covering both transmission network constraints and distribution-level demand/connection data via its Data Portal, plus constraint reports, interconnector flows and balancing data. Verified public RSS feed at /rss.xml.",
+     "confidence": "high",
+     "crawl_root": "https://neso.energy/rss.xml"
+    },
+    {
+     "name": "Energy-Stats UK",
+     "domain": "energy-stats.uk",
+     "type": "data/analytics",
+     "why": "Live GB electricity grid statistics including generation mix, demand and carbon intensity.",
+     "confidence": "high",
+     "crawl_root": "https://energy-stats.uk/feed"
+    }
+   ]
+  },
+  {
+   "name": "Hydrogen for power",
+   "coverage": "adequate",
+   "sources": [
+    {
+     "name": "Energy Monitor",
+     "domain": "energymonitor.ai",
+     "type": "newsletter/trade press",
+     "why": "Covers hydrogen-to-power policy, hydrogen production economics and power-sector decarbonisation pathways.",
+     "confidence": "high",
+     "crawl_root": "https://energymonitor.ai/feed"
+    },
+    {
+     "name": "Hydrogen Central",
+     "domain": "hydrogen-central.com",
+     "type": "trade/news",
+     "why": "Daily hydrogen industry news covering hydrogen-to-power projects, hydrogen production economics, government hydrogen programmes and power-sector decarbonisation. Verified feed.",
+     "confidence": "medium",
+     "crawl_root": "https://hydrogen-central.com/feed"
+    }
+   ]
   }
+ ],
+ "registries": [
+  {
+   "name": "Elexon Balancing Mechanism Reporting Service (BMRS)",
+   "domain": "bmrs.elexon.co.uk",
+   "type": "data/API",
+   "why": "Structured real-time and historic balancing mechanism, imbalance price and ancillary service data.",
+   "endpoint": "https://developer.data.elexon.co.uk/api-details",
+   "confidence": "high"
+  },
+  {
+   "name": "National Grid ESO Data Portal",
+   "domain": "nationalgrideso.com/data-portal",
+   "type": "data/registry",
+   "why": "Transmission network constraints, interconnector flows and system balancing data.",
+   "endpoint": "https://www.nationalgrideso.com/data-portal",
+   "confidence": "high"
+  },
+  {
+   "name": "Ofgem",
+   "domain": "ofgem.gov.uk",
+   "type": "regulator",
+   "why": "Price control determinations, RIIO settlements, and market design consultations.",
+   "confidence": "high"
+  },
+  {
+   "name": "LCCC CfD Counterparty",
+   "domain": "lccc.org.uk",
+   "type": "regulator/counterparty",
+   "why": "CfD auction results, strike prices, and scheme payment data.",
+   "confidence": "high"
+  },
+  {
+   "name": "OpenAlex",
+   "domain": "api.openalex.org",
+   "type": "academic/API",
+   "why": "Open scholarly index for peer-reviewed research on grid economics, storage tech and net-zero modelling (used as crawl endpoint for journal content).",
+   "confidence": "high"
+  },
+  {
+   "name": "Elexon Insights Data Platform",
+   "domain": "insights.elexon.co.uk",
+   "type": "data/registry",
+   "why": "Aggregated UK electricity generation and market insight dashboards.",
+   "confidence": "medium"
+  }
+ ],
+ "queries": [
+  "grid-scale battery storage revenue streams market maturity",
+  "grid connection queue statistics renewable projects",
+  "ancillary services frequency regulation market design",
+  "interconnector capacity auction results market coupling",
+  "renewable energy support scheme auction results policy",
+  "demand-side flexibility market design electrification",
+  "nuclear new-build economics financing models",
+  "long-duration energy storage CAES thermal gravity flow",
+  "offshore wind auction results technology trends",
+  "carbon market prices ETS climate economics data",
+  "electricity market design price controls regulation",
+  "distribution grid data analytics congestion management",
+  "hydrogen for power generation economics"
+ ],
+ "news_vs_analysis": "news",
+ "notes": "Modo Energy and National Grid ESO are core to the topic but are bot-protected; crawler should target their public data endpoints and podcast feed URLs rather than homepage. current-news.co.uk serves its feed via evinfrastructurenews.com/rss.xml. Elexon BMRS API is the definitive structured source for balancing data. LCCC uses lccc.org.uk (lccc.uk fails DNS). DESNZ content is accessible via gov.uk rather than desnz.gov.uk which fails DNS.",
+ "review_record": {
+  "findings": [
+   {
+    "severity": "minor",
+    "area": "duplicates",
+    "issue": "domain neso.energy also under 'Interconnectors & market coupling'",
+    "suggestion": "reuse across subareas is fine; exact duplicates are noise"
+   },
+   {
+    "severity": "minor",
+    "area": "duplicates",
+    "issue": "domain energy-stats.uk also under 'Carbon markets / ETS & climate-economics data'",
+    "suggestion": "reuse across subareas is fine; exact duplicates are noise"
+   },
+   {
+    "severity": "minor",
+    "area": "duplicates",
+    "issue": "domain energymonitor.ai also under 'Interconnectors & market coupling'",
+    "suggestion": "reuse across subareas is fine; exact duplicates are noise"
+   }
+  ]
+ }
 }

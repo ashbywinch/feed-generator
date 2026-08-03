@@ -52,6 +52,7 @@ import xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import feedparser
 import requests
@@ -103,11 +104,13 @@ APPEND_LOCK = threading.Lock()  # serialize JSONL appends from worker threads
 QUOTA_DEAD = threading.Event()  # set when embedding 429s persist: stop, exit clean, resume later
 
 
-def parse_opml(path: Path) -> list[dict]:
+def parse_opml(path: Path) -> list[dict[str, Any]]:
     """FR-1: feeds with folder, title, xmlUrl. URL-shaped categories are junk, never topics."""
     root = ET.parse(path).getroot()
     body = root.find("body")
-    feeds: list[dict] = []
+    if body is None:
+        return []
+    feeds: list[dict[str, Any]] = []
     seen: set[str] = set()
     for cat in body.findall("outline"):
         folder = cat.get("text") or cat.get("title") or "Uncategorized"
@@ -126,9 +129,10 @@ def parse_opml(path: Path) -> list[dict]:
 
 # --- disk cache helpers ---------------------------------------------------
 
-def load_samples() -> dict[str, dict]:
+
+def load_samples() -> dict[str, dict[str, Any]]:
     """url -> latest cached sample entry (last line per url wins)."""
-    out: dict[str, dict] = {}
+    out: dict[str, dict[str, Any]] = {}
     if not SAMPLES_PATH.exists():
         return out
     for line in SAMPLES_PATH.read_text(encoding="utf-8").splitlines():
@@ -142,12 +146,12 @@ def load_samples() -> dict[str, dict]:
     return out
 
 
-def append_sample(entry: dict) -> None:
+def append_sample(entry: dict[str, Any]) -> None:
     with APPEND_LOCK, SAMPLES_PATH.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
-def sample_age(cached: dict) -> float:
+def sample_age(cached: dict[str, Any]) -> float:
     """Seconds since the cached sample was taken; unknown age retries."""
     try:
         return time.time() - datetime.fromisoformat(cached["sampled_at"]).timestamp()
@@ -177,7 +181,7 @@ def append_embeddings(fragments: list[str], vecs: list[list[float]]) -> None:
         fh.write(json.dumps({"fragments": fragments, "embeddings": vecs}, ensure_ascii=False) + "\n")
 
 
-def load_names() -> dict[str, dict]:
+def load_names() -> dict[str, dict[str, Any]]:
     if not NAMES_PATH.exists():
         return {}
     try:
@@ -187,7 +191,7 @@ def load_names() -> dict[str, dict]:
         return {}
 
 
-def save_names(names: dict[str, dict]) -> None:
+def save_names(names: dict[str, dict[str, Any]]) -> None:
     """Atomic replace so a crash never corrupts the whole cache."""
     tmp = NAMES_PATH.with_suffix(".tmp")
     tmp.write_text(json.dumps(names, indent=2, ensure_ascii=False) + "\n")
@@ -214,12 +218,13 @@ def save_integrity(flagged: dict[str, str]) -> None:
     tmp.replace(INTEGRITY_PATH)
 
 
-def cluster_signature(cluster: list[dict]) -> str:
+def cluster_signature(cluster: list[dict[str, Any]]) -> str:
     """Stable cache key for a cluster: its sorted feed URLs."""
     return json.dumps(sorted(f["url"] for f in cluster), ensure_ascii=False)
 
 
 # --- pipeline steps ---------------------------------------------------------
+
 
 class RateLimiter:
     """Thread-safe global pacing: at most one call per `interval` seconds.
@@ -285,7 +290,7 @@ def smoke_test() -> None:
     print("      ok")
 
 
-def sample_feed(feed: dict) -> dict:
+def sample_feed(feed: dict[str, Any]) -> dict[str, Any]:
     """Fetch recent item titles with a hard timeout. Dead feeds are tolerated.
 
     Never feedparser.parse(url) — it fetches with NO timeout and hung the
@@ -320,9 +325,7 @@ def embed_batch(texts: list[str], limiter: RateLimiter) -> list[list[float]]:
     backoff. Errors are sanitized so a key can never be echoed.
     """
     url = f"{EMB_BASE}/models/{EMB_MODEL}:batchEmbedContents"
-    payload = {
-        "requests": [{"model": f"models/{EMB_MODEL}", "content": {"parts": [{"text": t}]}} for t in texts]
-    }
+    payload = {"requests": [{"model": f"models/{EMB_MODEL}", "content": {"parts": [{"text": t}]}} for t in texts]}
     last_exc: Exception | None = None
     for attempt in range(4):
         try:
@@ -360,29 +363,30 @@ def spherical_kmeans(vecs: list[list[float]], k: int, iters: int = 25, seed: int
     """
     import numpy as np  # noqa: PLC0415 — spike-only dep; fail at call, not import
 
-    X = np.asarray(vecs, dtype=np.float64)
-    norms = np.linalg.norm(X, axis=1, keepdims=True)
-    X = X / np.where(norms == 0, 1, norms)
+    x = np.asarray(vecs, dtype=np.float64)
+    norms = np.linalg.norm(x, axis=1, keepdims=True)
+    x = x / np.where(norms == 0, 1, norms)
     rng = np.random.default_rng(seed)
-    n = len(X)
-    centroids = [X[rng.integers(n)]]
+    n = len(x)
+    centroids = [x[rng.integers(n)]]
     for _ in range(k - 1):
-        d2 = np.clip(1.0 - X @ np.asarray(centroids).T, 0, None)  # 1-cos can go tiny-negative
+        d2 = np.clip(1.0 - x @ np.asarray(centroids).T, 0, None)  # 1-cos can go tiny-negative
         d2 = np.clip(d2.min(axis=1), 1e-12, None)  # guard all-zero (degenerate) case
         probs = d2 / d2.sum()
-        centroids.append(X[rng.choice(n, p=probs)])
-    C = np.asarray(centroids)
+        centroids.append(x[rng.choice(n, p=probs)])
+    c = np.asarray(centroids)
+    labels: np.ndarray = np.empty(0, dtype=int)
     for _ in range(iters):
-        labels = (X @ C.T).argmax(axis=1)
-        new_C = np.array([X[labels == i].mean(axis=0) if np.any(labels == i) else C[i] for i in range(k)])
-        new_C = new_C / np.linalg.norm(new_C, axis=1, keepdims=True)
-        if np.allclose(C, new_C, atol=1e-6):
+        labels = (x @ c.T).argmax(axis=1)
+        new_c = np.array([x[labels == i].mean(axis=0) if np.any(labels == i) else c[i] for i in range(k)])
+        new_c = new_c / np.linalg.norm(new_c, axis=1, keepdims=True)
+        if np.allclose(c, new_c, atol=1e-6):
             break
-        C = new_C
+        c = new_c
     return labels.tolist()
 
 
-def check_feed_integrity(feeds: list[dict], limiter: RateLimiter) -> dict[str, str]:
+def check_feed_integrity(feeds: list[dict[str, Any]], limiter: RateLimiter) -> dict[str, str]:
     """Flag feeds whose recent items are off-topic vs their title.
 
     Domain takeover is real: a dead cooking blog's feedburner URL now emits
@@ -434,15 +438,15 @@ Respond with STRICT JSON only, one entry per feed IN ORDER:
 
 
 def split_oversized(
-    clusters: list[list[dict]], emb_cache: dict[str, list[float]], max_size: int = 15, depth: int = 0
-) -> list[list[dict]]:
+    clusters: list[list[dict[str, Any]]], emb_cache: dict[str, list[float]], max_size: int = 15, depth: int = 0
+) -> list[list[dict[str, Any]]]:
     """Recursively split clusters above max_size with their own k-means pass.
 
     One k over the whole corpus leaves a stubborn "professional/opinion blob"
     (29 feeds: 9 energy, 5 business, 3 stories ...) — all hug one centroid.
     Re-clustering the blob's own fragments breaks it into sub-themes.
     """
-    out: list[list[dict]] = []
+    out: list[list[dict[str, Any]]] = []
     for cl in clusters:
         if len(cl) > max_size and depth < 2:
             member_texts = [item for f in cl for item in f["items"]] + [f["title"] for f in cl]
@@ -453,7 +457,7 @@ def split_oversized(
             for f in cl:
                 frag[id(f)] = sub_labels[idx : idx + len(f["items"]) + 1]
                 idx += len(f["items"]) + 1
-            sub_map: dict[int, list[dict]] = {}
+            sub_map: dict[int, list[dict[str, Any]]] = {}
             for f in cl:
                 votes = frag[id(f)]
                 best = max(set(votes), key=votes.count)
@@ -464,7 +468,7 @@ def split_oversized(
     return out
 
 
-def name_cluster(cluster: list[dict]) -> dict:
+def name_cluster(cluster: list[dict[str, Any]]) -> dict[str, Any]:
     evidence = []
     for f in cluster[:10]:
         items = "; ".join(f["items"][:3]) if f.get("items") else "(no items)"
@@ -526,7 +530,7 @@ def main() -> None:
     samples = load_samples()
 
     # Reuse cached samples; only fetch uncached feeds and stale failures.
-    to_fetch: list[dict] = []
+    to_fetch: list[dict[str, Any]] = []
     for f in feeds:
         cached = samples.get(f["url"])
         if cached is None:
@@ -583,7 +587,7 @@ def main() -> None:
         print(f"      no suspicious feeds ({audit_note})")
 
     fragments: list[str] = []
-    frag_feed: list[dict] = []
+    frag_feed: list[dict[str, Any]] = []
     for f in ok:
         for item in f["items"]:
             fragments.append(item)
@@ -659,8 +663,8 @@ def main() -> None:
     for f in ok:
         frag_labels[id(f)] = item_labels[idx : idx + len(f["items"]) + 1]  # items + title
         idx += len(f["items"]) + 1
-    topic_map: dict[int, dict] = {}
-    ambiguous: list[dict] = []
+    topic_map: dict[int, dict[str, Any]] = {}
+    ambiguous: list[dict[str, Any]] = []
     for f in ok:
         votes = frag_labels[id(f)]
         best = max(set(votes), key=votes.count)
@@ -678,11 +682,11 @@ def main() -> None:
         print(f"      WARNING: largest topic is {sizes[0]}/{len(ok)} feeds — consider higher k")
 
     names = load_names()
-    named: list[dict] = []
+    named: list[dict[str, Any]] = []
     print(f"[5/6] naming {len(clusters)} topics ({len(names)} cached names loaded) ...")
     naming_limiter = RateLimiter(NAMING_INTERVAL)
     names_lock = threading.Lock()
-    nq: queue.Queue[list[dict] | None] = queue.Queue()
+    nq: queue.Queue[list[dict[str, Any]] | None] = queue.Queue()
     for cl in clusters:
         nq.put(cl)
     for _ in range(NAMING_WORKERS):
@@ -698,8 +702,9 @@ def main() -> None:
                 sig = cluster_signature(cl)
                 with names_lock:
                     cached = names.get(sig)
+                info: dict[str, Any] = dict(cached) if cached is not None else {}
+                note = ""
                 if cached is not None:
-                    info = dict(cached)
                     note = "cached"
                 else:
                     if len(cl) == 1:

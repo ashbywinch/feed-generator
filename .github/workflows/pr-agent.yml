@@ -17,3 +17,16 @@ jobs:
           OPENAI_KEY: ${{ secrets.FEED_GENERATOR_API_KEY }}
           OPENAI_BASE_URL: https://opencode.ai/zen/go/v1
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Fail loud: fail the PR when no "PR Reviewer Guide" comment covers the
+      # head commit. Match the FULL and SHORT sha (the bot posts the short
+      # one), token-bounded so unrelated hex strings can't false-positive.
+      - name: Fail loud if no review covers the head commit
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SHA="${{ github.event.pull_request.head.sha }}"
+          if ! gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+              --jq '.[].body' | grep -qE "(^|[^0-9a-f])($SHA|${SHA:0:7})([^0-9a-f]|$)"; then
+            echo "::error::AI review did not post for commit $SHA — the review may have failed silently."
+            exit 1
+          fi

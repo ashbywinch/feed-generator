@@ -8,7 +8,8 @@ dependencies = [
     "requests>=2.32.0",
     "feedparser>=6.0.11",
     "feedgen>=1.0.0",
-    "python-dotenv>=1.0.0",
+    "python-dotenv>=1.2.2",
+    "numpy>=2.0.0",
 ]
 
 [dependency-groups]
@@ -46,8 +47,9 @@ addopts = ["-m", "not e2e"]
 omit = ["*/__main__.py"]
 
 [tool.basedpyright]
-# bare `basedpyright` is config-driven (no subcommand). Scope analysis to
-# the package + tests: spikes/ are one-off scratch (runnable via `make
-# spike`, not type-gated), and setting `exclude` alone drops the implicit
-# .venv exclusion, exploding the scan.
-include = ["signalflow", "tests"]
+# bare `basedpyright` is config-driven (no subcommand). Scope analysis to the
+# whole repo — signalflow, tests, AND spikes: no code is excluded from gates.
+# `exclude` alone would drop the implicit .venv exclusion, exploding the scan.
+include = ["signalflow", "tests", "spikes"]
+# Local stubs for deps without published types (feedparser has none in typeshed).
+stubPath = "typings"

@@ -1,6 +1,6 @@
 # Data Centers / AI / macro — Discovery Source List
 
-Status: needs-human by reviewer loop (iteration 1). 10 subareas, 27 sources, 5 queries. Generated 2026-08-01.
+Status: needs-human by reviewer loop (iteration 1). 10 subareas, 27 sources, 10 queries. Generated 2026-08-01.
 
 ## Subareas
 ### 1. Data center construction & buildout
@@ -109,11 +109,16 @@ Government programs, export-control policy, and geopolitical analysis of the AI 
 - **SIA Market Data / Databook** (`semiconductors.org`) — Standard registry for global semiconductor revenue and shipment data, feeding chip-demand tracking for AI buildout.
 
 ## Queries
-1. data center gigawatts announced versus built
-2. hyperscaler AI capex guidance quarterly tracking
-3. AI silicon export controls H20 rare earth supply chain
-4. data center grid interconnection queue power bottleneck
-5. AI infrastructure financing debt credit pipeline buildout
+1. hyperscale data center construction delays
+2. advanced chip export controls semiconductor supply chain
+3. AI market concentration GPU demand model economics
+4. AI infrastructure financing debt equity cycles
+5. data center power grid interconnection bottleneck
+6. hyperscaler capex guidance quarterly spending
+7. AI infrastructure project finance credit pipeline
+8. semiconductor shipment revenue data industry
+9. AI compute policy geopolitical think tank
+10. AI capex investment cycle financing trends
 
 ## News vs analysis
 {'news': 'gentic.news, datacenterknowledge.com, datacenterdynamics.com track concrete buildout/capacity events.', 'analysis': 'SemiAnalysis, 404K Research, Street Alpha, Capital & Compute, Wheelie Investor, Terrain Labs, Dirt to Data, Grid Capacity Intelligence, Infrastructure Research, Alex Lanin, CSIS provide first-principles analysis.'}

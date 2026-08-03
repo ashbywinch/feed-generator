@@ -1,14 +1,21 @@
-"""FR-8: daily engine orchestration + CLI.
+"""FR-8: recurring engine orchestration + CLI.
 
-One daily run: parse OPML -> (topic model already seeded from elicitation)
--> discover (registries + Exa per topic strategy) -> dedup (4 layers) ->
-store -> digest -> publish -> prune. Idempotent by construction: dedup L2 +
-URL-unique inserts mean a re-run emits no duplicates.
+Setup (one-and-done, FR-1/FR-2): `python -m signalflow setup` parses the OPML
+and persists the exclusion set + curated topics. Re-run setup only when the
+user adds/removes a topic.
+
+Recurring run (default daily; weekly if yield thin): `python -m signalflow run`
+executes the STORED strategies — discover (registries + Exa per topic strategy)
++ feed selection (FR-9) -> dedup (4 layers) -> store -> digest -> publish ->
+prune. It never re-derives topics or re-parses the OPML. Idempotent by
+construction: dedup L2 + URL-unique inserts mean a re-run emits no duplicates.
 """
 
 from __future__ import annotations
 
+import contextlib
 import sys
+from typing import Any
 
 from .config import Config
 from .dedup import DedupPipeline
@@ -27,34 +34,125 @@ ASSIGNMENT_PATH = PROJECT_ROOT / "spikes" / "state" / "assignment.json"
 
 
 class Engine:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        cfg: Config | None = None,
+        memory: Any | None = None,
+        llm: Any | None = None,
+        embedder: Any | None = None,
+        parse_opml_fn: Any = parse_opml,
+        load_topics_fn: Any = load_topics,
+        discovery_cls: Any = Discovery,
+        pipeline_cls: Any = DedupPipeline,
+        build_digest_fn: Any = build_digest,
+        publish_fn: Any = publish,
+    ) -> None:
+        """Constructor DI: collaborators are injectable so tests never patch
+        module globals (coding-standards: DI over patching). Defaults keep
+        production wiring unchanged."""
         load_env()
-        self._cfg = Config.from_env()
-        self._memory = Memory(self._cfg, DB_PATH)
-        self._llm = LLM(self._cfg)
-        self._embedder = Embedder(self._cfg)
+        self._cfg = cfg if cfg is not None else Config.from_env()
+        self._memory = memory if memory is not None else Memory(self._cfg, DB_PATH)
+        self._llm = llm if llm is not None else LLM(self._cfg)
+        self._embedder = embedder if embedder is not None else Embedder(self._cfg)
+        self._parse_opml = parse_opml_fn
+        self._load_topics = load_topics_fn
+        self._discovery_cls = discovery_cls
+        self._pipeline_cls = pipeline_cls
+        self._build_digest = build_digest_fn
+        self._publish = publish_fn
 
-    # -- daily run (FR-8) ----------------------------------------------------
+    # -- setup (FR-1/FR-2: one-and-done) -------------------------------------
+
+    def setup(self, force: bool = False) -> int:
+        """One-and-done: parse OPML, persist exclusion set + curated topics.
+
+        Re-run only when the user adds/removes a topic. The recurring run
+        (`run`) reads the stored blacklist and topics — it never touches OPML.
+        `force` bypasses the shrink guard for a deliberate large unsubscribe.
+        """
+        print("[setup] OPML -> exclusion set + topics")
+        known_domains, feeds = self._parse_opml(PROJECT_ROOT / "feedly.opml")
+        if not known_domains:
+            print("FATAL: OPML parsed zero domains — refusing to persist an empty exclusion set")
+            print("       (corrupt/truncated feedly.opml? fix it, then re-run setup)")
+            return 1
+        previous = self._memory.blacklist()
+        ratio = self._cfg.min_blacklist_ratio
+        if previous and not force and len(known_domains) < ratio * len(previous):
+            print(
+                f"FATAL: OPML parsed {len(known_domains)} domains vs {len(previous)} previously stored "
+                f"— a drop this large (>{1 - ratio:.0%}) looks like a truncated/partial export, "
+                "refusing to shrink the exclusion set (the PRD forbids a partial blacklist: it voids "
+                "the zero-duplication guarantee). Fix feedly.opml, or re-run `setup --force` if the "
+                "shrink is a deliberate unsubscribe."
+            )
+            return 1
+        # Persist + verify the exclusion set FIRST — a blacklist write that
+        # doesn't stick must leave NOTHING behind (no topics seeded into a
+        # half-configured store). A RAISING write (DB lock, disk full) gets the
+        # same restore + FATAL, not a raw traceback (r21).
+        try:
+            self._memory.save_blacklist(known_domains)
+            if self._memory.blacklist() != known_domains:
+                # The failed write may have already wiped the stored set (partial
+                # DELETE+INSERT) — restore the last-good exclusion set so the
+                # recurring run keeps working, matching the zero-seed rollback.
+                self._memory.save_blacklist(previous)
+                print("FATAL: exclusion-set write incomplete — refusing to complete setup (no partial blacklist)")
+                return 1
+        except Exception as exc:  # noqa: BLE001 — a raising write must not escape setup()
+            with contextlib.suppress(Exception):  # a locked DB may fail the restore too (best effort)
+                self._memory.save_blacklist(previous)  # restore last-good set
+            print(
+                f"FATAL: exclusion-set write failed ({type(exc).__name__}) — "
+                "refusing to complete setup; previous blacklist restore attempted"
+            )
+            return 1
+        previous_topics: list[dict[str, Any]] = []
+        try:
+            previous_topics = self._memory.topics()  # snapshot BEFORE clearing (r19)
+            self._memory.clear_topics()  # a re-run must drop topics removed from the curated set
+            seeded = self._seed_from_curated()
+        except Exception as exc:  # noqa: BLE001 — a seed crash must not leave a partial setup
+            self._memory.save_blacklist(previous)  # roll back: no partial setup
+            self._restore_topics(previous_topics)
+            print(f"FATAL: topics seed failed ({type(exc).__name__}) — refusing to persist a partial setup")
+            return 1
+        if seeded <= 0:
+            self._memory.save_blacklist(previous)  # roll back: no partial setup
+            self._restore_topics(previous_topics)
+            print("FATAL: topics seed produced zero topics — refusing to persist a partial setup")
+            return 1
+        print(f"      {len(feeds)} feeds, {len(known_domains)} blacklist domains stored")
+        print("[setup] done — topics + exclusion set persisted")
+        return 0
+
+    # -- recurring run (FR-8) -------------------------------------------------
 
     def run(self) -> int:
-        print("[1/6] engine: OPML + memory")
-        known_domains, feeds = parse_opml(PROJECT_ROOT / "feedly.opml")
-        print(f"      {len(feeds)} feeds, {len(known_domains)} blacklist domains")
-        self._seed_topics_if_empty()
+        known_domains = self._memory.blacklist()
+        if not known_domains:
+            print("FATAL: no exclusion set stored — run `python -m signalflow setup` first")
+            return 1
+        topics = self._memory.topics()
+        if not topics:
+            print("FATAL: no topics stored — run `python -m signalflow setup` first")
+            return 1
+        print(f"[1/6] engine: {len(known_domains)} blacklist domains, {len(topics)} topics (stored)")
 
         print("[2/6] discovery (registries + Exa per topic strategy)")
-        topics = self._memory.topics()
-        candidates = Discovery(self._cfg).discover(topics)
+        candidates = self._discovery_cls(self._cfg).discover(topics)
         print(f"      {len(candidates)} candidates across {len(topics)} topics")
 
         print("[3/6] dedup (L1-L4) + evaluation")
-        pipeline = DedupPipeline(self._cfg, known_domains, self._memory, self._llm, self._embedder)
+        pipeline = self._pipeline_cls(self._cfg, known_domains, self._memory, self._llm, self._embedder)
         events = pipeline.process(candidates)
 
         print("[4/6] digest")
         if events:
-            build_digest(self._cfg, events, DIGEST_PATH)
-            publish(self._cfg, DIGEST_PATH)
+            self._build_digest(self._cfg, events, DIGEST_PATH)
+            self._publish(self._cfg, DIGEST_PATH)
         else:
             print("      no new events — keeping previous digest")
 
@@ -65,15 +163,30 @@ class Engine:
         print("[6/6] done")
         return 0
 
-    def _seed_topics_if_empty(self) -> None:
-        if self._memory.topics():
-            print("      topics table already populated")
+    def _restore_topics(self, previous_topics: list[dict[str, Any]]) -> None:
+        """Re-seed the previously stored topics after a failed setup re-run.
+
+        clear_topics() wiped them; a transient seed failure must not leave the
+        recurring run with an empty topics table (r19 suggestion — same
+        assignment shape seed_topics consumes)."""
+        if not previous_topics:
             return
-        self._seed_from_curated()
+        assignment = {
+            "topics": {
+                t.get("name", ""): {
+                    "n_feeds": t.get("feed_count", 0),
+                    "gap": bool(t.get("gap")),
+                    "strategy": t.get("strategy", {}),
+                }
+                for t in previous_topics
+                if t.get("name")
+            }
+        }
+        self._memory.seed_topics(assignment)
 
     def _seed_from_curated(self) -> int:
         """Seed the topics table from the curated topics.json (walkthrough final set)."""
-        topics = load_topics()
+        topics = self._load_topics()
         assignment = {
             "topics": {
                 t["name"]: {
@@ -98,7 +211,7 @@ class Engine:
     def smoke(self) -> int:
         """Fail-fast self-check: opml + memory + embeddings + router chat."""
         print("smoke: opml")
-        known_domains, feeds = parse_opml(PROJECT_ROOT / "feedly.opml")
+        known_domains, feeds = self._parse_opml(PROJECT_ROOT / "feedly.opml")
         print(f"  ok ({len(feeds)} feeds, {len(known_domains)} domains)")
         print("smoke: memory")
         self._memory.topics()
@@ -143,7 +256,12 @@ def main(argv: list[str] | None = None) -> int:
         removed = engine._memory.prune()
         print(f"pruned {removed} events")
         return 0
+    if command == "setup":
+        return engine.setup(force="--force" in args)
     if command == "run":
         return engine.run()
-    print("usage: python -m signalflow [run|smoke|topics|topics-doc|reseed|prune|sources <topic>]  (default: run)")
+    print(
+        "usage: python -m signalflow "
+        + "[run|setup [--force]|smoke|topics|topics-doc|reseed|prune|sources <topic>]  (default: run)"
+    )
     return 2
