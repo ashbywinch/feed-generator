@@ -1,0 +1,260 @@
+"""Per-topic weekly RSS feeds (FR-9 digest, per topic) + topic background pages.
+
+Each topic's feed entry renders OUR selection verdict, not the article:
+  - description: the why-it-matters summary (the pick's `reason`; falls back
+    to the observed event, then the thesis) — what the reader needs to know
+    before clicking.
+  - content: that summary, then a link to the topic's long-read background
+    page (the area story), then a clickable preview snippet of the article
+    (the item's own summary, truncated) linking to the original.
+Entry id = the article URL (Feedly de-dupes on id), pubDate = pick time.
+
+Pure rendering — no network, no LLM. The spike CLI (spikes/build_feeds.py)
+wires paths; this module only knows layouts it is told.
+"""
+
+from __future__ import annotations
+
+import html
+import json
+import re
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from feedgen.feed import FeedGenerator
+
+SNIPPET_LIMIT = 400  # preview snippet cap (chars); the clickable article preview
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def strip_html(text: str) -> str:
+    """Tags removed, whitespace collapsed — the plain text of an item summary."""
+    return re.sub(r"\s+", " ", _TAG_RE.sub("", text or "")).strip()
+
+
+def why_summary(pick: dict[str, Any]) -> str:
+    """Our summary of why the article is important: reason, else event, else thesis."""
+    for key in ("reason", "empirical_event", "thesis"):
+        value = pick.get(key)
+        if value:
+            return str(value)
+    return ""
+
+
+def snippet_text(summary: str, limit: int = SNIPPET_LIMIT) -> str:
+    """Plain-text preview: strip HTML, truncate at a word boundary."""
+    text = strip_html(summary)
+    if len(text) <= limit:
+        return text
+    cut = text[: limit - 1].rsplit(" ", 1)[0]
+    return cut.rstrip(".,;:") + "…"
+
+
+def load_snippet_map(feeds_path: Path) -> dict[str, str]:
+    """url -> latest item summary from the shared feed cache (weekly_feeds.jsonl).
+
+    Latest line per crawl_root wins; items without a summary are skipped.
+    """
+    out: dict[str, str] = {}
+    if not feeds_path.exists():
+        return out
+    for line in feeds_path.read_text(encoding="utf-8").splitlines():
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        for item in entry.get("items") or []:
+            summary = item.get("summary")
+            if summary and item.get("url"):
+                out[item["url"]] = str(summary)
+    return out
+
+
+def pick_snippet(pick: dict[str, Any], snippet_map: dict[str, str], limit: int = SNIPPET_LIMIT) -> str:
+    """The clickable preview text: the article's own summary, else its title."""
+    summary = snippet_map.get(pick["url"])
+    if summary:
+        return snippet_text(summary, limit=limit)
+    return snippet_text(pick.get("title", ""), limit=limit)
+
+
+def _pub_date(pick: dict[str, Any]) -> datetime | None:
+    raw = pick.get("picked_at")
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(raw))
+    except ValueError:
+        return None
+    return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
+
+
+def _entry_body(pick: dict[str, Any], topic_name: str, story_url: str, snippet: str) -> str:
+    esc = html.escape
+    summary = esc(why_summary(pick))
+    return (
+        f"<p>{summary}</p>"
+        f'<p><a href="{esc(story_url)}">Topic background: {esc(topic_name)} &rarr;</a></p>'
+        f'<p><a href="{esc(pick["url"])}">{esc(snippet)}</a></p>'
+    )
+
+
+def build_topic_feed(
+    *,
+    slug: str,
+    topic_name: str,
+    picks: list[dict[str, Any]],
+    story: dict[str, Any],
+    feed_url: str,
+    story_url: str,
+    out_path: Path,
+    snippet_map: dict[str, str] | None = None,
+) -> int:
+    """Build one topic's RSS feed from its picks. Returns the entry count.
+
+    story is only used for its existence/recency here (the long-read link is
+    story_url); the page itself is rendered by render_story_html.
+    """
+    del slug, story  # metadata only; feed identity is feed_url
+    snippets = snippet_map if snippet_map is not None else {}
+    fg = FeedGenerator()
+    fg.id(feed_url)
+    fg.title(f"SignalFlow — {topic_name}")
+    fg.link(href=story_url, rel="alternate")
+    fg.description(f"Weekly curated selection for {topic_name} — why each article matters.")
+
+    for pick in picks:
+        fe = fg.add_entry()
+        fe.id(pick["url"])  # stable source URL: Feedly de-dupes on id
+        fe.title(pick.get("title", ""))
+        fe.link(href=pick["url"])
+        fe.description(why_summary(pick))
+        fe.content(
+            _entry_body(pick, topic_name, story_url, pick_snippet(pick, snippets)),
+            type="CDATA",
+        )
+        pub = _pub_date(pick)
+        if pub is not None:
+            fe.pubDate(pub)
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out_path.with_suffix(".tmp")
+    fg.rss_file(str(tmp), pretty=True)
+    tmp.replace(out_path)  # atomic: a failed build never publishes a partial feed
+    return len(picks)
+
+
+# --- topic background page --------------------------------------------------
+
+
+_STORY_CSS = (
+    "<style>"
+    "body{font-family:system-ui,-apple-system,sans-serif;max-width:46rem;margin:2rem auto;"
+    "padding:0 1rem;line-height:1.55;color:#1a1a1a}"
+    "h1{font-size:1.6rem} h2{margin-top:2rem;font-size:1.15rem} "
+    "li{margin:.35rem 0} .meta{color:#666;font-size:.85rem}"
+    "</style>"
+)
+
+
+def render_story_html(story: dict[str, Any], topic_name: str) -> str:
+    """Standalone HTML page for the topic background long read (the area story)."""
+    esc = html.escape
+    parts = [
+        "<!doctype html><html><head><meta charset='utf-8'>",
+        f"<title>{esc(topic_name)} — SignalFlow topic background</title>",
+        _STORY_CSS,
+        "</head><body>",
+        f"<h1>{esc(topic_name)}</h1>",
+        f"<p class='meta'>Version {story.get('version', 0)} · updated {esc(str(story.get('updated_at', ''))[:10])}</p>",
+    ]
+    overview = story.get("overview", "")
+    if overview:
+        parts.append("<h2>Overview</h2>")
+        for para in str(overview).split("\n\n"):
+            if para.strip():
+                parts.append(f"<p>{esc(para)}</p>")
+    angles = story.get("angles", {})
+    if isinstance(angles, dict) and angles:
+        parts.append("<h2>Subareas</h2>")
+        for subarea in sorted(angles):
+            items = angles[subarea]
+            if not isinstance(items, list):
+                continue  # corrupt section: skip rendering, eval gates flag it
+            parts.append(f"<h3>{esc(str(subarea))}</h3><ul>")
+            parts.extend(f"<li>{esc(str(a))}</li>" for a in items)
+            parts.append("</ul>")
+    questions = story.get("open_questions", [])
+    if questions:
+        parts.append("<h2>Open questions</h2><ul>")
+        parts.extend(f"<li>{esc(str(q))}</li>" for q in questions)
+        parts.append("</ul>")
+    parts.append("</body></html>")
+    return "\n".join(parts)
+
+
+# --- site builder -----------------------------------------------------------
+
+
+def _site_urls(base_url: str, slug: str) -> tuple[str, str]:
+    root = base_url.rstrip("/")
+    return f"{root}/feeds/{slug}.xml", f"{root}/topics/{slug}/"
+
+
+def build_site(
+    *,
+    picks_dir: Path,
+    stories_dir: Path,
+    feeds_path: Path,
+    site_dir: Path,
+    base_url: str,
+) -> list[tuple[str, int]]:
+    """Build every topic's feed + background page into the static site layout.
+
+    Iterates the per-topic picks files (spikes/state/picks/{slug}.json); a
+    topic is built only when it has BOTH picks (non-empty) and a story — the
+    feed body links the story page, so a missing story means no feed. Returns
+    [(slug, entry_count)] for the topics built.
+    """
+    snippets = load_snippet_map(feeds_path)
+    built: list[tuple[str, int]] = []
+    for picks_path in sorted(picks_dir.glob("*.json")):
+        try:
+            payload = json.loads(picks_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue  # corrupt picks: skip, the runner will regenerate
+        if not isinstance(payload, dict):
+            continue
+        slug = str(payload.get("slug") or picks_path.stem)
+        topic_name = str(payload.get("topic") or slug)
+        picks = payload.get("picks") or []
+        if not picks:
+            continue  # a quiet week yields no feed (an empty feed helps no one)
+        story_path = stories_dir / f"{slug}.json"
+        if not story_path.exists():
+            continue  # no background long read -> the feed body would dangle
+        try:
+            story = json.loads(story_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        if not isinstance(story, dict):
+            continue
+        feed_url, story_url = _site_urls(base_url, slug)
+        feed_out = site_dir / "feeds" / f"{slug}.xml"
+        page_out = site_dir / "topics" / slug / "index.html"
+        n = build_topic_feed(
+            slug=slug,
+            topic_name=topic_name,
+            picks=picks,
+            story=story,
+            feed_url=feed_url,
+            story_url=story_url,
+            out_path=feed_out,
+            snippet_map=snippets,
+        )
+        page_out.parent.mkdir(parents=True, exist_ok=True)
+        page_out.write_text(render_story_html(story, topic_name), encoding="utf-8")
+        built.append((slug, n))
+    return built
