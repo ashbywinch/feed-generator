@@ -6,7 +6,7 @@
 
 Energy generation, storage, transmission and grid balancing, and the economics and policy of the net-zero transition.
 
-- **In:** Grid-scale batteries, solar/wind/pumped-hydro projects, CfD auctions, energy markets and pricing, grid data analytics (Modo Energy-style), climate-economics data.
+- **In:** Grid-scale batteries, solar/wind/pumped-hydro projects, CfD auctions, energy markets and pricing, grid data analytics (Modo Energy-style), climate-economics data. Nuclear new-build economics (RAB, CfDs, SMRs).
 - **Out:** Consumer EVs, energy-efficiency gadgets, corporate sustainability PR, climate activism.
 - **Sources:** solarpowerportal, By the Numbers, Theory of Change, Carbon Brief
 

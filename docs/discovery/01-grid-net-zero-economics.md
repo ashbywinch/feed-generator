@@ -123,9 +123,9 @@ adequate
 2. grid connection queue statistics renewable projects
 3. ancillary services frequency regulation market design
 4. interconnector capacity auction results market coupling
-5. CfD auction results renewable energy policy
+5. renewable energy support scheme auction results policy
 6. demand-side flexibility market design electrification
-7. nuclear new-build economics RAB CfD SMR
+7. nuclear new-build economics financing models
 8. long-duration energy storage CAES thermal gravity flow
 9. offshore wind auction results technology trends
 10. carbon market prices ETS climate economics data

@@ -75,7 +75,6 @@ CFG = Config(
 )
 
 MIN_QUERIES = CFG.eval_min_queries
-MAX_QUERIES = 13  # upper bound; a topic's actual subarea count may be lower (see main)
 QUERY_SLACK = CFG.eval_query_slack  # extras beyond one-per-subarea (prompt: "strong subareas may get two")
 
 MAX_UNCOVERED = CFG.eval_max_uncovered  # subareas a query set may leave out and still pass
@@ -201,10 +200,12 @@ def query_bounds(subareas: list[str]) -> tuple[int, int]:
     return lo, hi
 
 
-def mechanical_check(queries: list[str], min_queries: int = MIN_QUERIES, max_queries: int = MAX_QUERIES) -> list[str]:
+def mechanical_check(queries: list[str], min_queries: int = MIN_QUERIES, max_queries: int | None = None) -> list[str]:
     failures: list[str] = []
-    if not (min_queries <= len(queries) <= max_queries):
-        failures.append(f"{len(queries)} queries (need {min_queries}-{max_queries})")
+    if not (min_queries <= len(queries) <= (max_queries if max_queries is not None else 10**9)):
+        failures.append(
+            f"{len(queries)} queries (need {min_queries}-{max_queries if max_queries is not None else 'unbounded'})"
+        )
     seen: set[str] = set()
     for q in queries:
         qq = q.strip()

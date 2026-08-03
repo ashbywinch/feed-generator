@@ -273,6 +273,18 @@ def held_out_articles(
                     pub = None
                 if pub is not None and pub < cutoff:
                     continue
+            elif it.get("first_seen"):
+                # undated items window on first_seen, exactly like the weekly
+                # pipeline (is_item_in_window) — stale undated articles must
+                # not be held out (r18 suggestion)
+                try:
+                    first = datetime.fromisoformat(it["first_seen"])
+                    if first.tzinfo is None:
+                        first = first.replace(tzinfo=UTC)
+                except ValueError:
+                    first = None
+                if first is not None and first < cutoff:
+                    continue
             source = feed.get("source", "?")
             if source in seen_sources:
                 continue
@@ -383,18 +395,19 @@ def contextualization_passes(sufficient: int, total: int, pass_frac: float) -> b
     return sufficient / total >= pass_frac
 
 
-def load_picked_urls() -> set[str]:
+def load_picked_urls(path: Path | None = None) -> set[str]:
     """URLs already surfaced (pick history); torn tail lines are skipped + logged.
 
     Mirrors weekly_selection.load_picked_urls and _load_jsonl — every cache
     reader must tolerate a torn tail line AND surface it (compliance: never
-    swallow errors silently).
+    swallow errors silently). `path` is injectable (DI over patching).
     """
     out: set[str] = set()
-    if not PICKS_HISTORY_PATH.exists():
+    pick_path = path if path is not None else PICKS_HISTORY_PATH
+    if not pick_path.exists():
         return out
     skipped = 0
-    for line in PICKS_HISTORY_PATH.read_text(encoding="utf-8").splitlines():
+    for line in pick_path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         try:
@@ -402,7 +415,7 @@ def load_picked_urls() -> set[str]:
         except (json.JSONDecodeError, KeyError):
             skipped += 1  # torn tail line from a crash; that entry is lost anyway
     if skipped:
-        print(f"      WARNING: {PICKS_HISTORY_PATH.name}: skipped {skipped} corrupt line(s)")
+        print(f"      WARNING: {pick_path.name}: skipped {skipped} corrupt line(s)")
     return out
 
 

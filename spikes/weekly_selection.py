@@ -168,31 +168,33 @@ def _append_jsonl(path: Path, entry: dict[str, Any]) -> None:
         _ = fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
-def load_feeds() -> dict[str, dict[str, Any]]:
-    return _load_jsonl(FEEDS_PATH)
+def load_feeds(path: Path | None = None) -> dict[str, dict[str, Any]]:
+    return _load_jsonl(path if path is not None else FEEDS_PATH)
 
 
-def load_verdicts(story_version: int, slug: str) -> dict[str, dict[str, Any]]:
+def load_verdicts(story_version: int, slug: str, path: Path | None = None) -> dict[str, dict[str, Any]]:
     """Cached verdicts for the CURRENT topic, prompt revision, and story version.
 
     The cache is shared across topics, so a verdict is only reusable when it
     was produced under the same topic (slug) — otherwise topic A's judgment
     could be replayed for the same article URL under topic B. A prompt change
     (PROMPT_REV bump) or a folded story (version bump) also invalidates.
+    `path` is injectable (DI over patching) — defaults to the module cache.
     """
     return {
         k: v
-        for k, v in _load_jsonl(VERDICTS_PATH).items()
+        for k, v in _load_jsonl(path if path is not None else VERDICTS_PATH).items()
         if v.get("slug") == slug and v.get("rev") == PROMPT_REV and v.get("story_ver", 0) == story_version
     }
 
 
-def load_picked_urls() -> set[str]:
+def load_picked_urls(path: Path | None = None) -> set[str]:
     out: set[str] = set()
-    if not PICKS_HISTORY_PATH.exists():
+    pick_path = path if path is not None else PICKS_HISTORY_PATH
+    if not pick_path.exists():
         return out
     skipped = 0
-    for line in PICKS_HISTORY_PATH.read_text(encoding="utf-8").splitlines():
+    for line in pick_path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
         try:
@@ -200,7 +202,7 @@ def load_picked_urls() -> set[str]:
         except (json.JSONDecodeError, KeyError):
             skipped += 1  # torn tail line from a crash; that entry is lost anyway
     if skipped:
-        print(f"      WARNING: {PICKS_HISTORY_PATH.name}: skipped {skipped} corrupt line(s)")
+        print(f"      WARNING: {pick_path.name}: skipped {skipped} corrupt line(s)")
     return out
 
 
@@ -443,7 +445,7 @@ Return EXACTLY one verdict per item below, same order:
         try:
             limiter.wait()
             data = llm.chat_json(retry_prompt, max_tokens=LLM_MAX_TOKENS)
-            for v in data.get("verdicts", []) if isinstance(data, dict) else []:
+            for v in (data.get("verdicts") or []) if isinstance(data, dict) else []:
                 if isinstance(v, dict) and v.get("url"):
                     _ = verdicts.setdefault(v["url"], v)
         except Exception as exc:  # noqa: BLE001 — retry is best-effort
@@ -471,7 +473,7 @@ article reports, phrased to stand as the digest's Observed Event bullet.
         try:
             limiter.wait()
             data = llm.chat_json(retry_prompt, max_tokens=LLM_MAX_TOKENS)
-            for v in data.get("verdicts", []) if isinstance(data, dict) else []:
+            for v in (data.get("verdicts") or []) if isinstance(data, dict) else []:
                 if isinstance(v, dict) and v.get("url") and v["url"] in verdicts:
                     # MERGE, don't replace: the retry may return only the added
                     # sentence, dropping approved/reason/thesis. Fill just the
@@ -838,15 +840,18 @@ def smoke_test() -> None:
     print("      ok")
 
 
-def load_source_list(topic_name: str) -> tuple[dict[str, Any] | None, list[Source], str]:
+def load_source_list(
+    topic_name: str, discovery_dir: Path | None = None
+) -> tuple[dict[str, Any] | None, list[Source], str]:
     """Find the topic's discovery listing by its topic field; dedupe sources by crawl_root.
 
     Returns (listing, sources, slug) where slug is the discovery file stem used
-    to key the area story.
+    to key the area story. `discovery_dir` is injectable (DI over patching).
     """
     listing: dict[str, Any] | None = None
     slug = ""
-    for path in DISCOVERY_DIR.glob("*.json"):
+    scan_dir = discovery_dir if discovery_dir is not None else DISCOVERY_DIR
+    for path in scan_dir.glob("*.json"):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:

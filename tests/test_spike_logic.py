@@ -52,7 +52,7 @@ def test_parse_bool_is_strict() -> None:
 # --- weekly_selection: verdict cache is namespaced by topic slug (r4) -------
 
 
-def test_load_verdicts_filters_by_slug(tmp_path: Any, monkeypatch: Any) -> None:
+def test_load_verdicts_filters_by_slug(tmp_path: Any) -> None:
     """Same URL judged under topic A must not replay under topic B."""
     cache = tmp_path / "weekly_verdicts.jsonl"
     cache.write_text(
@@ -80,12 +80,11 @@ def test_load_verdicts_filters_by_slug(tmp_path: Any, monkeypatch: Any) -> None:
         )
         + "\n"
     )
-    monkeypatch.setattr(ws, "VERDICTS_PATH", cache)
-    got = ws.load_verdicts(story_version=1, slug="a")
+    got = ws.load_verdicts(story_version=1, slug="a", path=cache)
     assert set(got) == {"a|sub|https://x/1"}  # topic B's verdict must not leak in
 
 
-def test_load_verdicts_filters_by_rev_and_story_version(tmp_path: Any, monkeypatch: Any) -> None:
+def test_load_verdicts_filters_by_rev_and_story_version(tmp_path: Any) -> None:
     """Stale prompt-rev and stale story-version verdicts are never reused."""
     cache = tmp_path / "weekly_verdicts.jsonl"
     cache.write_text(
@@ -102,8 +101,7 @@ def test_load_verdicts_filters_by_rev_and_story_version(tmp_path: Any, monkeypat
         )
         + "\n"
     )
-    monkeypatch.setattr(ws, "VERDICTS_PATH", cache)
-    got = ws.load_verdicts(story_version=1, slug="a")
+    got = ws.load_verdicts(story_version=1, slug="a", path=cache)
     assert set(got) == {"a|s|u"}  # only the current-rev + current-story verdict survives
 
 
@@ -339,7 +337,7 @@ def test_window_reserves_slots_for_undated_items() -> None:
 # --- eval_story: pick-history read tolerates torn lines (r11) --------------
 
 
-def test_eval_story_load_picked_urls_handles_torn_lines(tmp_path: Any, monkeypatch: Any) -> None:
+def test_eval_story_load_picked_urls_handles_torn_lines(tmp_path: Any) -> None:
     """A torn JSONL tail line must not crash the eval's pick-history read."""
     ev = _load_spike("eval_story")
     cache = tmp_path / "weekly_picks.jsonl"
@@ -349,8 +347,7 @@ def test_eval_story_load_picked_urls_handles_torn_lines(tmp_path: Any, monkeypat
         + '{"url": "torn", extra'  # invalid JSON tail line
         + "\n"
     )
-    monkeypatch.setattr(ev, "PICKS_HISTORY_PATH", cache)
-    picked = ev.load_picked_urls()
+    picked = ev.load_picked_urls(path=cache)
     assert "https://x/ok" in picked  # valid entry survives
     assert "torn" not in picked  # corrupt line skipped, no crash
 
@@ -518,7 +515,7 @@ def test_normalize_url_strips_tracker_families() -> None:
 # --- weekly_selection: shared feeds keyed on FULL subarea set (r14) --------
 
 
-def test_shared_feed_subareas_deduplicated_on_merge(tmp_path: Any, monkeypatch: Any) -> None:
+def test_shared_feed_subareas_deduplicated_on_merge(tmp_path: Any) -> None:
     """A crawl_root repeated WITHIN the same subarea must not append the
     subarea twice: ['A','A'] would turn the verdict key from A into A|A and
     silently re-key every cached verdict (r15 suggestion)."""
@@ -532,8 +529,7 @@ def test_shared_feed_subareas_deduplicated_on_merge(tmp_path: Any, monkeypatch: 
         ],
     }
     (tmp_path / "t.json").write_text(json.dumps(listing), encoding="utf-8")
-    monkeypatch.setattr(ws, "DISCOVERY_DIR", tmp_path)
-    _, sources, _ = ws.load_source_list("T")
+    _, sources, _ = ws.load_source_list("T", discovery_dir=tmp_path)
     assert len(sources) == 1
     assert sources[0]["subareas"] == ["A", "B"]  # no "A" duplication
     assert ws.subarea_key(sources[0]) == "A|B"  # stable key
@@ -609,6 +605,68 @@ def test_held_out_sample_handles_naive_timestamps() -> None:
     }
     got = ev.held_out_articles(feeds, set(), {"pending": []})
     assert any(i["url"] == "https://x/naive" for i in got)  # included, no crash
+
+
+def test_held_out_sample_windows_undated_by_first_seen() -> None:
+    """Undated items must window on first_seen, exactly like the weekly
+    pipeline — a stale undated article must not be held out as fresh (r18
+    suggestion)."""
+    ev = _load_spike("eval_story")
+    cutoff = datetime.now(UTC) - timedelta(days=ev.RECENCY_DAYS)
+    feeds = {
+        "a": {
+            "source": "test-source-fresh",
+            "items": [
+                {
+                    "url": "https://x/undated-fresh",
+                    "title": "UF",
+                    "summary": "s",
+                    "published": None,
+                    "undated": True,
+                    "first_seen": (cutoff + timedelta(days=1)).isoformat(),
+                },
+            ],
+        },
+        "b": {
+            "source": "test-source-stale",
+            "items": [
+                {
+                    "url": "https://x/undated-stale",
+                    "title": "US",
+                    "summary": "s",
+                    "published": None,
+                    "undated": True,
+                    "first_seen": (cutoff - timedelta(days=30)).isoformat(),
+                },
+            ],
+        },
+    }
+    got = ev.held_out_articles(feeds, set(), {"pending": []})
+    urls = [i["url"] for i in got]
+    assert "https://x/undated-fresh" in urls
+    assert "https://x/undated-stale" not in urls  # first seen before window -> excluded
+
+
+def test_evaluate_source_retry_handles_verdicts_null(capsys: Any) -> None:
+    """The retry path must survive {\"verdicts\": null} — the first-call guard
+    was fixed, so the retry loop must not iterate None and print 'retry
+    failed' for a malformed-but-recoverable model reply (r18 suggestion)."""
+
+    class NullRetryLLM:
+        def chat_json(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+            return {"verdicts": None}  # null on BOTH calls — the retry-loop case
+
+    class Limiter:
+        def wait(self) -> None:
+            pass
+
+    source = {"name": "S", "subarea": "sub", "subareas": ["sub"]}
+    topic = {"name": "T", "description": "d", "in": "i", "out": "o"}
+    verdicts = ws.evaluate_source(
+        source, [{"url": "https://x/1", "title": "T", "summary": "s"}], topic, NullRetryLLM(), Limiter(), ""
+    )
+    assert len(verdicts) == 1  # item still yields a (rejected) verdict
+    assert "retry failed" not in capsys.readouterr().out  # null handled, not an exception
 
 
 def test_geo_anchors_catch_uk_mechanisms() -> None:
@@ -821,7 +879,7 @@ def test_mechanical_check_handles_non_dict_angles() -> None:
 # --- weekly_selection: corrupt cache lines are logged, not silently dropped (r10) --
 
 
-def test_load_jsonl_reports_corrupt_lines(tmp_path: Any, monkeypatch: Any, capsys: Any) -> None:
+def test_load_jsonl_reports_corrupt_lines(tmp_path: Any, capsys: Any) -> None:
     """A torn JSONL tail line must be skipped AND surfaced, not silently swallowed."""
     cache = tmp_path / "weekly_feeds.jsonl"
     cache.write_text(
@@ -830,8 +888,7 @@ def test_load_jsonl_reports_corrupt_lines(tmp_path: Any, monkeypatch: Any, capsy
         + '{"key": "torn", extra'  # invalid JSON: torn tail line
         + "\n"
     )
-    monkeypatch.setattr(ws, "FEEDS_PATH", cache)
-    got = ws.load_feeds()
+    got = ws.load_feeds(path=cache)
     assert set(got) == {"ok"}  # valid entry survives
     captured = capsys.readouterr().out.lower()
     assert "torn" in captured or "skipped" in captured or "corrupt" in captured
