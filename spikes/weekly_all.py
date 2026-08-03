@@ -139,7 +139,8 @@ def _load_payload(path: Path | None) -> dict[str, Any] | None:
         return None
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
+    except (json.JSONDecodeError, OSError) as exc:
+        print(f"      WARNING: {path}: corrupt state file treated as absent ({exc})")
         return None  # corrupt or unreadable: treat as absent (re-run decides)
     return data if isinstance(data, dict) else None
 
@@ -219,17 +220,18 @@ def plan_runs(
 # --- execution --------------------------------------------------------------
 
 
-def generate_sources(topic: dict[str, Any]) -> tuple[bool, int]:
+def generate_sources(topic: dict[str, Any], *, limiter: RateLimiter | None = None) -> tuple[bool, int]:
     """Generate + persist a topic's discovery source list (make-topic-sources flow).
 
     Mirrors `python -m signalflow sources <topic>`: generate -> gates -> review
     until approval (MAX_ITER rounds), then persist docs/discovery/{slug}.json.
     Returns (approved, iterations) — a needs-human list is still persisted and
-    usable; only a hard failure raises.
+    usable; only a hard failure raises. limiter is the runner's shared one: the
+    generation's router calls pace through it like selection's do.
     """
     from signalflow.source_lists import generate_topic_sources, persist
 
-    listing, verdict, iterations, _searches = generate_topic_sources(topic, CFG, ROOT / "feedly.opml")
+    listing, verdict, iterations, _searches = generate_topic_sources(topic, CFG, ROOT / "feedly.opml", limiter=limiter)
     persist(topic["name"], listing, verdict, iterations)
     return bool(verdict.get("approved")), iterations
 
@@ -260,12 +262,16 @@ def run_all(
             generated = approved = False
             if spec.needs_sources:
                 try:
-                    approved, _iterations = generate_fn(spec.topic)
-                except Exception:
+                    approved, _iterations = generate_fn(spec.topic, limiter=limiter)
+                except Exception as first_exc:  # noqa: BLE001 — retry below, but surface the first failure
+                    message = str(first_exc)
+                    if LLM_KEY:
+                        message = message.replace(LLM_KEY, "***")
+                    print(f"      first generation attempt failed for {spec.topic['name']}, retrying: {message[:200]}")
                     # ONE immediate retry: generation failures are stochastic
                     # (router errors, non-JSON prose); a fresh attempt has a
                     # good chance. Bounded — a second failure fails the topic.
-                    approved, _iterations = generate_fn(spec.topic)
+                    approved, _iterations = generate_fn(spec.topic, limiter=limiter)
                 generated = True
                 listing, sources, _slug = load_list_fn(spec.topic["name"])
                 if listing is None:

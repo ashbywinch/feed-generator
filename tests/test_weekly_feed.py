@@ -211,6 +211,14 @@ def test_load_snippet_map_missing_file(tmp_path: Path) -> None:
     assert load_snippet_map(tmp_path / "nope.jsonl") == {}
 
 
+def test_load_snippet_map_warns_on_corrupt_lines(tmp_path: Path, capsys) -> None:
+    feeds = tmp_path / "feeds.jsonl"
+    feeds.write_text('{"key": "a", "items": [{"url": "u", "summary": "s"}]}\nnot-json\n', encoding="utf-8")
+    m = load_snippet_map(feeds)
+    assert m["u"] == "s"  # good line still parsed
+    assert "not-json" in capsys.readouterr().out  # corrupt line surfaced, not silent
+
+
 # --- story page ------------------------------------------------------------
 
 
@@ -263,6 +271,8 @@ def test_build_site_writes_feed_and_page(tmp_path: Path) -> None:
     )
     assert (site / "feeds" / "02-test.xml").exists()
     assert (site / "topics" / "02-test" / "index.html").exists()
+    assert not (site / "topics" / "02-test" / "index.html.tmp").exists()  # atomic page write
+    assert not (site / "feeds" / "02-test.xml.tmp").exists()
     parsed = feedparser.parse(str(site / "feeds" / "02-test.xml"))
     assert len(parsed.entries) == 1
     # the story page is the feed's alternate link target

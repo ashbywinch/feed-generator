@@ -4,10 +4,13 @@ The agent tool-loop itself needs router + Exa keys; it is exercised by the
 manual `make topic-sources` run, not the unit suite.
 """
 
+import time
 from datetime import date, timedelta
 from typing import Any
 
+from signalflow.ratelimit import RateLimiter
 from signalflow.source_lists import (
+    _agent_chat,
     _parse_json,
     exclude_domains,
     gate_collision,
@@ -18,6 +21,29 @@ from signalflow.source_lists import (
     render_markdown,
     slug_for,
 )
+
+
+class _FakeLLM:
+    """Chat client that finalizes immediately with parseable JSON — no tools."""
+
+    def chat_tools(
+        self, messages: list[dict[str, Any]], tools: list[dict[str, Any]], *, max_tokens: int = 0
+    ) -> dict[str, Any]:
+        return {"content": "{}"}
+
+
+def test_agent_chat_paces_with_limiter() -> None:
+    """The runner shares ONE rate limiter; source generation must pace its LLM
+    calls through it too, or 3 concurrent generations burst the router quota."""
+    limiter = RateLimiter(interval=0.05)
+    llm: Any = _FakeLLM()
+    cfg: Any = None  # unused in the fake path; kept for the real signature
+    start = time.monotonic()
+    _agent_chat(llm, cfg, "prompt", parse=_parse_json, limiter=limiter)
+    _agent_chat(llm, cfg, "prompt", parse=_parse_json, limiter=limiter)
+    _agent_chat(llm, cfg, "prompt", parse=_parse_json, limiter=limiter)
+    elapsed = time.monotonic() - start
+    assert elapsed >= 0.09  # 3 rounds on a fresh limiter = 2 paced sleeps
 
 
 def _listing(**over: Any) -> dict[str, Any]:

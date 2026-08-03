@@ -294,6 +294,7 @@ CREATE TABLE IF NOT EXISTS feed_recommendations (
 | `LLM_MAX_TOKENS` | 8192 | FR-9 LLM response cap |
 | `WEEKLY_WORKERS` | 3 | FR-9 multi-topic runner: topics regenerated at a time |
 | `SITE_BASE_URL` | `https://signalflow.local` | FR-9 feed/page URLs (placeholder until hosting decided, OQ-3) |
+| `NETLIFY_SITE_ID` | _(empty)_ | FR-7 publish: Netlify site id for the deploy API (empty = local-only) |
 ## Decisions (recommendations; review before lock)
 
 | Question | Decision | Rationale |

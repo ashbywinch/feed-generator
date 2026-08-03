@@ -64,6 +64,7 @@ def load_snippet_map(feeds_path: Path) -> dict[str, str]:
         try:
             entry = json.loads(line)
         except json.JSONDecodeError:
+            print(f"      WARNING: {feeds_path.name}: skipping corrupt line: {line[:60]!r}")
             continue
         for item in entry.get("items") or []:
             summary = item.get("summary")
@@ -223,9 +224,11 @@ def build_site(
     for picks_path in sorted(picks_dir.glob("*.json")):
         try:
             payload = json.loads(picks_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"      WARNING: {picks_path.name}: corrupt picks file skipped ({exc})")
             continue  # corrupt picks: skip, the runner will regenerate
         if not isinstance(payload, dict):
+            print(f"      WARNING: {picks_path.name}: unexpected payload shape — skipped")
             continue
         slug = str(payload.get("slug") or picks_path.stem)
         topic_name = str(payload.get("topic") or slug)
@@ -237,9 +240,11 @@ def build_site(
             continue  # no background long read -> the feed body would dangle
         try:
             story = json.loads(story_path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"      WARNING: {story_path.name}: corrupt story file skipped ({exc})")
             continue
         if not isinstance(story, dict):
+            print(f"      WARNING: {story_path.name}: unexpected payload shape — skipped")
             continue
         feed_url, story_url = _site_urls(base_url, slug)
         feed_out = site_dir / "feeds" / f"{slug}.xml"
@@ -255,6 +260,8 @@ def build_site(
             snippet_map=snippets,
         )
         page_out.parent.mkdir(parents=True, exist_ok=True)
-        page_out.write_text(render_story_html(story, topic_name), encoding="utf-8")
+        page_tmp = page_out.with_suffix(".html.tmp")
+        page_tmp.write_text(render_story_html(story, topic_name), encoding="utf-8")
+        page_tmp.replace(page_out)  # atomic, same as the feed: never publish a truncated page
         built.append((slug, n))
     return built

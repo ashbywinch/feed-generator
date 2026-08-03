@@ -355,7 +355,7 @@ def test_run_all_generates_sources_before_selecting(tmp_path: Path) -> None:
     calls: list[str] = []
     topic = _topic("No List Topic")
 
-    def fake_generate(t: dict[str, Any]) -> tuple[bool, int]:
+    def fake_generate(t: dict[str, Any], **kwargs) -> tuple[bool, int]:
         calls.append(f"generate:{t['name']}")
         return True, 3  # approved after 3 iterations
 
@@ -395,7 +395,7 @@ def test_run_all_generation_failure_isolated(tmp_path: Path) -> None:
     good = _topic("Good Topic")
     bad = _topic("Bad Topic")
 
-    def fake_generate(t: dict[str, Any]) -> tuple[bool, int]:
+    def fake_generate(t: dict[str, Any], **kwargs) -> tuple[bool, int]:
         if t["name"] == "Bad Topic":
             raise RuntimeError("EXA_API_KEY missing")
         return True, 1
@@ -426,7 +426,7 @@ def test_run_all_generation_without_usable_list_fails(tmp_path: Path) -> None:
     """Generation 'succeeds' but no list appears on disk -> the topic fails,
     it must not select against an empty listing."""
 
-    def fake_generate(t: dict[str, Any]) -> tuple[bool, int]:
+    def fake_generate(t: dict[str, Any], **kwargs) -> tuple[bool, int]:
         return False, 6  # never approved
 
     ran: list[str] = []
@@ -464,7 +464,7 @@ def test_run_all_retries_generation_once_then_selects(tmp_path: Path) -> None:
     attempts: list[str] = []
     ran: list[str] = []
 
-    def flaky_generate(t: dict[str, Any]) -> tuple[bool, int]:
+    def flaky_generate(t: dict[str, Any], **kwargs) -> tuple[bool, int]:
         attempts.append(t["name"])
         if len(attempts) == 1:
             raise RuntimeError("router 400: label empty or too long")  # transient
@@ -502,7 +502,7 @@ def test_run_all_generation_fails_after_retry(tmp_path: Path) -> None:
     total, then the topic fails and the batch continues."""
     attempts: list[str] = []
 
-    def always_fail(t: dict[str, Any]) -> tuple[bool, int]:
+    def always_fail(t: dict[str, Any], **kwargs) -> tuple[bool, int]:
         attempts.append(t["name"])
         raise RuntimeError("EXA_API_KEY missing")
 
