@@ -260,3 +260,39 @@ def test_run_all_empty_plan_no_calls(tmp_path: Path) -> None:
 
     assert wa.run_all(plan, workers=3, run_topic_fn=fake) == []
     assert called == []
+
+
+def test_ensure_per_topic_picks_materializes_legacy_with_slug(tmp_path: Path) -> None:
+    """A topic fresh via the legacy single-file gets a per-topic picks file, so
+    the feed builder (and the next freshness check) sees it without a re-run."""
+    picks_dir = tmp_path / "picks"
+    picks_dir.mkdir()
+    legacy = tmp_path / "weekly_picks.json"
+    legacy.write_text(
+        json.dumps(_payload((NOW - timedelta(hours=1)).isoformat(), topic="Topic A")),  # no slug field (pre-runner)
+        encoding="utf-8",
+    )
+    assert wa.ensure_per_topic_picks("Topic A", "00-topic-a", picks_dir, legacy) is True
+    written = json.loads((picks_dir / "00-topic-a.json").read_text(encoding="utf-8"))
+    assert written["slug"] == "00-topic-a"
+    assert written["topic"] == "Topic A"
+    assert len(written["picks"]) == 2
+
+
+def test_ensure_per_topic_picks_skips_when_already_present(tmp_path: Path) -> None:
+    picks_dir = tmp_path / "picks"
+    picks_dir.mkdir()
+    (picks_dir / "00-topic-a.json").write_text(json.dumps({"slug": "00-topic-a", "picks": []}), encoding="utf-8")
+    legacy = tmp_path / "weekly_picks.json"
+    legacy.write_text(json.dumps(_payload(NOW.isoformat(), topic="Topic A")), encoding="utf-8")
+    assert wa.ensure_per_topic_picks("Topic A", "00-topic-a", picks_dir, legacy) is False
+    assert json.loads((picks_dir / "00-topic-a.json").read_text(encoding="utf-8"))["picks"] == []  # untouched
+
+
+def test_ensure_per_topic_picks_ignores_other_topics_legacy(tmp_path: Path) -> None:
+    picks_dir = tmp_path / "picks"
+    picks_dir.mkdir()
+    legacy = tmp_path / "weekly_picks.json"
+    legacy.write_text(json.dumps(_payload(NOW.isoformat(), topic="Topic B")), encoding="utf-8")
+    assert wa.ensure_per_topic_picks("Topic A", "00-topic-a", picks_dir, legacy) is False
+    assert not (picks_dir / "00-topic-a.json").exists()

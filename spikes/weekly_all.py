@@ -125,6 +125,28 @@ def _load_payload(path: Path | None) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
+def ensure_per_topic_picks(topic_name: str, slug: str, picks_dir: Path, legacy_path: Path | None) -> bool:
+    """Materialize a per-topic picks file from the legacy single-file.
+
+    A topic fresh via the legacy fallback (never re-run under the runner) has
+    no per-topic picks file yet; without one the feed builder finds nothing and
+    the next freshness check must fall back again. Copy the legacy payload
+    (stamping the slug) into picks_dir/{slug}.json — one-time convergence.
+    Returns True when a file was written.
+    """
+    per_topic = picks_dir / f"{slug}.json"
+    if per_topic.exists():
+        return False  # already per-topic: nothing to converge
+    legacy = _load_payload(legacy_path)
+    if legacy is None or legacy.get("topic") != topic_name:
+        return False  # legacy belongs to another topic (or absent)
+    payload = dict(legacy)
+    payload["slug"] = slug
+    picks_dir.mkdir(parents=True, exist_ok=True)
+    per_topic.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return True
+
+
 def plan_runs(
     topics: list[dict[str, Any]],
     *,
@@ -219,9 +241,11 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     for name, slug in plan.fresh:
-        per_topic = _load_payload(PICKS_DIR / f"{slug}.json")
-        n = len((per_topic or {}).get("picks", [])) if per_topic else 0
-        ts = ((per_topic or {}).get("generated_at") or "?")[:10]
+        if ensure_per_topic_picks(name, slug, PICKS_DIR, LEGACY_PICKS_PATH):
+            print(f"      migrated {name} picks -> spikes/state/picks/{slug}.json (legacy single-file)")
+        payload = _load_payload(PICKS_DIR / f"{slug}.json")
+        n = len(payload.get("picks", [])) if payload else 0
+        ts = ((payload or {}).get("generated_at") or "?")[:10]
         print(f"[skip] {name} — fresh (last selection {ts}, {n} picks)")
     for name in plan.no_list:
         print(f"[skip] {name} — no discovery source list (run `make topic-sources TOPIC=...`)")
