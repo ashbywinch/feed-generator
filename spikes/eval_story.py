@@ -64,14 +64,11 @@ LLM_MODEL = os.environ.get("OPENCODE_GO_MODEL", "deepseek-v4-flash")
 # Eval-gate thresholds live on the Config env surface (PRD config contract,
 # r15): the eval and the weekly pipeline share one source of truth so a
 # threshold changed via .env cannot silently drift the two apart.
-CFG = Config(
-    llm_key=LLM_KEY,
-    llm_base=LLM_BASE,
-    llm_model=LLM_MODEL,
-    google_key=os.environ.get("GOOGLE_API_KEY", ""),
-    embed_model=os.environ.get("EMBEDDING_MODEL", "gemini-embedding-001"),
-    exa_key=os.environ.get("EXA_API_KEY", ""),
-)
+# One env surface for engine + spikes: from_env_optional honors every
+# documented override (PROMPT_REV, RECENCY_DAYS, EVAL_PASS_FRAC, ...) in real
+# runs while importing cleanly in CI (no keys) — a direct Config(...) here
+# would silently ignore the env overrides (r19).
+CFG = Config.from_env_optional()
 
 OVERVIEW_MIN_WORDS = CFG.eval_overview_min_words
 MIN_DECLARATIVE_PER_SECTION = CFG.eval_min_declarative

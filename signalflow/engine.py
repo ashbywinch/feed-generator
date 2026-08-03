@@ -99,15 +99,19 @@ class Engine:
             self._memory.save_blacklist(previous)
             print("FATAL: exclusion-set write incomplete — refusing to complete setup (no partial blacklist)")
             return 1
+        previous_topics: list[dict[str, Any]] = []
         try:
+            previous_topics = self._memory.topics()  # snapshot BEFORE clearing (r19)
             self._memory.clear_topics()  # a re-run must drop topics removed from the curated set
             seeded = self._seed_from_curated()
         except Exception as exc:  # noqa: BLE001 — a seed crash must not leave a partial setup
             self._memory.save_blacklist(previous)  # roll back: no partial setup
+            self._restore_topics(previous_topics)
             print(f"FATAL: topics seed failed ({type(exc).__name__}) — refusing to persist a partial setup")
             return 1
         if seeded <= 0:
             self._memory.save_blacklist(previous)  # roll back: no partial setup
+            self._restore_topics(previous_topics)
             print("FATAL: topics seed produced zero topics — refusing to persist a partial setup")
             return 1
         print(f"      {len(feeds)} feeds, {len(known_domains)} blacklist domains stored")
@@ -148,6 +152,27 @@ class Engine:
 
         print("[6/6] done")
         return 0
+
+    def _restore_topics(self, previous_topics: list[dict[str, Any]]) -> None:
+        """Re-seed the previously stored topics after a failed setup re-run.
+
+        clear_topics() wiped them; a transient seed failure must not leave the
+        recurring run with an empty topics table (r19 suggestion — same
+        assignment shape seed_topics consumes)."""
+        if not previous_topics:
+            return
+        assignment = {
+            "topics": {
+                t.get("name", ""): {
+                    "n_feeds": t.get("feed_count", 0),
+                    "gap": bool(t.get("gap")),
+                    "strategy": t.get("strategy", {}),
+                }
+                for t in previous_topics
+                if t.get("name")
+            }
+        }
+        self._memory.seed_topics(assignment)
 
     def _seed_from_curated(self) -> int:
         """Seed the topics table from the curated topics.json (walkthrough final set)."""

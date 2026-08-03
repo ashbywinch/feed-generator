@@ -957,6 +957,23 @@ def test_llm_check_handles_non_dict_output() -> None:
     assert len(failures) == 2  # every query fails with a controlled verdict
 
 
+def test_llm_check_handles_non_list_judgments() -> None:
+    """{\"judgments\": <non-list>} must fail every query cleanly, not crash
+    the gate with len() TypeError (r19 finding)."""
+    eq = _load_spike("eval_queries")
+
+    class BadJudgmentsLLM:
+        def chat_json(self, prompt: str, **kwargs: Any) -> dict[str, Any]:
+            return {"judgments": 3}  # malformed: not a list
+
+    class Limiter:
+        def wait(self) -> None:
+            pass
+
+    failures = eq.llm_check(["q1", "q2"], {"name": "T", "in": "i", "out": "o"}, BadJudgmentsLLM(), Limiter())
+    assert len(failures) == 2  # each query flagged as unjudged, no crash
+
+
 def test_llm_check_handles_router_exception() -> None:
     eq = _load_spike("eval_queries")
 

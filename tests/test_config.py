@@ -12,6 +12,21 @@ def test_from_env_missing_key_fails_fast(monkeypatch):
         Config.from_env()
 
 
+def test_from_env_optional_tolerates_missing_keys(monkeypatch):
+    """Spike scripts import Config at module level in CI (no keys) AND must
+    honor env overrides in real runs — the optional loader reads env with
+    defaults instead of raising (r19 finding)."""
+    for var in ("OPENCODE_GO_API_KEY", "OPENCODE_GO_BASE_URL", "GOOGLE_API_KEY", "RECENCY_DAYS"):
+        monkeypatch.delenv(var, raising=False)
+    cfg = Config.from_env_optional()
+    assert cfg.llm_key == ""  # no keys: tolerated, defaults empty
+    assert cfg.weekly_recency_days == 7  # default preserved
+    # with a key override present, the env value IS honored
+    monkeypatch.setenv("RECENCY_DAYS", "14")
+    cfg2 = Config.from_env_optional()
+    assert cfg2.weekly_recency_days == 14
+
+
 def test_from_env_parses_overrides(monkeypatch):
     monkeypatch.setenv("OPENCODE_GO_API_KEY", "k")
     monkeypatch.setenv("OPENCODE_GO_BASE_URL", "https://router/v1")

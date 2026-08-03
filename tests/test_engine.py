@@ -284,6 +284,40 @@ def test_setup_rolls_back_blacklist_when_seed_raises(cfg: Any) -> None:
     assert engine._memory.blacklist() == set()
 
 
+def test_setup_restores_topics_when_seed_raises(cfg: Any) -> None:
+    """A seed crash after clear_topics() must restore the previously stored
+    topics — otherwise the recurring run aborts with 'no topics stored' and
+    prior curated strategies are lost (r19 finding/suggestion)."""
+    saved_topics: list[dict[str, Any]] = []
+
+    def _parse(path: Any) -> Any:
+        return {"sub.com"}, []
+
+    class M(FakeMemory):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, **kwargs)
+            self._seed_calls = 0
+
+        def seed_topics(self, assignment: dict[str, Any]) -> int:
+            self._seed_calls += 1
+            if self._seed_calls == 1:
+                raise RuntimeError("topics file corrupt")  # the initial seed fails
+            saved_topics.extend({"name": t} for t in assignment["topics"])  # the restore succeeds
+            self._topics = [{"name": t} for t in assignment["topics"]]
+            return len(assignment["topics"])
+
+        def save_blacklist(self, domains: set[str]) -> int:
+            self._blacklist = set(domains)
+            return len(domains)
+
+    engine = _engine(cfg, memory_cls=M, parse_opml=_parse, load_topics=engine_mod.load_topics)
+    # a previous successful setup stored two topics
+    cast(Any, engine._memory)._topics = [{"name": "A", "strategy": {}}, {"name": "B", "strategy": {}}]
+    assert engine.setup() == 1  # seed raises -> rollback
+    names = {t["name"] for t in engine._memory.topics()}
+    assert names == {"A", "B"}  # previous topics restored, not left empty
+
+
 def test_setup_drops_topics_removed_from_curated_set(cfg: Any) -> None:
     """Re-running setup after a topic is removed from the curated set must drop
     it — seed_topics only upserts, so a stale topic would keep being discovered

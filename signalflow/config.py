@@ -61,16 +61,32 @@ class Config:
 
     @classmethod
     def from_env(cls) -> Config:
-        required = ("OPENCODE_GO_API_KEY", "OPENCODE_GO_BASE_URL", "GOOGLE_API_KEY")
-        missing = [v for v in required if not os.environ.get(v)]
-        if missing:
+        """Strict loader: raise if any required key is missing (engine paths)."""
+        return cls._from_env(required=True)
+
+    @classmethod
+    def from_env_optional(cls) -> Config:
+        """Tolerant loader: read env with defaults when keys are missing.
+
+        The spike scripts construct Config at module import time, which runs in
+        CI (no keys) — but they MUST honor env overrides (PROMPT_REV,
+        RECENCY_DAYS, EVAL_PASS_FRAC, ...) in real runs. One loader keeps the
+        Config env surface as the single source of truth for both (r19).
+        """
+        return cls._from_env(required=False)
+
+    @classmethod
+    def _from_env(cls, required: bool) -> Config:
+        required_vars = ("OPENCODE_GO_API_KEY", "OPENCODE_GO_BASE_URL", "GOOGLE_API_KEY")
+        missing = [v for v in required_vars if not os.environ.get(v)]
+        if required and missing:
             raise SystemExit(f"FATAL: missing env vars: {', '.join(missing)} — check .env")
         return cls(
-            llm_key=os.environ["OPENCODE_GO_API_KEY"],
-            llm_base=os.environ["OPENCODE_GO_BASE_URL"],
+            llm_key=os.environ.get("OPENCODE_GO_API_KEY", ""),
+            llm_base=os.environ.get("OPENCODE_GO_BASE_URL", ""),
             llm_model=os.environ.get("OPENCODE_GO_MODEL", "deepseek-v4-flash"),
             embed_model=os.environ.get("EMBEDDING_MODEL", "gemini-embedding-001"),
-            google_key=os.environ["GOOGLE_API_KEY"],
+            google_key=os.environ.get("GOOGLE_API_KEY", ""),
             exa_key=os.environ.get("EXA_API_KEY", ""),
             sim_high=float(os.environ.get("SIM_THRESHOLD_HIGH", "0.82")),
             sim_low=float(os.environ.get("SIM_THRESHOLD_LOW", "0.65")),
