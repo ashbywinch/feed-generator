@@ -129,7 +129,7 @@ jobs:
         env: { RCLONE_CONFIG_R2_TYPE: s3, RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}, ... }
       - run: echo "topics=$(.venv/bin/python spikes/topic_rotation.py --csv)" >> "$GITHUB_OUTPUT"
         id: rotation
-      - run: TOPICS="${{ steps.rotation.outputs.topics }}" uv run python spikes/weekly_all.py
+      - run: WEEKLY_TOPICS="${{ steps.rotation.outputs.topics }}" uv run python spikes/weekly_all.py
         env: { OPENCODE_GO_API_KEY: ..., OPENCODE_GO_BASE_URL: ..., EXA_API_KEY: ... }
       - run: uv run python spikes/build_feeds.py
       - run: uv run python spikes/deploy_site.py
