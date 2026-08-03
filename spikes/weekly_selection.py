@@ -37,8 +37,10 @@ Repeatability (the point of this pipeline):
         work (everything cached) never folds and stays cheap; after one
         re-evaluation the system settles (cached verdicts cover the window).
   - Output: spikes/output/weekly_report.md (human) + spikes/state/weekly_picks.json
-        (machine-readable picks) + spikes/output/story_{slug}.md (rendered story
-        view, like docs/topics.md from topics.json).
+        (legacy single-file) + spikes/state/picks/{slug}.json (per-topic
+        machine-readable picks — freshness + feed-builder source) +
+        spikes/output/story_{slug}.md (rendered story view, like
+        docs/topics.md from topics.json).
 
 Run: make spike-weekly   (TOPIC="Grid & Net Zero economics" is the default)
 
@@ -54,6 +56,7 @@ import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -1015,24 +1018,42 @@ def zero_pick_source_names(sources: list[Source]) -> list[str]:
     return [s["name"] for s in sources if s["items"] and not s["picks"] and not s.get("eval_error")]
 
 
-def main(argv: list[str] | None = None) -> int:
-    del argv  # config comes from env; signature mirrors the engine's main()
-    for var in ("OPENCODE_GO_API_KEY", "OPENCODE_GO_BASE_URL"):
-        if not os.environ.get(var):
-            print(f"FATAL: missing env var {var} — check .env (see .env.example)")
-            return 1
-    smoke_test()
+@dataclass(frozen=True)
+class TopicOut:
+    """Per-topic output paths for one weekly selection run.
 
-    topics = load_topics()
-    topic = next((t for t in topics if t["name"].lower() == TOPIC_NAME.lower()), None)
-    if topic is None:
-        print(f"unknown topic: {TOPIC_NAME!r}; available:\n  " + "\n  ".join(t["name"] for t in topics))
-        return 1
-    listing, sources, slug = load_source_list(topic["name"])
-    if listing is None:
-        print(f"no discovery source list for {topic['name']!r} — run `make topic-sources TOPIC=...` first")
-        return 1
+    picks_path is the topic's machine-readable picks JSON — the runner's
+    freshness source and the feed builder's input. legacy_picks_path is the
+    single-file spikes/state/weekly_picks.json kept for single-topic CLI runs;
+    multi-topic runs pass None (a shared single file would race across worker
+    threads).
+    """
+
+    picks_path: Path
+    report_path: Path
+    story_md_path: Path
+    legacy_picks_path: Path | None = None
+
+
+def run_topic(
+    topic: dict[str, Any],
+    listing: dict[str, Any],
+    sources: list[Source],
+    slug: str,
+    out: TopicOut,
+    *,
+    limiter: RateLimiter | None = None,
+) -> dict[str, Any]:
+    """Run the weekly selection pipeline for ONE topic, writing per-topic outputs.
+
+    Shared caches (feeds/verdicts/pick-history JSONL) stay module-level and are
+    thread-safe via APPEND_LOCK; only the per-topic outputs vary, so concurrent
+    topics (spikes/weekly_all.py) can share one process and one RateLimiter.
+    Returns the run summary dict (also rendered to the report).
+    """
     print(f"[1/6] topic: {topic['name']} | {len(sources)} unique sources (from docs/discovery/)")
+    if limiter is None:
+        limiter = RateLimiter(EVAL_INTERVAL)
 
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     story = load_story(slug)
@@ -1244,6 +1265,7 @@ def main(argv: list[str] | None = None) -> int:
 
     picks: list[dict[str, Any]] = []
     seen_pick_urls: set[str] = set()
+    now = datetime.now(UTC).isoformat()  # one run timestamp for picks + history + feeds
     for s in sources:
         order = {it["url"]: i for i, it in enumerate(s["items"])}
         approved = sorted(
@@ -1267,6 +1289,7 @@ def main(argv: list[str] | None = None) -> int:
                     "reason": v.get("reason", ""),
                     "thesis": v.get("thesis", ""),
                     "empirical_event": v.get("empirical_event", ""),
+                    "picked_at": now,
                 }
             )
 
@@ -1281,11 +1304,13 @@ def main(argv: list[str] | None = None) -> int:
         story["pending"] = story.get("pending", []) + [p for p in picks if p["url"] not in known_pending]
     story_md = render_story_markdown(story, topic["name"])
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    report_path = OUT_DIR / "weekly_report.md"
-    story_md_path = OUT_DIR / f"story_{slug}.md"
+    out.report_path.parent.mkdir(parents=True, exist_ok=True)
+    out.picks_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path = out.report_path
+    story_md_path = out.story_md_path
     summary: dict[str, Any] = {
         "topic": topic["name"],
+        "slug": slug,
         "generated_at": datetime.now(UTC).isoformat(),
         "recency_days": RECENCY_DAYS,
         "sources_total": len(sources),
@@ -1324,10 +1349,16 @@ def main(argv: list[str] | None = None) -> int:
     # file, never the exclusion). Per-pick appends could interleave with a crash
     # and leave some URLs out of the history.
     with APPEND_LOCK, PICKS_HISTORY_PATH.open("a", encoding="utf-8") as fh:
-        now = datetime.now(UTC).isoformat()
         lines = [
             json.dumps(
-                {"key": p["url"], "picked_at": now, "url": p["url"], "title": p["title"], "source": p["source"]},
+                {
+                    "key": p["url"],
+                    "picked_at": p.get("picked_at", now),
+                    "slug": slug,
+                    "url": p["url"],
+                    "title": p["title"],
+                    "source": p["source"],
+                },
                 ensure_ascii=False,
             )
             + "\n"
@@ -1341,24 +1372,64 @@ def main(argv: list[str] | None = None) -> int:
     if picks:
         save_story(slug, story)
 
-    tmp = PICKS_PATH.with_suffix(".tmp")
     payload = json.dumps(
-        {"generated_at": summary["generated_at"], "topic": topic["name"], "picks": picks},
+        {"generated_at": summary["generated_at"], "topic": topic["name"], "slug": slug, "picks": picks},
         indent=2,
         ensure_ascii=False,
     )
+    # Per-topic picks file first (the runner's freshness/feed source), then the
+    # legacy single-file (single-topic runs only) — atomic replaces throughout.
+    tmp = out.picks_path.with_suffix(".tmp")
     _ = tmp.write_text(payload + "\n", encoding="utf-8")
-    _ = tmp.replace(PICKS_PATH)
+    _ = tmp.replace(out.picks_path)
+    if out.legacy_picks_path is not None:
+        tmp = out.legacy_picks_path.with_suffix(".tmp")
+        _ = tmp.write_text(payload + "\n", encoding="utf-8")
+        _ = tmp.replace(out.legacy_picks_path)
     print(f"[5/6] picked {len(picks)} articles")
     for p in picks:
         print(f"      - [{p['source']}] {p['title'][:90]}")
     zero = zero_pick_source_names(sources)
     if zero:
         print(f"      zero picks ({len(zero)}): {', '.join(zero[:8])}{' …' if len(zero) > 8 else ''}")
-    print(f"[6/6] report -> {report_path.relative_to(ROOT)}")
-    print(f"      picks  -> {PICKS_PATH.relative_to(ROOT)}")
-    print(f"      story  -> {story_md_path.relative_to(ROOT)} (v{story.get('version', 0)})")
-    return 0
+
+    def _shown(p: Path) -> Path:
+        try:
+            return p.relative_to(ROOT)
+        except ValueError:
+            return p  # outside the repo (e.g. test tmp dirs): show absolute
+
+    print(f"[6/6] report -> {_shown(report_path)}")
+    print(f"      picks  -> {_shown(out.picks_path)}")
+    print(f"      story  -> {_shown(story_md_path)} (v{story.get('version', 0)})")
+    return summary
+
+
+def main(argv: list[str] | None = None) -> int:
+    del argv  # config comes from env; signature mirrors the engine's main()
+    for var in ("OPENCODE_GO_API_KEY", "OPENCODE_GO_BASE_URL"):
+        if not os.environ.get(var):
+            print(f"FATAL: missing env var {var} — check .env (see .env.example)")
+            return 1
+    smoke_test()
+
+    topics = load_topics()
+    topic = next((t for t in topics if t["name"].lower() == TOPIC_NAME.lower()), None)
+    if topic is None:
+        print(f"unknown topic: {TOPIC_NAME!r}; available:\n  " + "\n  ".join(t["name"] for t in topics))
+        return 1
+    listing, sources, slug = load_source_list(topic["name"])
+    if listing is None:
+        print(f"no discovery source list for {topic['name']!r} — run `make topic-sources TOPIC=...` first")
+        return 1
+    out = TopicOut(
+        picks_path=STATE_DIR / "picks" / f"{slug}.json",
+        report_path=OUT_DIR / "weekly_report.md",
+        story_md_path=OUT_DIR / f"story_{slug}.md",
+        legacy_picks_path=PICKS_PATH,  # single-topic CLI runs keep the legacy file
+    )
+    summary = run_topic(topic, listing, sources, slug, out)
+    return 0 if summary.get("slug") else 1
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -24,6 +25,9 @@ def _load_spike(name: str) -> Any:
     if spec is None or spec.loader is None:
         raise ImportError(f"cannot load spike {name}")
     mod = importlib.util.module_from_spec(spec)
+    # Register before exec: dataclasses (and any sys.modules lookup) need the
+    # module visible under its real name while the class body runs.
+    sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
 
@@ -1095,6 +1099,153 @@ def test_single_article_never_passes_via_tolerance() -> None:
     # total == 1 with zero sufficient must FAIL (was: 0 >= 0 via total-1 passed).
     assert ev.contextualization_passes(sufficient=0, total=1, pass_frac=ev.PASS_FRAC) is False
     assert ev.contextualization_passes(sufficient=1, total=1, pass_frac=ev.PASS_FRAC) is True
+
+
+# --- run_topic: per-topic outputs, picked_at, slugged history (multi-topic) --
+
+
+def _fake_topic() -> dict[str, Any]:
+    return {"name": "Test Topic", "description": "d", "in": "i", "out": "o", "sources": []}
+
+
+def _fake_source() -> dict[str, Any]:
+    return {
+        "name": "Fake Feed",
+        "domain": "fake.example",
+        "type": "newsletter",
+        "why": "",
+        "crawl_root": "https://fake.example/feed",
+        "subarea": "Sub A",
+        "subareas": ["Sub A"],
+    }
+
+
+def _run_topic_fixture(tmp_path: Any, monkeypatch: Any) -> dict[str, Any]:
+    """Wire run_topic with fake fetch/eval/caches so the REAL pipeline body
+    (window, verdict mirroring, picks, history, per-topic writes) runs without
+    network or LLM. Returns everything assertions need."""
+    import json as _json
+
+    topic = _fake_topic()
+    listing: dict[str, Any] = {"topic": "Test Topic"}
+    slug = "01-test-topic"
+    source = _fake_source()
+
+    def fake_fetch_feed(s: dict[str, Any]) -> dict[str, Any]:
+        s["items"] = [
+            {
+                "url": f"https://fake.example/{i}",
+                "title": f"Article {i}",
+                "summary": f"Summary {i}",
+                "published": (datetime.now(UTC) - timedelta(days=i)).isoformat(),
+            }
+            for i in range(1, 4)
+        ]
+        s["feed_version"] = "1"
+        return s
+
+    def fake_evaluate_source(
+        source_: dict[str, Any],
+        items: list[dict[str, Any]],
+        _topic: dict[str, Any],
+        _llm: Any,
+        _limiter: Any,
+        _ctx: str,
+    ) -> list[dict[str, Any]]:
+        return [
+            {
+                "url": it["url"],
+                "title": it["title"],
+                "approved": True,
+                "reason": f"why {it['title']}",
+                "thesis": f"thesis {it['title']}",
+                "empirical_event": f"event {it['title']}",
+                "subarea": source_["subarea"],
+            }
+            for it in items[:2]
+        ]
+
+    story = {
+        "version": 1,
+        "updated_at": "2026-08-01T00:00:00+00:00",
+        "overview": "big picture",
+        "angles": {"Sub A": ["angle one"]},
+        "open_questions": ["q?"],
+        "pending": [],
+    }
+    feeds_path = tmp_path / "feeds.jsonl"
+    verdicts_path = tmp_path / "verdicts.jsonl"
+    history_path = tmp_path / "picks_history.jsonl"
+    monkeypatch.setattr(ws, "load_feeds", lambda: {})
+    monkeypatch.setattr(ws, "load_verdicts", lambda story_version, slug_, path=None: {})
+    monkeypatch.setattr(ws, "load_picked_urls", lambda: set())
+    monkeypatch.setattr(ws, "load_story", lambda slug_: story)
+    monkeypatch.setattr(ws, "save_story", lambda slug_, s: None)
+    monkeypatch.setattr(ws, "fetch_feed", fake_fetch_feed)
+    monkeypatch.setattr(ws, "evaluate_source", fake_evaluate_source)
+    monkeypatch.setattr(ws, "FEEDS_PATH", feeds_path)
+    monkeypatch.setattr(ws, "VERDICTS_PATH", verdicts_path)
+    monkeypatch.setattr(ws, "PICKS_HISTORY_PATH", history_path)
+    return {"topic": topic, "listing": listing, "slug": slug, "sources": [source], "story": story, "json": _json}
+
+
+def test_run_topic_writes_per_topic_picks_and_report(tmp_path: Any, monkeypatch: Any) -> None:
+    fx = _run_topic_fixture(tmp_path, monkeypatch)
+    out = ws.TopicOut(
+        picks_path=tmp_path / "picks" / "01-test-topic.json",
+        report_path=tmp_path / "reports" / "weekly_report_01-test-topic.md",
+        story_md_path=tmp_path / "story_01-test-topic.md",
+    )  # no legacy_picks_path: multi-topic mode
+    summary = ws.run_topic(fx["topic"], fx["listing"], fx["sources"], fx["slug"], out)
+
+    assert summary["slug"] == "01-test-topic"
+    assert summary["picked"] == 2
+
+    picks = fx["json"].loads(out.picks_path.read_text(encoding="utf-8"))
+    assert picks["slug"] == "01-test-topic"
+    assert picks["topic"] == "Test Topic"
+    assert len(picks["picks"]) == 2
+    for p in picks["picks"]:
+        assert p["url"].startswith("https://fake.example/")
+        assert p["reason"] == f"why {p['title']}"
+        assert p["thesis"] == f"thesis {p['title']}"
+        assert p["empirical_event"] == f"event {p['title']}"
+        datetime.fromisoformat(p["picked_at"])  # parseable; not str-patched
+
+    report = out.report_path.read_text(encoding="utf-8")
+    assert "Test Topic" in report
+    assert "Fake Feed" in report
+
+    lines = (tmp_path / "picks_history.jsonl").read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 2
+    for line in lines:
+        rec = fx["json"].loads(line)
+        assert rec["slug"] == "01-test-topic"
+        datetime.fromisoformat(rec["picked_at"])
+        assert rec["key"] == rec["url"]
+
+    vlines = (tmp_path / "verdicts.jsonl").read_text(encoding="utf-8").strip().splitlines()
+    assert len(vlines) == 2
+    for line in vlines:
+        assert fx["json"].loads(line)["slug"] == "01-test-topic"
+
+    assert not (tmp_path / "weekly_picks.json").exists()  # no legacy write in multi-topic mode
+
+
+def test_run_topic_legacy_single_file_only_when_configured(tmp_path: Any, monkeypatch: Any) -> None:
+    fx = _run_topic_fixture(tmp_path, monkeypatch)
+    legacy = tmp_path / "weekly_picks.json"
+    out = ws.TopicOut(
+        picks_path=tmp_path / "picks" / "01-test-topic.json",
+        report_path=tmp_path / "weekly_report.md",
+        story_md_path=tmp_path / "story_01-test-topic.md",
+        legacy_picks_path=legacy,
+    )
+    ws.run_topic(fx["topic"], fx["listing"], fx["sources"], fx["slug"], out)
+    assert legacy.exists()  # single-topic CLI runs keep the legacy file
+    payload = fx["json"].loads(legacy.read_text(encoding="utf-8"))
+    assert payload["topic"] == "Test Topic"
+    assert len(payload["picks"]) == 2
 
 
 if __name__ == "__main__":
