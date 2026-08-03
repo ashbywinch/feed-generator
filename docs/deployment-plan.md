@@ -64,25 +64,25 @@ the Worker. Same auth story, an HTTP API you own, marginally more code.
 
 ## Nightly rotation (two topics per night)
 
-13 topics, 2 per night × 7 nights = 14 slots → 6 nights of 2, 1 night of 1.
+13 topics, 2 per night × 7 nights = 14 slots → Mon-Sat run 2, Sunday runs 1.
+**Fixed weekly schedule** (no week-offset): sorted topic names are chunked
+Mon-Sat into pairs and Sunday takes the final single topic. Each topic has a
+fixed weekday slot — this is what guarantees ANY 7 consecutive days cover every
+topic at least once, which is the property that makes the rotation the
+self-healing recovery path. (A week-offset rotation would shuffle pairings but
+break that guarantee for windows spanning a week boundary — rejected.)
 
-Required change (not yet implemented): `spikes/weekly_all.py` accepts
-`WEEKLY_TOPICS` env (comma-separated topic names) and `plan_runs` filters to
-that subset — freshness gating still applies, so a topic in tonight's slot that
-ran < 7 days ago is skipped (cheap night, correct).
+Implemented: `spikes/topic_rotation.py` — `rotation_for(day, topics)` is pure
+and deterministic; the CLI prints tonight's topics (`--date` for testing,
+`--csv` for the workflow).
 
-Required new script: `spikes/topic_rotation.py` — deterministic from the date:
+Required change (implemented): `spikes/weekly_all.py` accepts `WEEKLY_TOPICS`
+env (comma-separated topic names) and `plan_runs` filters to that subset —
+freshness gating still applies, so a topic in tonight's slot that ran < 7 days
+ago is skipped (cheap night, correct).
 
-- Sort topic names; index `t = (topic_idx + week_offset) % 13`, chunk the
-  sorted list into 7 groups of 2 (last group of 1), assign group `d` to
-  weekday `d`, `week_offset = iso_week % 7` shuffles pairings weekly.
-- Output: tonight's topic names, one per line (`--csv` for the workflow).
-- Property that makes the rotation the recovery path: a missed or wiped run
-  leaves topics stale, and the rotation re-covers every topic within ~a week
-  automatically. A full state wipe never needs a manual mega-run.
-
-Acceptance: `python spikes/topic_rotation.py` on any date prints 2 (or 1)
-distinct topic names; across any 7 consecutive days every topic appears ≥ 1×.
+Acceptance (tests): `python spikes/topic_rotation.py` on any date prints 2 (or
+1) distinct topic names; across any 7 consecutive days every topic appears ≥ 1×.
 
 ## Front end + admin (Cloudflare Pages)
 

@@ -117,7 +117,13 @@ def _fake_loader(by_name: dict[str, tuple[Any, list[Any], str]]):
     return load
 
 
-def _plan(tmp_path: Path, topics: list[dict[str, Any]], loader: Any, legacy: dict[str, Any] | None = None):
+def _plan(
+    tmp_path: Path,
+    topics: list[dict[str, Any]],
+    loader: Any,
+    legacy: dict[str, Any] | None = None,
+    weekly_topics: list[str] | None = None,
+):
     return wa.plan_runs(
         topics,
         discovery_dir=tmp_path / "discovery",
@@ -127,6 +133,7 @@ def _plan(tmp_path: Path, topics: list[dict[str, Any]], loader: Any, legacy: dic
         recency_days=7,
         load_list=loader,
         legacy_payload=legacy,
+        weekly_topics=weekly_topics,
     )
 
 
@@ -169,6 +176,38 @@ def test_plan_runs_legacy_file_makes_topic_fresh(tmp_path: Path) -> None:
     plan = _plan(tmp_path, [topic], loader, legacy=legacy)
     assert plan.fresh == [("Topic A", "00-topic-a")]
     assert plan.to_run == []
+
+
+# --- WEEKLY_TOPICS: run only tonight's rotation subset ----------------------
+
+
+def test_plan_runs_filters_to_weekly_topics(tmp_path: Path) -> None:
+    (tmp_path / "picks").mkdir()
+    topics = [_topic("Alpha"), _topic("Bravo"), _topic("Charlie")]
+    loader = _fake_loader(
+        {
+            "Alpha": ({"topic": "Alpha"}, [{"name": "s"}], "01-alpha"),
+            "Bravo": ({"topic": "Bravo"}, [{"name": "s"}], "02-bravo"),
+            "Charlie": ({"topic": "Charlie"}, [{"name": "s"}], "03-charlie"),
+        }
+    )
+    plan = _plan(tmp_path, topics, loader, weekly_topics=["Alpha", "Charlie"])
+    assert [s.slug for s in plan.to_run] == ["01-alpha", "03-charlie"]
+    assert plan.fresh == []
+
+
+def test_plan_runs_weekly_topics_is_case_insensitive(tmp_path: Path) -> None:
+    (tmp_path / "picks").mkdir()
+    loader = _fake_loader({"Alpha": ({"topic": "Alpha"}, [{"name": "s"}], "01-alpha")})
+    plan = _plan(tmp_path, [_topic("Alpha")], loader, weekly_topics=["alpha"])
+    assert [s.slug for s in plan.to_run] == ["01-alpha"]
+
+
+def test_plan_runs_weekly_topics_empty_subset_runs_nothing(tmp_path: Path) -> None:
+    (tmp_path / "picks").mkdir()
+    loader = _fake_loader({"Alpha": ({"topic": "Alpha"}, [{"name": "s"}], "01-alpha")})
+    plan = _plan(tmp_path, [_topic("Alpha")], loader, weekly_topics=[])
+    assert plan.to_run == [] and plan.fresh == []
 
 
 # --- execution --------------------------------------------------------------

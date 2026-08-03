@@ -175,8 +175,16 @@ def plan_runs(
     recency_days: int,
     load_list: Callable[..., Any] = ws.load_source_list,
     legacy_payload: dict[str, Any] | None = None,
+    weekly_topics: list[str] | None = None,
 ) -> Plan:
-    """Classify every topic: stale (to_run), fresh (skip), or no source list."""
+    """Classify every topic: stale (to_run), fresh (skip), or no source list.
+
+    weekly_topics (the night's rotation subset, case-insensitive) restricts
+    planning to those topics; freshness gating still applies within the subset.
+    """
+    if weekly_topics is not None:
+        wanted = {name.lower() for name in weekly_topics}
+        topics = [t for t in topics if t["name"].lower() in wanted]
     plan = Plan()
     for topic in topics:
         listing, sources, slug = load_list(topic["name"], discovery_dir)
@@ -296,6 +304,7 @@ def main(argv: list[str] | None = None) -> int:
 
     topics = load_topics()
     now = datetime.now(UTC)
+    weekly_topics = [t.strip() for t in os.environ.get("WEEKLY_TOPICS", "").split(",") if t.strip()] or None
     plan = plan_runs(
         topics,
         discovery_dir=DISCOVERY_DIR,
@@ -303,6 +312,7 @@ def main(argv: list[str] | None = None) -> int:
         legacy_picks_path=LEGACY_PICKS_PATH,
         now=now,
         recency_days=RECENCY_DAYS,
+        weekly_topics=weekly_topics,
     )
 
     for name, slug in plan.fresh:
