@@ -30,9 +30,16 @@ def rotation_for(day: date, topics: list[str]) -> list[str]:
 
     Sorted topic names are chunked Mon-Sat into pairs and Sunday takes the
     final single topic. Any 7 consecutive days therefore cover all topics.
+    Fails loudly above 14 topics (2 per night x 7 nights): a topic silently
+    left off the rotation would never be regenerated.
     """
     names = sorted(topics)
     n = len(names)
+    if n > 7 * PAIRS_PER_NIGHT:
+        raise ValueError(
+            f"rotation supports at most {7 * PAIRS_PER_NIGHT} topics, got {n} — "
+            "the 2-per-night x 7-night cadence needs a redesign for more"
+        )
     day_index = day.weekday()  # 0 = Monday .. 6 = Sunday
     start = day_index * PAIRS_PER_NIGHT
     end = min(start + PAIRS_PER_NIGHT, n)

@@ -63,6 +63,14 @@ def test_zip_site_flattens_to_zip_root(tmp_path: Path) -> None:
     assert not any(n.startswith("site/") for n in names)  # site dir itself not nested
 
 
+def test_zip_site_excludes_hidden_files(tmp_path: Path) -> None:
+    """A stray .env (or any dotfile) in the site dir must never be uploaded."""
+    site = _site(tmp_path)
+    (site / ".env").write_text("SECRET=leak", encoding="utf-8")
+    with zipfile.ZipFile(io.BytesIO(zip_site(site))) as zf:
+        assert ".env" not in zf.namelist()
+
+
 def test_deploy_site_skipped_without_credentials(tmp_path: Path, capsys) -> None:
     def boom(*args: Any, **kwargs: Any) -> Any:
         raise AssertionError("http must not be called without credentials")

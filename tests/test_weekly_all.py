@@ -216,7 +216,7 @@ def test_plan_runs_weekly_topics_empty_subset_runs_nothing(tmp_path: Path) -> No
 def _recording_runner(results: list[tuple[str, str]], active: list[int], lock: threading.Lock, delay: float = 0.05):
     """Fake run_topic that records (slug, error) and tracks concurrent active."""
 
-    def fake(topic, listing, sources, slug, out, *, limiter=None):
+    def fake(topic, listing, sources, slug, out, *, limiter=None, **kwargs):
         with lock:
             active[0] += 1
             peak[0] = max(peak[0], active[0])
@@ -279,7 +279,7 @@ def test_run_all_workers_one_serializes(tmp_path: Path) -> None:
 def test_run_all_failure_isolated(tmp_path: Path) -> None:
     out = ws.TopicOut(picks_path=tmp_path / "p.json", report_path=tmp_path / "r.md", story_md_path=tmp_path / "s.md")
 
-    def flaky(topic, listing, sources, slug, out, *, limiter=None):
+    def flaky(topic, listing, sources, slug, out, *, limiter=None, **kwargs):
         if slug == "01":
             raise RuntimeError("router exploded")
         return {"picked": 2, "slug": slug}
@@ -298,7 +298,7 @@ def test_run_all_empty_plan_no_calls(tmp_path: Path) -> None:
     plan = wa.Plan(to_run=[], fresh=[])
     called: list[str] = []
 
-    def fake(topic, listing, sources, slug, out, *, limiter=None):
+    def fake(topic, listing, sources, slug, out, *, limiter=None, **kwargs):
         called.append(slug)
         return {"picked": 0, "slug": slug}
 
@@ -364,7 +364,7 @@ def test_run_all_generates_sources_before_selecting(tmp_path: Path) -> None:
             return {"topic": topic_name, "subareas": []}, [{"name": "s"}], "03-no-list-topic"
         return None, [], ""
 
-    def fake_run(t, listing, sources, slug, out, *, limiter=None):
+    def fake_run(t, listing, sources, slug, out, *, limiter=None, **kwargs):
         calls.append(f"select:{slug}:{bool(listing)}:{len(sources)}")
         return {"picked": 4, "slug": slug}
 
@@ -400,7 +400,7 @@ def test_run_all_generation_failure_isolated(tmp_path: Path) -> None:
             raise RuntimeError("EXA_API_KEY missing")
         return True, 1
 
-    def fake_run(t, listing, sources, slug, out, *, limiter=None):
+    def fake_run(t, listing, sources, slug, out, *, limiter=None, **kwargs):
         return {"picked": 2, "slug": slug}
 
     def fake_load(topic_name: str, discovery_dir: Path | None = None) -> tuple[Any, list[Any], str]:
@@ -431,7 +431,7 @@ def test_run_all_generation_without_usable_list_fails(tmp_path: Path) -> None:
 
     ran: list[str] = []
 
-    def fake_run(t, listing, sources, slug, out, *, limiter=None):
+    def fake_run(t, listing, sources, slug, out, *, limiter=None, **kwargs):
         ran.append(slug)
         return {"picked": 0, "slug": slug}
 
@@ -470,7 +470,7 @@ def test_run_all_retries_generation_once_then_selects(tmp_path: Path) -> None:
             raise RuntimeError("router 400: label empty or too long")  # transient
         return True, 2
 
-    def fake_run(t, listing, sources, slug, out, *, limiter=None):
+    def fake_run(t, listing, sources, slug, out, *, limiter=None, **kwargs):
         ran.append(slug)
         return {"picked": 3, "slug": slug}
 
@@ -524,3 +524,22 @@ def test_run_all_generation_fails_after_retry(tmp_path: Path) -> None:
     assert len(attempts) == 2  # bounded retry, not a loop
     assert result.ok is False
     assert "EXA_API_KEY" in result.error
+
+
+def test_run_all_redacts_keys_from_error_and_traceback(tmp_path: Path, monkeypatch: Any, capsys: Any) -> None:
+    """Exception messages can embed API keys (the codebase's LLM._redact exists
+    because of it) — both the RunResult error and the logged traceback must be
+    redacted, not just the traceback."""
+
+    def boom(t, listing, sources, slug, out, *, limiter=None, **kwargs):
+        raise RuntimeError("router rejected sekrit-key-abc")
+
+    monkeypatch.setattr(wa, "LLM_KEY", "sekrit-key-abc")
+    plan = wa.Plan(
+        to_run=[wa.RunSpec(topic=_topic("X"), slug="03-x", listing={}, sources=[], out=_out(tmp_path))],
+        fresh=[],
+    )
+    (result,) = wa.run_all(plan, workers=1, run_topic_fn=boom)
+
+    assert "sekrit-key-abc" not in result.error
+    assert "sekrit-key-abc" not in capsys.readouterr().out  # logged traceback redacted too

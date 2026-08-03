@@ -14,6 +14,8 @@ from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 ROOT = Path(__file__).resolve().parent.parent
 
 
@@ -76,6 +78,28 @@ def test_rotation_is_deterministic() -> None:
 def test_schedule_repeats_weekly() -> None:
     # Same weekday in consecutive weeks picks the same topics (fixed schedule).
     assert tr.rotation_for(MON, TOPICS) == tr.rotation_for(MON + timedelta(days=7), TOPICS)
+
+
+def test_fourteen_topics_fill_sunday_pair() -> None:
+    names = TOPICS + ["November"]  # 14: every night runs 2, no solo
+    for i in range(7):
+        assert len(tr.rotation_for(MON + timedelta(days=i), names)) == 2
+    week = [t for d in range(7) for t in tr.rotation_for(MON + timedelta(days=d), names)]
+    assert sorted(week) == sorted(names)
+
+
+def test_fifteen_topics_raise_loudly() -> None:
+    """More than 14 topics cannot fit the 2-per-night x 7-night cadence — fail
+    loudly rather than silently dropping a topic from the rotation forever."""
+    names = TOPICS + ["November", "Oscar"]
+    with pytest.raises(ValueError):
+        tr.rotation_for(MON, names)
+
+
+def test_fewer_topics_still_cover_all_in_a_week() -> None:
+    names = TOPICS[:11]  # 11 topics: Friday/Saturday singles, Sunday empty
+    week = [t for d in range(7) for t in tr.rotation_for(MON + timedelta(days=d), names)]
+    assert sorted(week) == sorted(names)
 
 
 def test_cli_prints_tonight_topics(monkeypatch: Any, capsys: Any) -> None:

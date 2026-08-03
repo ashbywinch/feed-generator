@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import threading
 import traceback
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -250,6 +251,8 @@ def run_all(
     RunResult and the remaining topics still run (and still count).
     """
     results: list[RunResult] = []
+    claims: set[str] = set()  # URLs picked this run, shared across topics
+    claims_lock = threading.Lock()
 
     def worker(spec: RunSpec) -> RunResult:
         try:
@@ -267,7 +270,16 @@ def run_all(
                 listing, sources, _slug = load_list_fn(spec.topic["name"])
                 if listing is None:
                     raise RuntimeError(f"source list generation produced no usable list for {spec.topic['name']!r}")
-            summary = run_topic_fn(spec.topic, listing, sources, spec.slug, spec.out, limiter=limiter)
+            summary = run_topic_fn(
+                spec.topic,
+                listing,
+                sources,
+                spec.slug,
+                spec.out,
+                limiter=limiter,
+                claims=claims,
+                claim_lock=claims_lock,
+            )
             return RunResult(
                 slug=spec.slug,
                 topic=spec.topic["name"],
@@ -278,10 +290,12 @@ def run_all(
             )
         except Exception as exc:  # noqa: BLE001 — keep the batch alive; log, don't swallow
             tb = traceback.format_exc()
+            message = str(exc)
             if LLM_KEY:
-                tb = tb.replace(LLM_KEY, "***")  # never leak keys into the log
+                tb = tb.replace(LLM_KEY, "***")
+                message = message.replace(LLM_KEY, "***")  # keys can appear in exception text
             print(f"      TRACEBACK for {spec.topic['name']}:\n{tb}")
-            return RunResult(slug=spec.slug, topic=spec.topic["name"], ok=False, error=str(exc)[:300])
+            return RunResult(slug=spec.slug, topic=spec.topic["name"], ok=False, error=message[:300])
 
     with ThreadPoolExecutor(max_workers=workers) as ex:
         futures = [ex.submit(worker, spec) for spec in plan.to_run]

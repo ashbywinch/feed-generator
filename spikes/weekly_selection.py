@@ -1043,12 +1043,22 @@ def run_topic(
     out: TopicOut,
     *,
     limiter: RateLimiter | None = None,
+    claims: set[str] | None = None,
+    claim_lock: threading.Lock | None = None,
 ) -> dict[str, Any]:
     """Run the weekly selection pipeline for ONE topic, writing per-topic outputs.
 
     Shared caches (feeds/verdicts/pick-history JSONL) stay module-level and are
     thread-safe via APPEND_LOCK; only the per-topic outputs vary, so concurrent
     topics (spikes/weekly_all.py) can share one process and one RateLimiter.
+
+    claims/claim_lock: the multi-topic runner's in-run claim set. Two topics
+    sharing a source can approve the SAME URL in one run (each loads the pick
+    history before the other appends); the claim set, checked atomically right
+    before picks are persisted, drops the duplicate from the second topic so a
+    URL never lands in two feeds (FR-9: never surface the same item twice).
+    Single-topic runs pass None and the gate is skipped.
+
     Returns the run summary dict (also rendered to the report).
     """
     print(f"[1/6] topic: {topic['name']} | {len(sources)} unique sources (from docs/discovery/)")
@@ -1292,6 +1302,21 @@ def run_topic(
                     "picked_at": now,
                 }
             )
+
+    # Cross-topic in-run dedup: a URL another topic claimed this run must not
+    # reach history/pending/picks/report — the second topic's run drops it here,
+    # BEFORE anything is persisted, so no artifact ever double-surfaces it.
+    if claim_lock is not None and claims is not None:
+        kept: list[dict[str, Any]] = []
+        with claim_lock:
+            for p in picks:
+                if p["url"] in claims:
+                    continue  # already surfaced by another topic this run
+                claims.add(p["url"])
+                kept.append(p)
+        if len(kept) != len(picks):
+            print(f"      dedup: dropped {len(picks) - len(kept)} pick(s) already claimed by another topic this run")
+        picks = kept
 
     # Queue this run's picks for the NEXT run's fold (deferred — folding now
     # would bump the story version and invalidate the verdicts we just cached,

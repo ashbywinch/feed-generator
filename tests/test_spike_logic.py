@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -1246,6 +1247,33 @@ def test_run_topic_legacy_single_file_only_when_configured(tmp_path: Any, monkey
     payload = fx["json"].loads(legacy.read_text(encoding="utf-8"))
     assert payload["topic"] == "Test Topic"
     assert len(payload["picks"]) == 2
+
+
+def test_run_topic_cross_topic_claim_dedups_shared_urls(tmp_path: Any, monkeypatch: Any) -> None:
+    """Two topics sharing a source can approve the same URL in one run — the
+    in-run claim set must drop the duplicate from the SECOND topic so it never
+    lands in two feeds (FR-9: never surface the same item twice)."""
+    fx = _run_topic_fixture(tmp_path, monkeypatch)
+    claims: set[str] = set()
+    claim_lock = threading.Lock()
+    out1 = ws.TopicOut(
+        picks_path=tmp_path / "picks" / "01-a.json",
+        report_path=tmp_path / "r1.md",
+        story_md_path=tmp_path / "s1.md",
+    )
+    out2 = ws.TopicOut(
+        picks_path=tmp_path / "picks" / "02-b.json",
+        report_path=tmp_path / "r2.md",
+        story_md_path=tmp_path / "s2.md",
+    )
+    ws.run_topic(fx["topic"], fx["listing"], fx["sources"], "01-a", out1, claims=claims, claim_lock=claim_lock)
+    ws.run_topic(fx["topic"], fx["listing"], fx["sources"], "02-b", out2, claims=claims, claim_lock=claim_lock)
+
+    p1 = fx["json"].loads(out1.picks_path.read_text(encoding="utf-8"))["picks"]
+    p2 = fx["json"].loads(out2.picks_path.read_text(encoding="utf-8"))["picks"]
+    assert len(p1) == 2  # first topic keeps its picks
+    assert p2 == []  # second topic: every URL already claimed this run
+    assert claims == {"https://fake.example/1", "https://fake.example/2"}
 
 
 if __name__ == "__main__":

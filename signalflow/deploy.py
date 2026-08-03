@@ -27,11 +27,15 @@ DEPLOY_URL = "https://api.netlify.com/api/v1/sites/{site_id}/deploys"
 
 
 def zip_site(site_dir: Path) -> bytes:
-    """Site directory -> zip bytes, files at the zip root (no nesting)."""
+    """Site directory -> zip bytes, files at the zip root (no nesting).
+
+    Hidden files (dotfiles) are excluded: a stray .env or state file in the
+    site dir must never be uploaded with the deploy.
+    """
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for path in sorted(site_dir.rglob("*")):
-            if path.is_file():
+            if path.is_file() and not path.name.startswith("."):
                 zf.write(path, path.relative_to(site_dir).as_posix())
     return buf.getvalue()
 
