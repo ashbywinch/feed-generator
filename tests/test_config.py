@@ -96,6 +96,20 @@ def test_eval_gate_env_overrides(monkeypatch):
     assert cfg.recurring_cron == "0 7 * * 1"
 
 
+def test_weekly_runner_env_overrides(monkeypatch):
+    """Multi-topic runner: worker count + site base URL surface as env."""
+    for var in ("OPENCODE_GO_API_KEY", "OPENCODE_GO_BASE_URL", "GOOGLE_API_KEY", "WEEKLY_WORKERS", "SITE_BASE_URL"):
+        monkeypatch.delenv(var, raising=False)
+    cfg = Config.from_env_optional()
+    assert cfg.weekly_workers == 3  # default: three topics at a time
+    assert cfg.site_base_url == "https://signalflow.local"  # placeholder until hosting decided (OQ-3)
+    monkeypatch.setenv("WEEKLY_WORKERS", "4")
+    monkeypatch.setenv("SITE_BASE_URL", "https://feeds.example.com")
+    cfg2 = Config.from_env_optional()
+    assert cfg2.weekly_workers == 4
+    assert cfg2.site_base_url == "https://feeds.example.com"
+
+
 def test_defaults_are_prd_values(cfg):
     assert cfg.sim_high == 0.82
     assert cfg.sim_low == 0.65
