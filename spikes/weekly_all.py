@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import traceback
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -45,6 +46,7 @@ LEGACY_PICKS_PATH = ws.PICKS_PATH  # single-file legacy (last single-topic run)
 RECENCY_DAYS = CFG.weekly_recency_days
 WORKERS = CFG.weekly_workers
 EVAL_INTERVAL = CFG.weekly_eval_interval
+LLM_KEY = os.environ.get("OPENCODE_GO_API_KEY", "")
 
 
 @dataclass(frozen=True)
@@ -261,6 +263,10 @@ def run_all(
                 sources_approved=approved,
             )
         except Exception as exc:  # noqa: BLE001 — keep the batch alive; log, don't swallow
+            tb = traceback.format_exc()
+            if LLM_KEY:
+                tb = tb.replace(LLM_KEY, "***")  # never leak keys into the log
+            print(f"      TRACEBACK for {spec.topic['name']}:\n{tb}")
             return RunResult(slug=spec.slug, topic=spec.topic["name"], ok=False, error=str(exc)[:300])
 
     with ThreadPoolExecutor(max_workers=workers) as ex:
