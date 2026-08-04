@@ -26,6 +26,24 @@ from feedgen.feed import FeedGenerator
 
 SNIPPET_LIMIT = 400  # preview snippet cap (chars); the clickable article preview
 
+RADAR_SVG = (
+    '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" '
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="M2 12a10 10 0 0 1 20 0"/><path d="M6 12a6 6 0 0 1 12 0"/>'
+    '<path d="M10 12a2 2 0 0 1 4 0"/><circle cx="12" cy="12" r=".5" fill="currentColor" stroke="none"/>'
+    "</svg>"
+)
+
+# SVG favicon data URI (URL-encoded; raw <>/# in href breaks parsing)
+FAVICON_URI = (
+    "data:image/svg+xml,"
+    "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000'"
+    "%20stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E"
+    "%3Cpath d='M2 12a10 10 0 0 1 20 0'/%3E%3Cpath d='M6 12a6 6 0 0 1 12 0'/%3E"
+    "%3Cpath d='M10 12a2 2 0 0 1 4 0'/%3E%3Ccircle cx='12' cy='12' r='.5' fill='%23000' stroke='none'/%3E"
+    "%3C/svg%3E"
+)
+
 _TAG_RE = re.compile(r"<[^>]+>")
 
 
@@ -288,10 +306,12 @@ def render_index(
         '<html lang="en"><head><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
         "<title>SignalFlow — Outside Discovery</title>"
+        f'<link rel="icon" href="{FAVICON_URI}">'
         '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">'
         "<style>"
         "body>header nav{display:flex;align-items:center;justify-content:space-between}"
-        "body>header nav a[aria-label=Home]{font-size:1.3rem;text-decoration:none}"
+        "body>header nav svg{display:block;vertical-align:middle}"
+        "body>header nav a[aria-label=Home]{font-size:1.3rem;text-decoration:none;line-height:0}"
         "#login-area{display:flex;align-items:center;gap:.5rem}"
         "#login-area details[open] ul{position:absolute;right:0;min-width:10rem;"
         "background:var(--pico-card-background-color);"
@@ -309,7 +329,7 @@ def render_index(
         "article ul li:last-child{border-bottom:none}"
         "</style></head><body>"
         '<header><nav class="container">'
-        '<a href="/" aria-label="Home">🏠</a>'
+        f'<a href="/" aria-label="Home">{RADAR_SVG}</a>'
         '<div id="login-area"><a href="/admin/auth/login">Login</a></div>'
         "</nav></header>"
         '<main class="container"><h1>SignalFlow</h1>'
