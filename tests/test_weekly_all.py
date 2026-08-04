@@ -626,3 +626,135 @@ def test_require_opml_if_generating(tmp_path: Path) -> None:
     opml.write_text("<?xml version='1.0'?><opml/>", encoding="utf-8")
     assert wa.require_opml_if_generating(gen, opml) is None
     assert wa.require_opml_if_generating(no_gen, tmp_path / "missing.opml") is None  # no generation: no need
+
+
+# --- run records (spikes/state/runs/ — admin page source) -------------------
+
+
+def _run_result(slug: str, topic: str, ok: bool, picked: int = 0, **kw: Any) -> Any:
+    return wa.RunResult(slug=slug, topic=topic, ok=ok, picked=picked, **kw)
+
+
+def test_write_run_record_writes_run_and_latest(tmp_path: Path) -> None:
+    runs_dir = tmp_path / "runs"
+    results = [
+        _run_result("01-a", "Topic A", True, picked=2),
+        _run_result("02-b", "Topic B", False, error="router exploded"),
+    ]
+    written = wa.write_run_record(
+        runs_dir,
+        results,
+        now=NOW,
+        weekly_topics=["Topic A", "Topic B"],
+        fresh=[("Topic C", "03-c")],
+        picks_dir=tmp_path / "picks",
+        stories_dir=tmp_path / "stories",
+        discovery_dir=tmp_path / "discovery",
+        verdicts_path=tmp_path / "weekly_verdicts.jsonl",
+    )
+    run_file = runs_dir / f"{NOW.isoformat(timespec='seconds').replace(':', '-')}.json"
+    assert written == run_file
+    assert run_file.exists()
+    assert (runs_dir / "latest.json").exists()
+    record = json.loads(run_file.read_text(encoding="utf-8"))
+    assert record["ts"] == NOW.isoformat(timespec="seconds")
+    assert record["weekly_topics"] == ["Topic A", "Topic B"]
+    assert record["fresh"] == [{"topic": "Topic C", "slug": "03-c"}]
+    assert record["summary"] == {"total": 2, "ok": 1, "failed": 1}
+    by_slug = {r["slug"]: r for r in record["results"]}
+    assert by_slug["01-a"]["ok"] is True and by_slug["01-a"]["picked"] == 2
+    assert by_slug["02-b"]["ok"] is False and "router exploded" in by_slug["02-b"]["error"]
+    assert json.loads((runs_dir / "latest.json").read_text(encoding="utf-8")) == record
+
+
+def test_write_run_record_enriches_story_verdicts_list(tmp_path: Path) -> None:
+    """Per-topic run records carry the admin fields: story version (from the
+    story file), verdict count (from the shared verdict cache), and the source
+    list status (present on disk / generated this run / missing)."""
+    stories = tmp_path / "stories"
+    stories.mkdir()
+    (stories / "01-a.json").write_text(json.dumps({"version": 3}), encoding="utf-8")
+    verdicts = tmp_path / "weekly_verdicts.jsonl"
+    verdicts.write_text(
+        "".join(json.dumps({"slug": slug, "rev": 9}) + "\n" for slug in ("01-a", "01-a", "02-b")),
+        encoding="utf-8",
+    )
+    discovery = tmp_path / "discovery"
+    discovery.mkdir()
+    (discovery / "01-a.json").write_text("{}", encoding="utf-8")
+    results = [
+        _run_result("01-a", "Topic A", True),
+        _run_result("02-b", "Topic B", False, error="boom", generated_sources=True),
+    ]
+    record = json.loads(
+        wa.write_run_record(
+            tmp_path / "runs",
+            results,
+            now=NOW,
+            weekly_topics=None,
+            fresh=[],
+            picks_dir=tmp_path / "picks",
+            stories_dir=stories,
+            discovery_dir=discovery,
+            verdicts_path=verdicts,
+        ).read_text(encoding="utf-8")
+    )
+    by_slug = {r["slug"]: r for r in record["results"]}
+    assert by_slug["01-a"]["story_version"] == 3
+    assert by_slug["01-a"]["verdicts"] == 2
+    assert by_slug["01-a"]["list"] == "present"
+    assert by_slug["02-b"]["verdicts"] == 1
+    assert by_slug["02-b"]["list"] == "generated"
+
+
+def test_write_run_record_missing_state_defaults_zero(tmp_path: Path) -> None:
+    """No story file, no verdicts, no discovery list -> zeros, not crashes."""
+    record = json.loads(
+        wa.write_run_record(
+            tmp_path / "runs",
+            [_run_result("01-a", "Topic A", True)],
+            now=NOW,
+            weekly_topics=None,
+            fresh=[],
+            picks_dir=tmp_path / "picks",
+            stories_dir=tmp_path / "stories",
+            discovery_dir=tmp_path / "discovery",
+            verdicts_path=tmp_path / "none.jsonl",
+        ).read_text(encoding="utf-8")
+    )
+    assert record["results"][0]["story_version"] == 0
+    assert record["results"][0]["verdicts"] == 0
+    assert record["results"][0]["list"] == "missing"
+
+
+def test_write_run_record_atomic_no_temp_left(tmp_path: Path) -> None:
+    runs_dir = tmp_path / "runs"
+    wa.write_run_record(
+        runs_dir,
+        [_run_result("01-a", "Topic A", True)],
+        now=NOW,
+        weekly_topics=None,
+        fresh=[],
+        picks_dir=tmp_path / "picks",
+        stories_dir=tmp_path / "stories",
+        discovery_dir=tmp_path / "discovery",
+        verdicts_path=tmp_path / "none.jsonl",
+    )
+    assert not list(runs_dir.glob("*.tmp"))
+
+
+def test_run_all_captures_redacted_traceback(tmp_path: Path, monkeypatch: Any) -> None:
+    """RunResult carries a redacted traceback excerpt for the admin page."""
+    monkeypatch.setattr(wa, "LLM_KEY", "sekrit-value-99")
+
+    def boom(topic, listing, sources, slug, out, *, limiter=None, **kwargs):
+        raise RuntimeError("sekrit-value-99 leaked in the exception")
+
+    plan = wa.Plan(
+        to_run=[wa.RunSpec(topic=_topic("X"), slug="03-x", listing={}, sources=[], out=_out(tmp_path))], fresh=[]
+    )
+    (result,) = wa.run_all(plan, workers=1, run_topic_fn=boom)
+
+    assert result.ok is False
+    assert "RuntimeError" in result.traceback  # the excerpt shows the exception type
+    assert "sekrit-value-99" not in result.traceback  # keys redacted in the record too

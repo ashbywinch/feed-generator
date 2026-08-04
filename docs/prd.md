@@ -138,7 +138,7 @@ Pipeline order — cheapest first; **never** call the LLM before Layer 2:
 ### FR-7 RSS digest — MUST
 - `signalflow_digest.xml`, RSS 2.0 via `feedgen`, atomically replaced each run. Feed id `https://signalflow.local/feed`, title "SignalFlow Discovery Digest".
 - Entry: title prefixed `[Topic]`; body = `<b>Observed Event:</b>` + `<b>Systemic Thesis:</b>` + direct outbound link. Per-entry id = stable source URL (Feedly de-dupes on id).
-- **Publish for Feedly:** the digest must be reachable at a public URL (Feedly polls URLs, not local files). Publish step uploads the file to the configured static host (default: Netlify) using a deploy token. Absolute URLs throughout.
+- **Publish for Feedly:** the digest must be reachable at a public URL (Feedly polls URLs, not local files). Publish step copies the digest into the site directory and deploys via the Cloudflare Pages Direct Upload adapter (`CF_API_TOKEN`/`CF_ACCOUNT_ID`/`CF_PROJECT`; see `docs/deployment-plan.md`). Absolute URLs throughout.
 - Acceptance: output parses with `feedparser`; each entry has both bullets and a working outbound URL; a fresh browser fetch of the public URL returns the current digest.
 
 ### FR-8 Recurring execution & maintenance — MUST
@@ -186,7 +186,7 @@ Pipeline: load topic boundary + source list → fetch feeds (TTL'd cache, stale-
 - Python 3 (stdlib `xml.etree.ElementTree`, `sqlite3`, `urllib`) + `requests` (all HTTP) + `feedgen` (RSS). No other languages, frameworks, or services.
 - Scheduling: one cron line calling the engine script — the only non-Python piece is the OS timer.
 - De-dup math: plain Python (`math`, cosine similarity).
-- All external systems (Opencode router, Exa, registries, Netlify deploy, YouTube in Phase 2) are HTTP APIs — no SDKs beyond `requests`.
+- All external systems (Opencode router, Exa, registries, Cloudflare Pages deploy, YouTube in Phase 2) are HTTP APIs — no SDKs beyond `requests`. The Cloudflare `_worker.js` admin gate is the one JS artifact (a deployment concern, not engine code — see `docs/deployment-plan.md`).
 
 ## Architecture
 
@@ -276,8 +276,10 @@ CREATE TABLE IF NOT EXISTS feed_recommendations (
 | `MIN_FEEDS_PER_TOPIC` | 3 | coverage gap threshold |
 | `MIN_BLACKLIST_RATIO` | 0.5 | setup guard: refuse a blacklist shrink below this fraction of the stored set (truncated-export protection) |
 | `MAX_SUGGESTIONS_PER_TOPIC` | 5 | recommendation cap |
-| `PUBLISH_TARGET` | `netlify` | static host for the digest |
-| `DEPLOY_TOKEN` | — | netlify/github deploy token (env) |
+| `SITE_BASE_URL` | `https://signalflow.local` | FR-9 feed/page URLs (placeholder until the Pages project exists; deploy refuses while unset) |
+| `CF_API_TOKEN` | _(empty)_ | FR-7/FR-9 deploy: Cloudflare API token (Pages:Edit + R2 read/write scope) |
+| `CF_ACCOUNT_ID` | _(empty)_ | FR-7/FR-9 deploy: Cloudflare account id (empty = local-only) |
+| `CF_PROJECT` | `signalflow` | FR-9 deploy: the Pages project name (served at `https://<project>.pages.dev`) |
 | `RECENCY_DAYS` | 7 | FR-9 weekly window |
 | `MAX_PICKS_PER_SOURCE` | 3 | FR-9 curation cap per source |
 | `MAX_ITEMS_PER_SOURCE` | 30 | FR-9 LLM-judged items cap per source |
@@ -293,8 +295,6 @@ CREATE TABLE IF NOT EXISTS feed_recommendations (
 | `JUNK_TITLE_MARKERS` | `factsheet,fact sheet` | FR-9 boilerplate titles filtered pre-LLM |
 | `LLM_MAX_TOKENS` | 8192 | FR-9 LLM response cap |
 | `WEEKLY_WORKERS` | 3 | FR-9 multi-topic runner: topics regenerated at a time |
-| `SITE_BASE_URL` | `https://signalflow.local` | FR-9 feed/page URLs (placeholder until hosting decided, OQ-3) |
-| `NETLIFY_SITE_ID` | _(empty)_ | FR-7 publish: Netlify site id for the deploy API (empty = local-only) |
 ## Decisions (recommendations; review before lock)
 
 | Question | Decision | Rationale |
@@ -338,4 +338,4 @@ CREATE TABLE IF NOT EXISTS feed_recommendations (
 
 - **OQ-1 (resolved):** embeddings = Google `gemini-embedding-001` — GA model with its own free-tier quota bucket, verified working; `gemini-embedding-2`'s per-model daily quota walls quickly. OpenAI `text-embedding-3-small` ($0.02/M) is cheaper per token but needs a new account.
 - **OQ-2:** Does Ofgem SIF expose a structured JSON API? (resolved by build-time spike; default = defer)
-- **OQ-3:** Hosting account for the public digest URL — Netlify (default) or GitHub Pages? (user picks at setup; both supported by `PUBLISH_TARGET`)
+- **OQ-3 (resolved):** hosting = Cloudflare Pages + R2 (free stack, no per-deploy credits; nightly deploy cadence exceeds Netlify's free plan) — see `docs/deployment-plan.md`. The single deploy path is Cloudflare Pages Direct Upload; `PUBLISH_TARGET` is gone (one host).

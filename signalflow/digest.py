@@ -2,17 +2,23 @@
 
 Entries: title prefixed [Topic]; body = Observed Event + Systemic Thesis +
 direct outbound link; per-entry id = stable source URL (Feedly de-dupes on
-id). The digest must be reachable at a public URL for Feedly — publishing is
-a static-host deploy (default Netlify); without a token we stay local-only.
+id). The digest must be reachable at a public URL for Feedly — publishing
+copies it into the site directory and deploys the site via the Cloudflare
+Pages Direct Upload adapter (docs/deployment-plan.md); without credentials
+the digest stays local-only.
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from feedgen.feed import FeedGenerator
 
 from .config import Config
+from .deploy import deploy_site
+from .env import PROJECT_ROOT
 from .models import ApprovedEvent
 
 
@@ -45,12 +51,30 @@ def build_digest(cfg: Config, events: list[ApprovedEvent], out_path: Path) -> No
     print(f"      digest -> {shown} ({len(events)} entries)")
 
 
-def publish(cfg: Config, digest_path: Path) -> None:
-    """Deploy the digest to the static host. Local-only until DEPLOY_TOKEN set."""
-    if not cfg.deploy_token:
-        print("      publish: skipped (no DEPLOY_TOKEN) — digest is local-only; see docs/prd.md FR-7")
+def publish(
+    cfg: Config,
+    digest_path: Path,
+    *,
+    site_dir: Path | None = None,
+    deploy_fn: Callable[..., Any] = deploy_site,
+) -> None:
+    """Deploy the digest to the static host: copy it into the site directory
+    and publish the site (FR-7). Local-only until the CF credentials are set.
+    site_dir/deploy_fn are injectable for tests — the real path is the repo
+    site dir + signalflow.deploy.
+    """
+    if not (cfg.cf_api_token and cfg.cf_account_id and cfg.cf_project):
+        print(
+            "      publish: skipped (no CF_API_TOKEN / CF_ACCOUNT_ID / CF_PROJECT) — "
+            "digest is local-only; see docs/deployment-plan.md"
+        )
         return
-    # Netlify deploy API: requires a site id + token. Kept minimal on purpose;
-    # hosting choice is the user's call (PRD open question OQ-3).
-    site_id = cfg.deploy_token  # placeholder — real flow: NETLIFY_SITE_ID + token auth
-    print(f"      publish: not yet wired to Netlify site {site_id!r} — TODO in hosting setup")
+    site_dir = site_dir or (PROJECT_ROOT / "spikes" / "output" / "site")
+    site_dir.mkdir(parents=True, exist_ok=True)
+    dest = site_dir / digest_path.name
+    tmp = dest.with_suffix(dest.suffix + ".tmp")
+    tmp.write_bytes(digest_path.read_bytes())
+    tmp.replace(dest)  # atomic: a failed write never ships a partial digest
+    result = deploy_fn(cfg, site_dir)
+    if result:
+        print(f"      publish: live at {result.get('url')}")

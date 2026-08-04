@@ -65,10 +65,10 @@ class Config:
     # Multi-topic weekly runner (spike-weekly-all): concurrent topics, site layout
     weekly_workers: int = 3  # topics regenerated at a time (3 threads)
     site_base_url: str = "https://signalflow.local"  # placeholder until hosting decided (OQ-3)
-    # Publishing
-    publish_target: str = "netlify"
-    deploy_token: str = ""
-    netlify_site_id: str = ""
+    # Publishing (FR-7/FR-9): Cloudflare Pages Direct Upload (deployment-plan.md)
+    cf_api_token: str = ""
+    cf_account_id: str = ""
+    cf_project: str = ""  # the Pages project name (served at <name>.pages.dev)
 
     @classmethod
     def from_env(cls) -> Config:
@@ -134,7 +134,7 @@ class Config:
             llm_max_tokens=int(os.environ.get("LLM_MAX_TOKENS", "8192")),
             weekly_workers=int(os.environ.get("WEEKLY_WORKERS", "3")),
             site_base_url=os.environ.get("SITE_BASE_URL", "https://signalflow.local"),
-            publish_target=os.environ.get("PUBLISH_TARGET", "netlify"),
-            deploy_token=os.environ.get("DEPLOY_TOKEN", ""),
-            netlify_site_id=os.environ.get("NETLIFY_SITE_ID", ""),
+            cf_api_token=os.environ.get("CF_API_TOKEN", ""),
+            cf_account_id=os.environ.get("CF_ACCOUNT_ID", ""),
+            cf_project=os.environ.get("CF_PROJECT", ""),
         )

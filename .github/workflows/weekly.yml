@@ -1,0 +1,76 @@
+# Nightly feed generation + deploy: rotation -> selection -> build -> admin ->
+# Cloudflare Pages. CI runs ONLY make targets (house rule: the Makefile is the
+# single dev entry point). The only non-make steps are tool bootstrap
+# (rclone for the R2 state sync) and GITHUB_OUTPUT plumbing for the rotation.
+#
+# Single writer on the R2 state bucket: the concurrency group prevents
+# overlapping runs (a manual dispatch while the schedule fires would otherwise
+# race the state push).
+name: weekly
+on:
+  schedule:
+    - cron: "0 6 * * *"   # matches RECURRING_CRON default (UTC)
+  workflow_dispatch: {}   # manual verification runs
+concurrency:
+  group: weekly
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install rclone
+        # Ops binary for the R2 state sync (make state-pull/push invoke it).
+        # Pinned version; everything else in this job is a make target.
+        run: |
+          curl -sSLo /tmp/rclone.zip https://downloads.rclone.org/v1.69.0/rclone-v1.69.0-linux-amd64.zip
+          unzip -o -q /tmp/rclone.zip -d /tmp/rclone
+          sudo mv /tmp/rclone/rclone-v1.69.0-linux-amd64/rclone /usr/local/bin/
+      - run: make setup
+      - name: feedly.opml (exclusion set; never committed)
+        run: make feedly-opml
+        env:
+          FEEDLY_OPML_B64: ${{ secrets.FEEDLY_OPML_B64 }}
+      - name: Pull state from R2 (idempotency memory)
+        run: make state-pull
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      - name: Tonight's rotation
+        id: rotation
+        # make rotation prints "a,b" — GITHUB_OUTPUT plumbing only.
+        run: make rotation | sed 's/^/topics=/' >> "$GITHUB_OUTPUT"
+      - name: Weekly selection (tonight's topics)
+        run: make spike-weekly-all
+        env:
+          WEEKLY_TOPICS: ${{ steps.rotation.outputs.topics }}
+          OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
+          OPENCODE_GO_BASE_URL: ${{ secrets.OPENCODE_GO_BASE_URL }}
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+          EXA_API_KEY: ${{ secrets.EXA_API_KEY }}
+      - name: Build feeds + topic pages
+        run: make feeds
+        env:
+          SITE_BASE_URL: ${{ vars.SITE_BASE_URL }}
+      - name: Render admin + install OAuth gate worker
+        run: make admin
+      - name: Deploy to Cloudflare Pages (Direct Upload)
+        run: make deploy
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_PROJECT: ${{ secrets.CF_PROJECT }}
+          SITE_BASE_URL: ${{ vars.SITE_BASE_URL }}
+      - name: Push state to R2
+        # if: always() — partial state beats none; runs are idempotent
+        if: always()
+        run: make state-push
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}

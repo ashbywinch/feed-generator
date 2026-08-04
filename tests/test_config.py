@@ -111,14 +111,28 @@ def test_weekly_runner_env_overrides(monkeypatch):
 
 
 def test_deploy_env_overrides(monkeypatch):
-    """Netlify deploy wiring: site id surfaces as env, empty by default (local-only)."""
-    for var in ("OPENCODE_GO_API_KEY", "OPENCODE_GO_BASE_URL", "GOOGLE_API_KEY", "NETLIFY_SITE_ID"):
+    """Cloudflare Pages deploy wiring: account/project/token surface as env,
+    empty by default (local-only)."""
+    for var in (
+        "OPENCODE_GO_API_KEY",
+        "OPENCODE_GO_BASE_URL",
+        "GOOGLE_API_KEY",
+        "CF_API_TOKEN",
+        "CF_ACCOUNT_ID",
+        "CF_PROJECT",
+    ):
         monkeypatch.delenv(var, raising=False)
     cfg = Config.from_env_optional()
-    assert cfg.netlify_site_id == ""
-    monkeypatch.setenv("NETLIFY_SITE_ID", "abc-123")
+    assert cfg.cf_api_token == ""
+    assert cfg.cf_account_id == ""
+    assert cfg.cf_project == ""
+    monkeypatch.setenv("CF_API_TOKEN", "tok")
+    monkeypatch.setenv("CF_ACCOUNT_ID", "acc-1")
+    monkeypatch.setenv("CF_PROJECT", "signalflow")
     cfg2 = Config.from_env_optional()
-    assert cfg2.netlify_site_id == "abc-123"
+    assert cfg2.cf_api_token == "tok"
+    assert cfg2.cf_account_id == "acc-1"
+    assert cfg2.cf_project == "signalflow"
 
 
 def test_defaults_are_prd_values(cfg):

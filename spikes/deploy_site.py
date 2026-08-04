@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Deploy the built static site (spikes/output/site/) to Netlify.
+"""Deploy the built static site (spikes/output/site/) to Cloudflare Pages.
 
-Uploads the per-topic feeds + topic background pages to the configured Netlify
-site so Feedly can poll public URLs. Local-only (skipped) until DEPLOY_TOKEN
-and NETLIFY_SITE_ID are set in .env — see docs/prd.md FR-7 / OQ-3.
+Uploads the per-topic feeds + topic pages (+ admin, when present) to the
+configured Cloudflare Pages project so Feedly can poll public URLs. Local-only
+(skipped) until CF_API_TOKEN, CF_ACCOUNT_ID and CF_PROJECT are set in .env —
+see docs/deployment-plan.md.
 
-Run: make deploy
+Run: make deploy (depends on make feeds + make admin)
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     result = deploy_site(CFG, SITE_DIR)
     if result is None:
         return 0  # local-only: credentials not configured yet
-    print(f"      deploy: live at {result.get('ssl_url') or result.get('url')}")
+    print(f"      deploy: live at {result.get('url')}")
     return 0
 
 
