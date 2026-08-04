@@ -120,19 +120,22 @@ def test_deploy_env_overrides(monkeypatch):
         "CF_API_TOKEN",
         "CF_ACCOUNT_ID",
         "CF_PROJECT",
+        "CLOUDFLARE_API_TOKEN",
+        "CLOUDFLARE_ACCOUNT_ID",
+        "CLOUDFLARE_PROJECT",
     ):
         monkeypatch.delenv(var, raising=False)
     cfg = Config.from_env_optional()
     assert cfg.cf_api_token == ""
     assert cfg.cf_account_id == ""
-    assert cfg.cf_project == ""
+    assert cfg.cf_project == "feed-generator"  # Config default
     monkeypatch.setenv("CF_API_TOKEN", "tok")
     monkeypatch.setenv("CF_ACCOUNT_ID", "acc-1")
-    monkeypatch.setenv("CF_PROJECT", "signalflow")
+    monkeypatch.setenv("CF_PROJECT", "my-project")
     cfg2 = Config.from_env_optional()
     assert cfg2.cf_api_token == "tok"
     assert cfg2.cf_account_id == "acc-1"
-    assert cfg2.cf_project == "signalflow"
+    assert cfg2.cf_project == "my-project"
 
 
 def test_defaults_are_prd_values(cfg):

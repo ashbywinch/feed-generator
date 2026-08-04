@@ -509,6 +509,7 @@ article reports, phrased to stand as the digest's Observed Event bullet.
             {
                 "url": it["url"],
                 "title": it["title"],
+                "published": it.get("published", ""),
                 "approved": approved,
                 "reason": str(v.get("reason", ""))[:200],
                 "subarea": subarea_label(source),  # ALL covered subareas, never model-invented
@@ -1312,6 +1313,7 @@ def run_topic(
                 {
                     "url": v["url"],
                     "title": v["title"],
+                    "published": v.get("published", ""),
                     "source": s["name"],
                     "domain": s["domain"],
                     "subarea": v.get("subarea") or s["subarea"],

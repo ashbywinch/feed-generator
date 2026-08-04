@@ -34,6 +34,17 @@ def strip_html(text: str) -> str:
     return re.sub(r"\s+", " ", _TAG_RE.sub("", text or "")).strip()
 
 
+def _format_date(iso: str | None) -> str:
+    """ISO datetime -> compact human date like 'Aug 3, 2026' or '—' if absent."""
+    if not iso:
+        return "—"
+    try:
+        dt = datetime.fromisoformat(iso)
+    except (ValueError, TypeError):
+        return "—"
+    return dt.strftime("%b %-d, %Y")
+
+
 def why_summary(pick: dict[str, Any]) -> str:
     """Our summary of why the article is important: reason, else event, else thesis."""
     for key in ("reason", "empirical_event", "thesis"):
@@ -204,6 +215,112 @@ def _site_urls(base_url: str, slug: str) -> tuple[str, str]:
     return f"{root}/feeds/{slug}.xml", f"{root}/topics/{slug}/"
 
 
+def render_index(
+    *,
+    picks_dir: Path,
+    stories_dir: Path,
+    site_dir: Path,
+    base_url: str,
+    built_topics: list[tuple[str, int]],
+) -> str:
+    """Render the site's landing page (index.html) — blog-like topic cards.
+
+    Each topic with picks + a story gets a card: the story overview as a
+    blurb, the latest picks with why-relevant notes, and links to the
+    background page and RSS feed. The page includes a toolbar with a home
+    icon and a login/user-dropdown area populated by JS.
+    """
+    esc = html.escape
+    cards: list[str] = []
+    for slug, _count in built_topics:
+        picks_path = picks_dir / f"{slug}.json"
+        story_path = stories_dir / f"{slug}.json"
+        try:
+            payload = json.loads(picks_path.read_text(encoding="utf-8"))
+            story = json.loads(story_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        topic_name = str(payload.get("topic") or slug)
+        picks = payload.get("picks") or []
+        blurb = (story.get("overview") or "")[:400]
+        if len(blurb) >= 400:
+            last_space = blurb.rfind(" ")
+            blurb = blurb[:last_space] + " …" if last_space > 300 else blurb + " …"
+        feed_url, story_url = _site_urls(base_url, slug)
+        pick_items = "".join(
+            f'<li><a class="pick-title" href="{esc(p.get("url", ""))}">'
+            f"{esc(p.get('title', ''))}</a>"
+            f'<span class="pick-source"> — {esc(p.get("source") or p.get("domain") or "")}'
+            f" ({_format_date(p.get('published'))})</span>"
+            f'<p class="pick-reason">{esc(p.get("reason", ""))}</p></li>'
+            for p in picks[:5]
+            if p.get("url")
+        )
+        cards.append(
+            f"<article>"
+            f"<hgroup><h2>{esc(topic_name)}</h2>"
+            f'<p class="topic-blurb">{esc(blurb)}</p></hgroup>'
+            f'<div class="topic-links">'
+            f'<a href="{esc(story_url)}">Read the background →</a>'
+            f'<a href="{esc(feed_url)}">RSS feed →</a>'
+            f"</div>"
+            f"<ul>{pick_items}</ul>"
+            f"</article>"
+        )
+    cards_html = "\n".join(cards) if cards else "<p>No topics yet — the nightly pipeline hasn't run.</p>"
+    tooltip_js = (
+        "<script>"
+        "(async function(){"
+        "const r=await fetch('/admin/auth/status');"
+        "const d=await r.json();"
+        "const a=document.getElementById('login-area');"
+        "if(d.logged_in){"
+        "a.innerHTML='<details class=dropdown><summary>'+"
+        "d.email.replace(/&/g,'&amp;').replace(/</g,'&lt;')+' ▾</summary>"
+        '<ul><li><a href="/admin/">Admin</a></li>'
+        '<li><a href="/admin/auth/logout">Logout</a></li></ul></details>'
+        "}else{"
+        "a.innerHTML='<a href=\"/admin/auth/login\">Login</a>'"
+        "}})()</script>"
+    )
+    return (
+        "<!doctype html>"
+        '<html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        "<title>SignalFlow — Outside Discovery</title>"
+        '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">'
+        "<style>"
+        "body>header nav{display:flex;align-items:center;justify-content:space-between}"
+        "body>header nav a[aria-label=Home]{font-size:1.3rem;text-decoration:none}"
+        "#login-area{display:flex;align-items:center;gap:.5rem}"
+        "#login-area details[open] ul{position:absolute;right:0;min-width:10rem;"
+        "background:var(--pico-card-background-color);"
+        "border:1px solid var(--pico-muted-border-color);"
+        "border-radius:var(--pico-border-radius);padding:.25rem 0;z-index:10}"
+        "#login-area details[open] ul li{padding:0;margin:0}"
+        "#login-area details[open] ul li a{display:block;padding:.35rem .75rem;text-decoration:none}"
+        "main article{margin-bottom:2rem}"
+        ".topic-links{display:flex;gap:1rem;font-size:.85rem;margin:.5rem 0 1rem}"
+        "article .pick-reason{color:var(--pico-muted-color);font-size:.9rem;margin:.1rem 0 0}"
+        "article .pick-source{color:var(--pico-muted-color);font-size:.8rem}"
+        "article .pick-title{font-weight:600}"
+        "article ul{list-style:none;padding:0;margin-top:.5rem}"
+        "article ul li{margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid var(--pico-muted-border-color)}"
+        "article ul li:last-child{border-bottom:none}"
+        "</style></head><body>"
+        '<header><nav class="container">'
+        '<a href="/" aria-label="Home">🏠</a>'
+        '<div id="login-area"><a href="/admin/auth/login">Login</a></div>'
+        "</nav></header>"
+        '<main class="container"><h1>SignalFlow</h1>'
+        '<p class="site-subtitle">Outside discovery — weekly curated commentary from the frontiers.</p>'
+        f"{cards_html}</main>"
+        "<footer class='container'><p>Powered by SignalFlow · "
+        '<a href="/admin/">Admin</a></p></footer>'
+        f"{tooltip_js}</body></html>"
+    )
+
+
 def build_site(
     *,
     picks_dir: Path,
@@ -265,4 +382,19 @@ def build_site(
         page_tmp.write_text(render_story_html(story, topic_name), encoding="utf-8")
         page_tmp.replace(page_out)  # atomic, same as the feed: never publish a truncated page
         built.append((slug, n))
+
+    # Render the landing page index.html from the topics just built
+    index_html = render_index(
+        picks_dir=picks_dir,
+        stories_dir=stories_dir,
+        site_dir=site_dir,
+        base_url=base_url,
+        built_topics=built,
+    )
+    index_out = site_dir / "index.html"
+    site_dir.mkdir(parents=True, exist_ok=True)
+    index_tmp = index_out.with_suffix(".html.tmp")
+    index_tmp.write_text(index_html, encoding="utf-8")
+    index_tmp.replace(index_out)
+    print(f"      index -> site/index.html ({len(built)} topics)")
     return built

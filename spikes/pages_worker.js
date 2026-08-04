@@ -132,6 +132,20 @@ function configError(env) {
   return null;
 }
 
+export async function handleStatus(request, env) {
+  const now = Math.floor(Date.now() / 1000);
+  const session = readCookie(request, SESSION_COOKIE);
+  const payload = session ? await verify(session, env.SESSION_SECRET, now) : null;
+  if (payload && allowedEmail(payload.email, env)) {
+    return new Response(JSON.stringify({ logged_in: true, email: payload.email }), {
+      headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    });
+  }
+  return new Response(JSON.stringify({ logged_in: false }), {
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+  });
+}
+
 export async function handleLogin(request, env) {
   const missing = configError(env);
   if (missing) return new Response(missing, { status: 500 });
@@ -209,6 +223,16 @@ return new Response(null, {
     });
 }
 
+export async function handleLogout(request, env) {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: "/",
+      "Set-Cookie": cookieHeader(SESSION_COOKIE, "", 0),
+    },
+  });
+}
+
 export async function handleAdmin(request, env) {
   const now = Math.floor(Date.now() / 1000);
   const session = readCookie(request, SESSION_COOKIE);
@@ -222,7 +246,9 @@ export async function handleAdmin(request, env) {
 export default {
   async fetch(request, env) {
     const pathname = new URL(request.url).pathname;
+    if (pathname === "/admin/auth/status") return handleStatus(request, env);
     if (pathname === "/admin/auth/login") return handleLogin(request, env);
+    if (pathname === "/admin/auth/logout") return handleLogout(request, env);
     if (pathname === "/admin/auth/callback") return handleCallback(request, env);
     if (pathname.startsWith("/admin/")) return handleAdmin(request, env);
     return env.ASSETS.fetch(request);
