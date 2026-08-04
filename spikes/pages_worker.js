@@ -200,13 +200,13 @@ export async function handleCallback(request, env) {
     { sub: idPayload.sub, email: idPayload.email, exp: now + SESSION_TTL_S },
     env.SESSION_SECRET
   );
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: "/admin/",
-      "Set-Cookie": cookieHeader(SESSION_COOKIE, session, SESSION_TTL_S),
-    },
-  });
+return new Response(null, {
+      status: 302,
+      headers: {
+        Location: new URL("/admin/", request.url).href,
+        "Set-Cookie": cookieHeader(SESSION_COOKIE, session, SESSION_TTL_S),
+      },
+    });
 }
 
 export async function handleAdmin(request, env) {
@@ -214,7 +214,7 @@ export async function handleAdmin(request, env) {
   const session = readCookie(request, SESSION_COOKIE);
   const payload = session ? await verify(session, env.SESSION_SECRET, now) : null;
   if (!payload || !allowedEmail(payload.email, env)) {
-    return Response.redirect("/admin/auth/login", 302);
+    return Response.redirect(new URL("/admin/auth/login", request.url).href, 302);
   }
   return env.ASSETS.fetch(request);
 }
