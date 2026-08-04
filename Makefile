@@ -143,7 +143,7 @@ state-push: setup
 
 feedly-opml:
 	@test -n "$$FEEDLY_OPML_B64" || { echo "      feedly-opml: FEEDLY_OPML_B64 not set — skipping"; exit 0; }; \
-	echo "$$FEEDLY_OPML_B64" | base64 -d > feedly.opml
+	echo "$$FEEDLY_OPML_B64" | base64 -d | gunzip > feedly.opml
 
 deploy: setup
 	@$(UV) run --env-file .env python spikes/deploy_site.py

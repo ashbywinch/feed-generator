@@ -134,7 +134,7 @@ class Config:
             llm_max_tokens=int(os.environ.get("LLM_MAX_TOKENS", "8192")),
             weekly_workers=int(os.environ.get("WEEKLY_WORKERS", "3")),
             site_base_url=os.environ.get("SITE_BASE_URL", "https://signalflow.local"),
-            cf_api_token=os.environ.get("CF_API_TOKEN", ""),
-            cf_account_id=os.environ.get("CF_ACCOUNT_ID", ""),
-            cf_project=os.environ.get("CF_PROJECT", ""),
+            cf_api_token=os.environ.get("CF_API_TOKEN") or os.environ.get("CLOUDFLARE_API_TOKEN", ""),
+            cf_account_id=os.environ.get("CF_ACCOUNT_ID") or os.environ.get("CLOUDFLARE_ACCOUNT_ID", ""),
+            cf_project=os.environ.get("CF_PROJECT") or os.environ.get("CLOUDFLARE_PROJECT", "feed-generator"),
         )
