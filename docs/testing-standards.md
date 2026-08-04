@@ -41,6 +41,15 @@ reproduces the bug FIRST. The order is non-negotiable:
 5. For review-driven fixes: also confirm the test goes RED when the fix is
    reverted, so the test genuinely pins the change and isn't a tautology.
 
+**RED run vs the make gates:** `make test` gates on lint + typecheck before
+pytest runs, so a new test that references an API that does not exist yet
+fails the gates first — a wrong-target red, not the missing-behavior red the
+rule requires. For the RED proof, invoke the test runner directly on the new
+file(s) (`.venv/bin/python -m pytest tests/test_x.py -x`) so the failure is
+the missing behavior, then make the code exist and the file pass lint. The
+GREEN run and every subsequent run go through `make test` — the direct
+invocation is only for the RED evidence, never the final gate.
+
 Weak tests are forbidden and are caught by the RED step:
 - **Inline reimplementation** — the test copies the logic instead of calling
   the code under test (passes regardless of the code).

@@ -1,7 +1,9 @@
 # Nightly feed generation + deploy: rotation -> selection -> build -> admin ->
-# Cloudflare Pages. CI runs ONLY make targets (house rule: the Makefile is the
-# single dev entry point). The only non-make steps are tool bootstrap
-# (rclone for the R2 state sync) and GITHUB_OUTPUT plumbing for the rotation.
+# Cloudflare Pages. Pipeline logic runs ONLY through make targets (house rule:
+# the Makefile is the single dev entry point). The only non-make steps are
+# tool bootstrap (rclone, the ops binary make state-pull/push invoke) and CI
+# plumbing (GITHUB_OUTPUT capture of the rotation CSV) — see
+# skill://new-repo-scaffold §2 for the boundary.
 #
 # Single writer on the R2 state bucket: the concurrency group prevents
 # overlapping runs (a manual dispatch while the schedule fires would otherwise
