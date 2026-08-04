@@ -207,6 +207,7 @@ def deploy_site(
     #    as a dedicated field (wrangler deploys it the same way).
     form: dict[str, tuple[Any, ...]] = {
         "manifest": (None, json.dumps(manifest), "application/json"),
+        "branch": (None, "main"),
     }
     if worker.is_file():
         form[WORKER_NAME] = (WORKER_NAME, worker.read_bytes(), "application/javascript")

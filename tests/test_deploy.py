@@ -197,6 +197,7 @@ def test_deploy_site_full_flow(tmp_path: Path) -> None:
         assert url == DEPLOY_URL.format(account_id="acc-1", project="proj-9")
         assert kwargs["headers"] == _authed("cf-token")
         form = kwargs["files"]
+        assert form["branch"][1] == "main"
         manifest = json.loads(form["manifest"][1])
         expected = {
             f"/{name}": file_hash(content, name.rsplit(".", 1)[-1] if "." in name else "")

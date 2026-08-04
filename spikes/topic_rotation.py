@@ -72,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
     names = [t["name"] for t in load_topics()]
     picks = rotation_for(day, names)
     if csv:
-        print(",".join(picks))
+        print("|".join(picks))
     else:
         print("\n".join(picks))
     return 0

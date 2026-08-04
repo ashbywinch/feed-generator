@@ -480,7 +480,7 @@ def main(argv: list[str] | None = None) -> int:
 
     topics = load_topics()
     now = datetime.now(UTC)
-    weekly_topics = [t.strip() for t in os.environ.get("WEEKLY_TOPICS", "").split(",") if t.strip()] or None
+    weekly_topics = [t.strip() for t in os.environ.get("WEEKLY_TOPICS", "").split("|") if t.strip()] or None
     plan = plan_runs(
         topics,
         discovery_dir=DISCOVERY_DIR,
