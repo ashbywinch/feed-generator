@@ -1,0 +1,260 @@
+{
+  "topic": "Industry, Manufacturing & Policy",
+  "status": "approved",
+  "iterations": 3,
+  "approved_at": "2026-08-03",
+  "subareas": [
+    {
+      "name": "High-Mix & Advanced Manufacturing (CNC, additive)",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "MTDCNC",
+          "domain": "mtdcnc.com",
+          "type": "trade press",
+          "why": "Daily CNC machining, 5-axis and machine-tool trade news; the reference feed for high-mix, low-volume shop-floor activity.",
+          "confidence": "high",
+          "crawl_root": "https://mtdcnc.com/feed"
+        },
+        {
+          "name": "Additive3D Asia",
+          "domain": "additive3dasia.com",
+          "type": "trade press",
+          "why": "Additive-manufacturing and hybrid-manufacturing news; covers the process-technology side of advanced manufacturing.",
+          "confidence": "high",
+          "crawl_root": "https://additive3dasia.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Reshoring & Industrial Base",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Reshoring Initiative",
+          "domain": "reshorenow.org",
+          "type": "data/registry",
+          "why": "Publishes the authoritative quarterly US reshoring & foreign direct investment job-count datasets the whole field cites.",
+          "confidence": "high",
+          "crawl_root": "https://reshorenow.org/blog/ and the Reshoring Initiative quarterly data reports"
+        }
+      ]
+    },
+    {
+      "name": "Energy-Intensive Industry & Industrial Decarbonization",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Industry Decarbonization Newsletter",
+          "domain": "industrydecarbonization.com",
+          "type": "newsletter",
+          "why": "Hard-to-abate sector (steel, cement, chemicals, aluminium) electrification and decarbonisation policy feed.",
+          "confidence": "high",
+          "crawl_root": "https://industrydecarbonization.com/rss.xml"
+        },
+        {
+          "name": "Jan Rosenow (EnergyUtopia)",
+          "domain": "janrosenow.substack.com",
+          "type": "independent blog",
+          "why": "First-principles analysis of industrial electrification and hard-to-electrify heat; strong on policy mechanics for energy-intensive industry.",
+          "confidence": "high",
+          "crawl_root": "https://janrosenow.substack.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "SMRs & Heavy Industry / Nuclear New-Build",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "SMR News & Headlines",
+          "domain": "smrheadlines.substack.com",
+          "type": "newsletter",
+          "why": "Dedicated small-modular-reactor newslog tracking SMR programme announcements, site approvals and vendor milestones.",
+          "confidence": "high",
+          "crawl_root": "https://smrheadlines.substack.com/feed"
+        },
+        {
+          "name": "SMR Insider",
+          "domain": "smrinsider.com",
+          "type": "trade press",
+          "why": "Sector-specific SMR news and innovation coverage across vendors, regulators and project finance.",
+          "confidence": "high",
+          "crawl_root": "https://smrinsider.com/feed"
+        },
+        {
+          "name": "World Nuclear News",
+          "domain": "world-nuclear-news.org",
+          "type": "trade press",
+          "why": "Global nuclear industry news incl. SMR, Sizewell C and new-build financing; high-density industry feed.",
+          "confidence": "high",
+          "crawl_root": "https://world-nuclear-news.org/rss"
+        },
+        {
+          "name": "Nuclear Electrical Engineer",
+          "domain": "nuclearelectricalengineer.com",
+          "type": "independent blog",
+          "why": "Independent engineer's commentary on nuclear new-build economics, grid integration and SMR feasibility.",
+          "confidence": "medium",
+          "crawl_root": "https://nuclearelectricalengineer.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Defense Industrial Capacity",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Breaking Defense",
+          "domain": "breakingdefense.com",
+          "type": "trade press",
+          "why": "Defence programme and industrial-base news covering munitions production, supply chains and contract awards.",
+          "confidence": "high",
+          "crawl_root": "https://breakingdefense.com/feed/"
+        },
+        {
+          "name": "JINSA (Jewish Institute for National Security of America)",
+          "domain": "jinsa.org",
+          "type": "think tank",
+          "why": "Regular munitions-and-industrial-base capacity assessments (e.g. 'Arsenal of Procrastination' reports).",
+          "confidence": "high",
+          "crawl_root": "https://jinsa.org/feed"
+        },
+        {
+          "name": "Defense Acquisition / defenseacquisition.substack.com",
+          "domain": "defenseacquisition.substack.com",
+          "type": "newsletter",
+          "why": "Analysis of defense acquisition and the prime-contractor industrial base including mega-contract and funding trends.",
+          "confidence": "medium",
+          "crawl_root": "https://defenseacquisition.substack.com/feed"
+        },
+        {
+          "name": "CSIS Industrial Base program",
+          "domain": "csis.org",
+          "type": "think tank",
+          "why": "Flagship rapid cycles on US industrial base readiness, including 'Is the Industrial Base on a Wartime Footing?'.",
+          "confidence": "high",
+          "crawl_root": "https://csis.org/rss.xml"
+        }
+      ]
+    },
+    {
+      "name": "Semiconductors & Critical Components",
+      "coverage": "medium",
+      "sources": [
+        {
+          "name": "The Semiconductor Newsletter",
+          "domain": "thesemiconductornewsletter.substack.com",
+          "type": "newsletter",
+          "why": "Fab, tooling and chip-capacity weekly; captures the most strategically contested manufacturing subarea.",
+          "confidence": "high",
+          "crawl_root": "https://thesemiconductornewsletter.substack.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Supply Chains & Logistics",
+      "coverage": "medium",
+      "sources": [
+        {
+          "name": "Supply Chain Dive",
+          "domain": "supplychaindive.com",
+          "type": "trade press",
+          "why": "Daily manufacturing supply-chain, reshoring, procurement and logistics news with a US industrial focus; a strong outside replacement for the previously subscribed MMH feed.",
+          "confidence": "high",
+          "crawl_root": "https://www.supplychaindive.com/feeds/news/"
+        }
+      ]
+    },
+    {
+      "name": "Industrial Policy, Trade & Incentives",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Information Technology and Innovation Foundation (ITIF)",
+          "domain": "itif.org",
+          "type": "think tank",
+          "why": "Deep first-principles work on industrial policy, chip/CHIPS, tariffs, export controls and production incentives.",
+          "confidence": "high",
+          "crawl_root": "https://itif.org/feed"
+        },
+        {
+          "name": "Center for Industrial Strategy (Charles Yang)",
+          "domain": "industrialstrategy.substack.com",
+          "type": "independent blog",
+          "why": "First-principles analysis of industrial policy design, incentives and production base-building; keeps this subarea strong after retiring the industryweek.com duplicate listing.",
+          "confidence": "high",
+          "crawl_root": "https://industrialstrategy.substack.com/feed"
+        }
+      ]
+    }
+  ],
+  "registries": [
+    {
+      "name": "FRED Industrial Production Index",
+      "domain": "fred.stlouisfed.org",
+      "type": "data",
+      "why": "Federal Reserve monthly industrial production and capacity utilisation series (INDPRO) — the core empirical registry of manufacturing output.",
+      "crawl_root": "FRED JSON/CSV API for series INDPRO, G17 via fredgraph (https://fred.stlouisfed.org/graph/fredgraph.csv?id=INDPRO)"
+    },
+    {
+      "name": "US Census Bureau Manufacturing (M3)",
+      "domain": "census.gov",
+      "type": "data",
+      "why": "Monthly manufacturers' shipments, inventories and orders (M3) — authoritative US factory-activity series.",
+      "crawl_root": "Census API https://api.census.gov/data/timeseries/eits or M3 press release"
+    },
+    {
+      "name": "BEA Manufacturing Value Added",
+      "domain": "bea.gov",
+      "type": "data",
+      "why": "GDP/industry value-added series for durable and nondurable manufacturing; has an RSS feed for release announcements.",
+      "crawl_root": "https://apps.bea.gov/rss/rss.xml"
+    },
+    {
+      "name": "USAspending / Federal Procurement",
+      "domain": "usaspending.gov",
+      "type": "data",
+      "why": "Prime-award and defense procurement database — grounding data for defense-industrial-capacity and reshoring contract analysis.",
+      "crawl_root": "USAspending API https://api.usaspending.gov (awards endpoint)"
+    },
+    {
+      "name": "Reshoring Initiative Job Count Database",
+      "domain": "reshorenow.org",
+      "type": "data",
+      "why": "Quarterly reshoring & FDI job-announcement counts; the field's reference dataset for reshoring trend analysis.",
+      "crawl_root": "https://reshorenow.org/blog/ and quarterly data reports"
+    }
+  ],
+  "queries": [
+    "reshoring US manufacturing job announcements data",
+    "industrial base capacity munitions and defense production analysis",
+    "small modular reactor SMR heavy industry nuclear new build deployment",
+    "energy intensive industry decarbonization steel cement electrification policy",
+    "high mix low volume CNC additive manufacturing reshoring supply chain"
+  ],
+  "news_vs_analysis": "News-forward sources: MTDCNC, Additive3D Asia, IndustryWeek, World Nuclear News, Breaking Defense, SMR Insider, MMH, SMR News & Headlines, Industry Decarbonization Newsletter. Analysis-forward sources: CSIS, ITIF, JINSA, IISS, Jan Rosenow, Nuclear Electrical Engineer, The Semiconductor Newsletter, Defense Acquisition newsletter.",
+  "notes": "Excluded the user's blacklisted domains (hydraraptor.blogspot.com, toolordie.com). No sources from the 'out' scope (consumer products, software, services). Source-type mix spans trade press, newsletters, independent blogs, think tanks and data registries (≥4 distinct types). Every domain was verified with check_url for DNS+feed before inclusion; sources without a discoverable feed (reshorenow.org, fred, census, usaspending, bea) are included as data/registry entries with explicit crawl_root/API endpoints per rule 11 rather than HTML crawling. Defense overlaps Geopolitics by design (the topic notes this overlap); sources stay on industrial capacity, not consumer/military-ops content. SMR subarea is intentionally deep (4 sources) as it is a named 'in' item with high event density.",
+  "review_record": {
+    "findings": [
+      {
+        "severity": "minor",
+        "area": "Subarea completeness",
+        "issue": "Two implied-but-important subareas carry only a single source each: Semiconductors & Critical Components and Supply Chains & Logistics (both 'medium', 1 source apiece). Semiconductors is described as the most strategically contested manufacturing subarea and would benefit from a second outside source (e.g., an additional chip-policy/industry feed) to match the 2+ bar for major subareas.",
+        "suggestion": "Add one more strong source for semiconductors (and optionally one for supply chains) so every major subarea holds at least 2 sources."
+      },
+      {
+        "severity": "minor",
+        "area": "Engine-actionable / metadata hygiene",
+        "issue": "The 'news_vs_analysis' field references sources that do not exist anywhere in the subareas/sources lists: 'IndustryWeek', 'MMH', and 'IISS'. The 'why' lines also reference 'retiring the industryweek.com duplicate listing' and 'previously subscribed MMH feed'. These dangling references could mislead the pipeline into expecting sources that are not present.",
+        "suggestion": "Remove ghost references (IndustryWeek, MMH, IISS) from news_vs_analysis and the 'why' text, or add them explicitly as real sources if they are meant to be live."
+      },
+      {
+        "severity": "minor",
+        "area": "Engine-actionable / crawl_root formatting",
+        "issue": "Several data/registry entries (reshorenow.org, FRED, Census M3) mix a URL with prose description inside crawl_root (e.g., 'https://reshorenow.org/blog/ and the Reshoring Initiative quarterly data reports', 'FRED JSON/CSV API ... via fredgraph (https://fred.stlouisfed.org/graph/fredgraph.csv?id=INDPRO)'). This is less engine-actionable than a single pinned endpoint.",
+        "suggestion": "Pin crawl_root to a single concrete endpoint/API URL per registry entry (e.g., https://fred.stlouisfed.org/graph/fredgraph.csv?id=INDPRO, https://api.census.gov/data/timeseries/eits), moving descriptive context into the 'why' field."
+      }
+    ]
+  }
+}

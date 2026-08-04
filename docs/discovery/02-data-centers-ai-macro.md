@@ -121,7 +121,8 @@ Government programs, export-control policy, and geopolitical analysis of the AI 
 10. AI capex investment cycle financing trends
 
 ## News vs analysis
-{'news': 'gentic.news, datacenterknowledge.com, datacenterdynamics.com track concrete buildout/capacity events.', 'analysis': 'SemiAnalysis, 404K Research, Street Alpha, Capital & Compute, Wheelie Investor, Terrain Labs, Dirt to Data, Grid Capacity Intelligence, Infrastructure Research, Alex Lanin, CSIS provide first-principles analysis.'}
+news: gentic.news, datacenterknowledge.com, datacenterdynamics.com track concrete buildout/capacity events.
+analysis: SemiAnalysis, 404K Research, Street Alpha, Capital & Compute, Wheelie Investor, Terrain Labs, Dirt to Data, Grid Capacity Intelligence, Infrastructure Research, Alex Lanin, CSIS provide first-principles analysis.
 
 ## Notes
 Excluded subscribed/blacklisted domains: blog.eladgil.com and chamathreads.substack.com. Boundaries respected: no consumer-EV, efficiency-gadget, corporate-sustainability-PR, or climate-activism sources (out of scope). Source-type mix covers 7 distinct types: trade press (DCK, DCD), independent blog (gentic.news, Capital & Compute), newsletter (SemiAnalysis, 404K, Street Alpha, Tech Cache, Grid Capacity Intelligence, Infrastructure Research, Lanin, Wheelie, Terrain Labs, Dirt to Data), think tank (CSIS), and data/registry (SIA). Subareas each have >=1 strong source; construction, chips, capex, and power have 2-3 each to match the breadth of a top AI-infrastructure podcast. SIA has no RSS feed, so its crawl_root points to the market-data page for scraping. Confirmed every domain resolves and serves a feed via check_url except semiconductors.org (registry page). Used only the 10-search discovery budget.

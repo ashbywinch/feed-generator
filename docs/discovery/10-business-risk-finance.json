@@ -1,0 +1,283 @@
+{
+  "topic": "Business, Risk & Finance",
+  "status": "needs-human",
+  "iterations": 2,
+  "approved_at": "2026-08-03",
+  "subareas": [
+    {
+      "name": "Capital Allocation & Strategy",
+      "coverage": "3 sources",
+      "sources": [
+        {
+          "name": "ACG Insights / Middle Market Growth",
+          "domain": "middlemarketgrowth.org",
+          "type": "trade press",
+          "why": "Middle-market M&A, private-equity deal flow, and buy-side investment analysis — distinct dedicated dealmaking source replacing the capitalallocators.com duplicate in Corporate Finance & Dealmaking while Capital Allocators stays in Capital Allocation & Strategy.",
+          "confidence": "high",
+          "crawl_root": "https://middlemarketgrowth.org/feed"
+        },
+        {
+          "name": "The Diff",
+          "domain": "thediff.co",
+          "type": "independent blog",
+          "why": "Byrne Hobart's essay series on durable competitive advantage, moats, market structure and capital-markets mechanics — first-principles strategy analysis in the Rumelt tradition, focused on the structural 'diffs' where value compounds over time.",
+          "confidence": "high",
+          "crawl_root": "https://thediff.co/feed"
+        },
+        {
+          "name": "Continuations",
+          "domain": "continuations.com",
+          "type": "independent blog",
+          "why": "Albert Wenger's long-form essays on capital allocation, tech company strategy, and systemic market change — original first-principles analysis.",
+          "confidence": "high",
+          "crawl_root": "https://api.paragraph.com/blogs/rss/@continuations.com"
+        }
+      ]
+    },
+    {
+      "name": "Economic Analysis & Behavioral Economics",
+      "coverage": "3 sources",
+      "sources": [
+        {
+          "name": "Marginal Revolution",
+          "domain": "marginalrevolution.com",
+          "type": "independent blog",
+          "why": "Tyler Cowen and Alex Tabarrok's high-frequency economics commentary — markets, culture, empirical evidence, Freakonomics-adjacent in approach.",
+          "confidence": "high",
+          "crawl_root": "https://marginalrevolution.com/feed"
+        },
+        {
+          "name": "Vox (The Highlight / Future Perfect)",
+          "domain": "vox.com",
+          "type": "newsletter",
+          "why": "Accessible economics explainers and cost-benefit analysis framing — Freakonomics-style economic thinking for broad audiences.",
+          "confidence": "high",
+          "crawl_root": "https://vox.com/rss/index.xml"
+        },
+        {
+          "name": "NBER (National Bureau of Economic Research)",
+          "domain": "nber.org",
+          "type": "academic/journal",
+          "why": "Working papers on empirical economics, behavioral finance, and market efficiency — primary-source evidence for analytical pieces.",
+          "confidence": "high",
+          "crawl_root": "https://back.nber.org/rss/aginghealth.xml"
+        }
+      ]
+    },
+    {
+      "name": "Market Structure & Competition",
+      "coverage": "2 sources",
+      "sources": [
+        {
+          "name": "Duke FinReg Blog",
+          "domain": "sites.duke.edu/thefinregblog",
+          "type": "independent blog",
+          "why": "Duke Financial Economics Center's research-led commentary on financial regulation, banking, capital-markets and market-structure policy — dedicated financial-regulation source replacing the promarket.org duplicate in Financial Regulation & Policy while ProMarket stays in Market Structure & Competition.",
+          "confidence": "high",
+          "crawl_root": "https://sites.duke.edu/thefinregblog/feed"
+        },
+        {
+          "name": "Special Situations Digest",
+          "domain": "specialsitsdigest.com",
+          "type": "trade press",
+          "why": "M&A and special-situations deal coverage with an empirical, data-driven bent — replaces the ft.com duplicate in Corporate Finance & Dealmaking while ft.com stays in Market Structure & Competition.",
+          "confidence": "high",
+          "crawl_root": "https://specialsitsdigest.com/feed"
+        },
+        {
+          "name": "ProMarket (Stigler Center, Chicago Booth)",
+          "domain": "promarket.org",
+          "type": "independent blog",
+          "why": "Chicago Booth Stigler Center's research-led commentary on competition policy, market power, antitrust and the determinants of market structure — a dedicated competition-policy source that deepens the subarea beyond M&A deal flow and FinReg reuse.",
+          "confidence": "high",
+          "crawl_root": "https://promarket.org/feed"
+        },
+        {
+          "name": "American Antitrust Institute",
+          "domain": "antitrustinstitute.org",
+          "type": "think tank",
+          "why": "Policy analysis, amicus work and empirical research on antitrust enforcement, merger review and competitive market structure — a second dedicated market-structure/competition source giving the subarea real breadth.",
+          "confidence": "high",
+          "crawl_root": "https://www.antitrustinstitute.org/feed/"
+        },
+        {
+          "name": "The Regulatory Review (Penn Program on Regulation)",
+          "domain": "theregreview.org",
+          "type": "academic/journal",
+          "why": "Penn Program on Regulation's daily commentary and scholarship on competition policy, financial market regulation, and the determinants of market structure — a distinct, feed-backed replacement for the specialsitsdigest.com and sites.duke.edu duplicates that were consolidating into their primary subareas (Corporate Finance & Dealmaking and Financial Regulation & Policy respectively). Pairs with ProMarket and the American Antitrust Institute to keep this subarea at 3 independent voices.",
+          "confidence": "high",
+          "crawl_root": "https://theregreview.org/feed"
+        }
+      ]
+    },
+    {
+      "name": "Macro-Finance & Systemic Risk",
+      "coverage": "3 sources",
+      "sources": [
+        {
+          "name": "Project Syndicate",
+          "domain": "project-syndicate.org",
+          "type": "newsletter",
+          "why": "Global macro-finance analysis from leading economists (Rogoff, Rodrik, Blanchard) on systemic risk, debt, and monetary policy.",
+          "confidence": "high",
+          "crawl_root": "https://project-syndicate.org/rss"
+        },
+        {
+          "name": "CEPR (Centre for Economic Policy Research)",
+          "domain": "cepr.org",
+          "type": "think tank",
+          "why": "Policy insight and discussion papers on macro-financial risk, banking resilience, and financial stability.",
+          "confidence": "high",
+          "crawl_root": "https://cepr.org/rss.xml"
+        },
+        {
+          "name": "NPR Planet Money",
+          "domain": "npr.org",
+          "type": "podcast",
+          "why": "Freakonomics-style economic storytelling on how money, markets, and monetary surprises actually work.",
+          "confidence": "high",
+          "crawl_root": "https://feeds.npr.org/1002/rss.xml"
+        }
+      ]
+    },
+    {
+      "name": "Corporate Finance & Dealmaking",
+      "coverage": "2 sources",
+      "sources": [
+        {
+          "name": "Special Situations Digest",
+          "domain": "specialsitsdigest.com",
+          "type": "trade press",
+          "why": "M&A and special-situations deal coverage with an empirical, data-driven bent — replaces the ft.com duplicate in Corporate Finance & Dealmaking while ft.com stays in Market Structure & Competition.",
+          "confidence": "high",
+          "crawl_root": "https://specialsitsdigest.com/feed"
+        },
+        {
+          "name": "ACG Insights / Middle Market Growth",
+          "domain": "middlemarketgrowth.org",
+          "type": "trade press",
+          "why": "Middle-market M&A, private-equity deal flow, and buy-side investment analysis — distinct dedicated dealmaking source replacing the capitalallocators.com duplicate in Corporate Finance & Dealmaking while Capital Allocators stays in Capital Allocation & Strategy.",
+          "confidence": "high",
+          "crawl_root": "https://middlemarketgrowth.org/feed"
+        },
+        {
+          "name": "PE Hub",
+          "domain": "pehub.com",
+          "type": "trade press",
+          "why": "Private-equity deal flow, leveraged buyouts, fund formation and transaction coverage — a distinct dealmaking source replacing the middlemarketgrowth.org duplicate (which stays primary in Capital Allocation & Strategy). Gives Corporate Finance & Dealmaking two independent voices alongside Special Situations Digest.",
+          "confidence": "high",
+          "crawl_root": "https://pehub.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Financial Regulation & Policy",
+      "coverage": "2 sources",
+      "sources": [
+        {
+          "name": "Tax Foundation",
+          "domain": "taxfoundation.org",
+          "type": "think tank",
+          "why": "Deep policy analysis of how taxation shapes capital allocation, corporate investment, and market behavior.",
+          "confidence": "high",
+          "crawl_root": "https://taxfoundation.org/feed"
+        },
+        {
+          "name": "Duke FinReg Blog",
+          "domain": "sites.duke.edu/thefinregblog",
+          "type": "independent blog",
+          "why": "Duke Financial Economics Center's research-led commentary on financial regulation, banking, capital-markets and market-structure policy — dedicated financial-regulation source replacing the promarket.org duplicate in Financial Regulation & Policy while ProMarket stays in Market Structure & Competition.",
+          "confidence": "high",
+          "crawl_root": "https://sites.duke.edu/thefinregblog/feed"
+        }
+      ]
+    },
+    {
+      "name": "Behavioral Economics & Decision Science",
+      "coverage": "1 source",
+      "sources": [
+        {
+          "name": "A Wealth of Common Sense",
+          "domain": "awealthofcommonsense.com",
+          "type": "independent blog",
+          "why": "Ben Carlson's behavioral-finance essays on investor psychology, decision-making under uncertainty, and market dynamics.",
+          "confidence": "high",
+          "crawl_root": "https://awealthofcommonsense.com/feed"
+        },
+        {
+          "name": "Confessions of a Supply-Side Liberal",
+          "domain": "blog.supplysideliberal.com",
+          "type": "independent blog",
+          "why": "Miles Kimball's essays on behavioral economics, decision-making under uncertainty, risk and welfare — rigorous Freakonomics-adjacent empirical analysis that pairs with A Wealth of Common Sense to give the behavioral subarea two distinct voices.",
+          "confidence": "high",
+          "crawl_root": "https://blog.supplysideliberal.com/post?format=rss"
+        }
+      ]
+    }
+  ],
+  "registries": [
+    {
+      "name": "OpenAlex API",
+      "domain": "api.openalex.org",
+      "type": "data/registry",
+      "why": "Open scholarly API for tracking new finance, economics, and strategy research papers across journals.",
+      "confidence": "high",
+      "crawl_root": "https://api.openalex.org"
+    },
+    {
+      "name": "SSRN",
+      "domain": "ssrn.com",
+      "type": "data/registry",
+      "why": "Preprint repository for finance, economics, and corporate strategy research — early access to working papers.",
+      "confidence": "high",
+      "crawl_root": "https://ssrn.com"
+    },
+    {
+      "name": "FRED (Federal Reserve Economic Data)",
+      "domain": "fred.stlouisfed.org",
+      "type": "data/registry",
+      "why": "Comprehensive US macroeconomic time series covering rates, credit, employment, and market indicators for risk analysis.",
+      "confidence": "high",
+      "crawl_root": "https://fred.stlouisfed.org"
+    },
+    {
+      "name": "CEPR Discussion Papers",
+      "domain": "cepr.org",
+      "type": "data/registry",
+      "why": "Curated policy research papers on macro-finance, banking, and financial market structure.",
+      "confidence": "high",
+      "crawl_root": "https://cepr.org/rss.xml"
+    }
+  ],
+  "queries": [
+    "capital allocation strategy",
+    "market structure competition regulation",
+    "macro-finance systemic risk monetary policy",
+    "corporate strategy risk management empirical",
+    "behavioral finance decision making markets"
+  ],
+  "news_vs_analysis": "Balance of daily market news (FT), deep analytical essays (Project Syndicate, Stratechery, Marginal Revolution), and primary academic research (NBER, CEPR, SSRN).",
+  "notes": "WSJ, Economist, Bloomberg, Reuters, HBR all bot-blocked or missing feeds — excluded. FT is primary trade-press source with free headline RSS. NBER feed is top-level working papers feed. OpenAlex API used for paper discovery bypassing journal paywalls. Freakonomics, Chamath, Rumelt domains excluded per blacklist.",
+  "review_record": {
+    "findings": [
+      {
+        "severity": "minor",
+        "area": "duplicates",
+        "issue": "domain ft.com also under 'Market Structure & Competition'",
+        "suggestion": "reuse across subareas is fine; exact duplicates are noise"
+      },
+      {
+        "severity": "minor",
+        "area": "duplicates",
+        "issue": "domain capitalallocators.com also under 'Capital Allocation & Strategy'",
+        "suggestion": "reuse across subareas is fine; exact duplicates are noise"
+      },
+      {
+        "severity": "minor",
+        "area": "duplicates",
+        "issue": "domain promarket.org also under 'Market Structure & Competition'",
+        "suggestion": "reuse across subareas is fine; exact duplicates are noise"
+      }
+    ]
+  }
+}

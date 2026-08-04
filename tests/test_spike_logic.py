@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sys
+import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -24,6 +26,9 @@ def _load_spike(name: str) -> Any:
     if spec is None or spec.loader is None:
         raise ImportError(f"cannot load spike {name}")
     mod = importlib.util.module_from_spec(spec)
+    # Register before exec: dataclasses (and any sys.modules lookup) need the
+    # module visible under its real name while the class body runs.
+    sys.modules[name] = mod
     spec.loader.exec_module(mod)
     return mod
 
@@ -1095,6 +1100,227 @@ def test_single_article_never_passes_via_tolerance() -> None:
     # total == 1 with zero sufficient must FAIL (was: 0 >= 0 via total-1 passed).
     assert ev.contextualization_passes(sufficient=0, total=1, pass_frac=ev.PASS_FRAC) is False
     assert ev.contextualization_passes(sufficient=1, total=1, pass_frac=ev.PASS_FRAC) is True
+
+
+# --- run_topic: per-topic outputs, picked_at, slugged history (multi-topic) --
+
+
+def _fake_topic() -> dict[str, Any]:
+    return {"name": "Test Topic", "description": "d", "in": "i", "out": "o", "sources": []}
+
+
+def _fake_source() -> dict[str, Any]:
+    return {
+        "name": "Fake Feed",
+        "domain": "fake.example",
+        "type": "newsletter",
+        "why": "",
+        "crawl_root": "https://fake.example/feed",
+        "subarea": "Sub A",
+        "subareas": ["Sub A"],
+    }
+
+
+def _run_topic_fixture(tmp_path: Any) -> dict[str, Any]:
+    """Wire run_topic with fake fetch/eval/caches so the REAL pipeline body
+    (window, verdict mirroring, picks, history, per-topic writes) runs without
+    network or LLM — via run_topic's DI seams (injected *_fn / *_path params),
+    never by patching module state (coding-standards.md). Returns everything
+    assertions need, including the `inject` kwargs dict.
+    """
+    import json as _json
+
+    topic = _fake_topic()
+    listing: dict[str, Any] = {"topic": "Test Topic"}
+    slug = "01-test-topic"
+    source = _fake_source()
+
+    def fake_fetch_feed(s: dict[str, Any]) -> dict[str, Any]:
+        s["items"] = [
+            {
+                "url": f"https://fake.example/{i}",
+                "title": f"Article {i}",
+                "summary": f"Summary {i}",
+                "published": (datetime.now(UTC) - timedelta(days=i)).isoformat(),
+            }
+            for i in range(1, 4)
+        ]
+        s["feed_version"] = "1"
+        return s
+
+    def fake_evaluate_source(
+        source_: dict[str, Any],
+        items: list[dict[str, Any]],
+        _topic: dict[str, Any],
+        _llm: Any,
+        _limiter: Any,
+        _ctx: str,
+    ) -> list[dict[str, Any]]:
+        return [
+            {
+                "url": it["url"],
+                "title": it["title"],
+                "approved": True,
+                "reason": f"why {it['title']}",
+                "thesis": f"thesis {it['title']}",
+                "empirical_event": f"event {it['title']}",
+                "subarea": source_["subarea"],
+            }
+            for it in items[:2]
+        ]
+
+    story = {
+        "version": 1,
+        "updated_at": "2026-08-01T00:00:00+00:00",
+        "overview": "big picture",
+        "angles": {"Sub A": ["angle one"]},
+        "open_questions": ["q?"],
+        "pending": [],
+    }
+    inject: dict[str, Any] = {
+        "feeds_path": tmp_path / "feeds.jsonl",
+        "verdicts_path": tmp_path / "verdicts.jsonl",
+        "picks_history_path": tmp_path / "picks_history.jsonl",
+        "load_feeds_fn": lambda: {},
+        "load_verdicts_fn": lambda story_version, slug_, path=None: {},
+        "load_picked_urls_fn": lambda: set(),
+        "load_story_fn": lambda slug_: story,
+        "save_story_fn": lambda slug_, s: None,
+        "fetch_feed_fn": fake_fetch_feed,
+        "evaluate_source_fn": fake_evaluate_source,
+    }
+    return {
+        "topic": topic,
+        "listing": listing,
+        "slug": slug,
+        "sources": [source],
+        "story": story,
+        "inject": inject,
+        "json": _json,
+    }
+
+
+def test_run_topic_writes_per_topic_picks_and_report(tmp_path: Any) -> None:
+    fx = _run_topic_fixture(tmp_path)
+    out = ws.TopicOut(
+        picks_path=tmp_path / "picks" / "01-test-topic.json",
+        report_path=tmp_path / "reports" / "weekly_report_01-test-topic.md",
+        story_md_path=tmp_path / "story_01-test-topic.md",
+    )  # no legacy_picks_path: multi-topic mode
+    summary = ws.run_topic(fx["topic"], fx["listing"], fx["sources"], fx["slug"], out, **fx["inject"])
+
+    assert summary["slug"] == "01-test-topic"
+    assert summary["picked"] == 2
+
+    picks = fx["json"].loads(out.picks_path.read_text(encoding="utf-8"))
+    assert picks["slug"] == "01-test-topic"
+    assert picks["topic"] == "Test Topic"
+    assert len(picks["picks"]) == 2
+    for p in picks["picks"]:
+        assert p["url"].startswith("https://fake.example/")
+        assert p["reason"] == f"why {p['title']}"
+        assert p["thesis"] == f"thesis {p['title']}"
+        assert p["empirical_event"] == f"event {p['title']}"
+        datetime.fromisoformat(p["picked_at"])  # parseable; not str-patched
+
+    report = out.report_path.read_text(encoding="utf-8")
+    assert "Test Topic" in report
+    assert "Fake Feed" in report
+
+    lines = (tmp_path / "picks_history.jsonl").read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 2
+    for line in lines:
+        rec = fx["json"].loads(line)
+        assert rec["slug"] == "01-test-topic"
+        datetime.fromisoformat(rec["picked_at"])
+        assert rec["key"] == rec["url"]
+
+    vlines = (tmp_path / "verdicts.jsonl").read_text(encoding="utf-8").strip().splitlines()
+    assert len(vlines) == 2
+    for line in vlines:
+        assert fx["json"].loads(line)["slug"] == "01-test-topic"
+
+    assert not (tmp_path / "weekly_picks.json").exists()  # no legacy write in multi-topic mode
+
+
+def test_run_topic_legacy_single_file_only_when_configured(tmp_path: Any) -> None:
+    fx = _run_topic_fixture(tmp_path)
+    legacy = tmp_path / "weekly_picks.json"
+    out = ws.TopicOut(
+        picks_path=tmp_path / "picks" / "01-test-topic.json",
+        report_path=tmp_path / "weekly_report.md",
+        story_md_path=tmp_path / "story_01-test-topic.md",
+        legacy_picks_path=legacy,
+    )
+    ws.run_topic(fx["topic"], fx["listing"], fx["sources"], fx["slug"], out, **fx["inject"])
+    assert legacy.exists()  # single-topic CLI runs keep the legacy file
+    payload = fx["json"].loads(legacy.read_text(encoding="utf-8"))
+    assert payload["topic"] == "Test Topic"
+    assert len(payload["picks"]) == 2
+
+
+def test_run_topic_cross_topic_claim_dedups_shared_urls(tmp_path: Any) -> None:
+    """Two topics sharing a source can approve the same URL in one run — the
+    in-run claim set must drop the duplicate from the SECOND topic so it never
+    lands in two feeds (FR-9: never surface the same item twice)."""
+    fx = _run_topic_fixture(tmp_path)
+    claims: set[str] = set()
+    claim_lock = threading.Lock()
+    out1 = ws.TopicOut(
+        picks_path=tmp_path / "picks" / "01-a.json",
+        report_path=tmp_path / "r1.md",
+        story_md_path=tmp_path / "s1.md",
+    )
+    out2 = ws.TopicOut(
+        picks_path=tmp_path / "picks" / "02-b.json",
+        report_path=tmp_path / "r2.md",
+        story_md_path=tmp_path / "s2.md",
+    )
+    ws.run_topic(
+        fx["topic"], fx["listing"], fx["sources"], "01-a", out1, claims=claims, claim_lock=claim_lock, **fx["inject"]
+    )
+    ws.run_topic(
+        fx["topic"], fx["listing"], fx["sources"], "02-b", out2, claims=claims, claim_lock=claim_lock, **fx["inject"]
+    )
+
+    p1 = fx["json"].loads(out1.picks_path.read_text(encoding="utf-8"))["picks"]
+    p2 = fx["json"].loads(out2.picks_path.read_text(encoding="utf-8"))["picks"]
+    assert len(p1) == 2  # first topic keeps its picks
+    assert p2 == []  # second topic: every URL already claimed this run
+    assert claims == {"https://fake.example/1", "https://fake.example/2"}
+
+
+def test_run_topic_uses_injected_shared_limiter(tmp_path: Any) -> None:
+    """The multi-topic runner passes ONE shared limiter; run_topic must USE it
+    (regression: an internal RateLimiter(...) construction used to overwrite
+    the injected one, silently disabling the global pacing contract)."""
+    fx = _run_topic_fixture(tmp_path)
+    seen: list[Any] = []
+    inject = dict(fx["inject"])
+
+    def fake_seed(
+        slug_: str, topic_: dict[str, Any], listing_: dict[str, Any], llm_: Any, limiter_: Any
+    ) -> dict[str, Any]:
+        seen.append(limiter_)
+        return {
+            "version": 1,
+            "updated_at": "",
+            "overview": "o",
+            "angles": {"Sub A": ["a"]},
+            "open_questions": [],
+            "pending": [],
+        }
+
+    inject["seed_story_fn"] = fake_seed
+    inject["load_story_fn"] = lambda slug_: {}  # no angles -> seed path runs
+    shared = threading.Lock()  # stand-in: any distinguishable object
+    out = ws.TopicOut(
+        picks_path=tmp_path / "picks" / "01-test-topic.json",
+        report_path=tmp_path / "r.md",
+        story_md_path=tmp_path / "s.md",
+    )
+    ws.run_topic(fx["topic"], fx["listing"], fx["sources"], fx["slug"], out, limiter=shared, **inject)
+    assert seen == [shared]  # seed got the SAME object, not a fresh RateLimiter
 
 
 if __name__ == "__main__":

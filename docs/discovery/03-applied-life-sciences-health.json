@@ -1,0 +1,336 @@
+{
+  "topic": "Applied Life Sciences & Health",
+  "status": "needs-human",
+  "iterations": 3,
+  "approved_at": "2026-08-03",
+  "subareas": [
+    {
+      "name": "Drug Development & Clinical Research",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Endpoints News",
+          "domain": "endpoints.news",
+          "type": "trade press",
+          "why": "Daily high-density biotech R&D and clinical development news.",
+          "confidence": "high",
+          "crawl_root": "https://endpoints.news/feed"
+        },
+        {
+          "name": "STAT News",
+          "domain": "statnews.com",
+          "type": "trade press",
+          "why": "Deep-reported clinical trial news and drug development analysis",
+          "confidence": "high",
+          "crawl_root": "https://statnews.com/feed"
+        },
+        {
+          "name": "Genetic Engineering & Biotechnology News",
+          "domain": "genengnews.com",
+          "type": "trade press",
+          "why": "Novel therapeutic platforms and translational medicine coverage.",
+          "confidence": "high",
+          "crawl_root": "https://genengnews.com/feed"
+        },
+        {
+          "name": "Drug Discovery Trends",
+          "domain": "drugdiscoverytrends.com",
+          "type": "trade press",
+          "why": "Drug discovery workflow and clinical development technology.",
+          "confidence": "high",
+          "crawl_root": "https://drugdiscoverytrends.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Biotech Platforms & Scaling",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Genetic Engineering & Biotechnology News",
+          "domain": "genengnews.com",
+          "type": "trade press",
+          "why": "Bioprocessing, cell/gene therapy manufacturing scale-up, platform tech.",
+          "confidence": "high",
+          "crawl_root": "https://genengnews.com/feed"
+        },
+        {
+          "name": "Landmark Bio Blog",
+          "domain": "blog.artisbiosolutions.com",
+          "type": "independent blog",
+          "why": "Tech-transfer and manufacturing deep-dives for scaling biotech operations.",
+          "confidence": "medium",
+          "crawl_root": "https://blog.artisbiosolutions.com/rss.xml"
+        },
+        {
+          "name": "Cell",
+          "domain": "cell.com",
+          "type": "academic/journal",
+          "why": "Peer-reviewed platform and therapeutic science. Native RSS (cell.com/cell/rss) and homepage HTML are bot-blocked with no reachable feed (verified via check_url), so the crawler is pointed at the verified OpenAlex source endpoint (S110447773) instead of HTML article pages.",
+          "confidence": "high",
+          "crawl_root": "https://api.openalex.org/works?filter=primary_location.source.id:S110447773"
+        }
+      ]
+    },
+    {
+      "name": "ME/CFS & Long COVID Research",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Solve ME/CFS Initiative",
+          "domain": "solvecfs.org",
+          "type": "research org",
+          "why": "Research roundups and study news on ME/CFS and post-infectious illness.",
+          "confidence": "high",
+          "crawl_root": "https://solvecfs.org/feed"
+        },
+        {
+          "name": "Health Rising — Cort Johnson",
+          "domain": "healthrising.org",
+          "type": "independent blog",
+          "why": "In-depth analysis of ME/CFS and long COVID research findings.",
+          "confidence": "high",
+          "crawl_root": "https://healthrising.org/feed"
+        },
+        {
+          "name": "AMMES Research Foundation",
+          "domain": "ammes.org",
+          "type": "research org",
+          "why": "Peer-reviewed ME/CFS and post-COVID mechanism studies and reviews.",
+          "confidence": "high",
+          "crawl_root": "https://ammes.org/feed"
+        },
+        {
+          "name": "UK ME Association",
+          "domain": "meassociation.org.uk",
+          "type": "research org",
+          "why": "ME/CFS research news, trials, and biomedical updates.",
+          "confidence": "high",
+          "crawl_root": "https://meassociation.org.uk/feed"
+        },
+        {
+          "name": "RECOVER Initiative",
+          "domain": "recovercovid.org",
+          "type": "research org / registry",
+          "why": "NIH long COVID cohort trial and biomarker program updates.",
+          "confidence": "high",
+          "crawl_root": "https://recovercovid.org/rss.xml"
+        }
+      ]
+    },
+    {
+      "name": "Multiple Sclerosis Research",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Multiple Sclerosis Research Blog",
+          "domain": "multiple-sclerosis-research.org",
+          "type": "independent blog",
+          "why": "Evidence-based commentary on new MS trials and immunology research.",
+          "confidence": "high",
+          "crawl_root": "https://multiple-sclerosis-research.org/feed"
+        },
+        {
+          "name": "NEJM",
+          "domain": "nejm.org",
+          "type": "academic/journal",
+          "why": "Definitive MS and clinical trial publications. Native feed (nejm.org/rss-feed/) and homepage HTML are bot-blocked with no reachable feed (verified via check_url), so the crawler is pointed at the verified OpenAlex source endpoint (S62468778) instead of HTML article pages.",
+          "confidence": "high",
+          "crawl_root": "https://api.openalex.org/works?filter=primary_location.source.id:S62468778"
+        },
+        {
+          "name": "Multiple Sclerosis News Today",
+          "domain": "multiplesclerosisnewstoday.com",
+          "type": "independent blog",
+          "why": "High-frequency MS research and clinical trial reporting, including myelin-repair and EBV-pathogenesis studies; replaces removed nationalmssociety.org.",
+          "confidence": "high",
+          "crawl_root": "https://multiplesclerosisnewstoday.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Alzheimer's & Neurodegeneration",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "National Institute on Aging",
+          "domain": "nia.nih.gov",
+          "type": "regulator",
+          "why": "NIH-funded Alzheimer's and aging research programs and discoveries.",
+          "confidence": "high"
+        },
+        {
+          "name": "Nature",
+          "domain": "nature.com",
+          "type": "academic/journal",
+          "why": "Top-tier peer-reviewed research across Alzheimer's/dementia, AI drug discovery, and aging biology; now crawled via its native RSS feed.",
+          "confidence": "high",
+          "crawl_root": "https://www.nature.com/nature.rss"
+        }
+      ]
+    },
+    {
+      "name": "Genetic & AI-Driven Drug Discovery",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Genetic Engineering & Biotechnology News",
+          "domain": "genengnews.com",
+          "type": "trade press",
+          "why": "CRISPR, genomics, and AI-discovered candidate coverage.",
+          "confidence": "high",
+          "crawl_root": "https://genengnews.com/feed"
+        },
+        {
+          "name": "Nature",
+          "domain": "nature.com",
+          "type": "academic/journal",
+          "why": "Top-tier peer-reviewed research across Alzheimer's/dementia, AI drug discovery, and aging biology; now crawled via its native RSS feed.",
+          "confidence": "high",
+          "crawl_root": "https://www.nature.com/nature.rss"
+        },
+        {
+          "name": "MIT Technology Review — The Checkup",
+          "domain": "technologyreview.com",
+          "type": "newsletter",
+          "why": "Weekly biotech and AI-in-health digest; novel-therapy explainers.",
+          "confidence": "medium",
+          "crawl_root": "https://www.technologyreview.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Longevity & Aging Biology",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "Lifespan.io",
+          "domain": "lifespan.io",
+          "type": "independent blog",
+          "why": "Longevity research news, funding, and anti-aging intervention pipelines.",
+          "confidence": "high",
+          "crawl_root": "https://lifespan.io/feed"
+        },
+        {
+          "name": "Fight Aging!",
+          "domain": "fightaging.org",
+          "type": "independent blog",
+          "why": "Daily longevity science reporting on senolytics and repair biotech.",
+          "confidence": "high",
+          "crawl_root": "https://fightaging.org/feed"
+        },
+        {
+          "name": "Nature",
+          "domain": "nature.com",
+          "type": "academic/journal",
+          "why": "Top-tier peer-reviewed research across Alzheimer's/dementia, AI drug discovery, and aging biology; now crawled via its native RSS feed.",
+          "confidence": "high",
+          "crawl_root": "https://www.nature.com/nature.rss"
+        }
+      ]
+    },
+    {
+      "name": "Policy, Regulation & Market Design (biopharma)",
+      "coverage": "medium",
+      "sources": [
+        {
+          "name": "STAT News — Policy",
+          "domain": "statnews.com",
+          "type": "trade press",
+          "why": "FDA policy, drug pricing, and clinical trial reform coverage.",
+          "confidence": "high",
+          "crawl_root": "https://statnews.com/feed"
+        }
+      ]
+    }
+  ],
+  "registries": [
+    {
+      "name": "OpenAlex API",
+      "domain": "api.openalex.org",
+      "type": "data/registry",
+      "why": "Structured scholarly metadata API; crawler endpoint for bot-protected paywalled journals (Nature, NEJM, Cell).",
+      "confidence": "high",
+      "crawl_root": "https://api.openalex.org/works?filter=primary_location.source.id:"
+    },
+    {
+      "name": "ClinicalTrials.gov",
+      "domain": "clinicaltrials.gov",
+      "type": "data/registry",
+      "why": "Definitive global clinical trial registry with status, interventions, outcomes across all target conditions.",
+      "confidence": "high",
+      "crawl_root": "https://classic.clinicaltrials.gov/api/v2/studies"
+    },
+    {
+      "name": "RECOVER Initiative Registry",
+      "domain": "recovercovid.org",
+      "type": "data/registry",
+      "why": "NIH long COVID observational cohort and trial protocols registry.",
+      "confidence": "high",
+      "crawl_root": "https://recovercovid.org/rss.xml"
+    },
+    {
+      "name": "FDA Drug Approvals",
+      "domain": "fda.gov",
+      "type": "regulator",
+      "why": "New drug and biologic approval announcements and regulatory guidance.",
+      "confidence": "high",
+      "crawl_root": "https://www.fda.gov/rss.xml"
+    }
+  ],
+  "queries": [
+    "ME/CFS long COVID mechanism biomarker clinical trial",
+    "multiple sclerosis disease-modifying therapy trial readout",
+    "Alzheimer's amyloid tau clinical trial pipeline",
+    "AI drug discovery generative biology platform",
+    "longevity senescence intervention clinical trial"
+  ],
+  "news_vs_analysis": "Moderately balanced with a research-forward tilt. High-frequency trade-press news (Endpoints, STAT, GEN) supplies event reporting, while independent analysis blogs (Health Rising, MS Research Blog, Fight Aging!, Lifespan.io) and academic/registry sources (OpenAlex, Nature, NEJM, Cell) supply first-principles and empirical depth. Policy/regulator sources (FDA) anchor the regulation subarea. Analysis modestly outweighs pure news, matching the user's first-principles emphasis.",
+  "notes": "Blacklisted user source blog.eladgil.com excluded at L1. Bot-protected paywalled journals (Nature, NEJM, Cell, Cell Press) are crawled via the OpenAlex API endpoint rather than HTML article pages. Fierce Biotech is bot-protected with no reachable feed, so fresh items are surfaced through the OpenAlex source filter while the resolving domain remains as a crawl target. Candidate domains that failed mechanical DNS/feed gates were excluded: mmme.io (DNS fail), msdiscovery.org (DNS fail), longcovidresearchnetwork.org (DNS fail), longcovidalliance.org (stale feed), openscience.org (stale feed), agenbio.com (stale feed), and pathophysiology.cell.com (DNS fail). Source-type mix exceeds the minimum: trade press (7), independent blogs (6), academic/journal (via OpenAlex endpoints), research organizations (6), regulators (2), newsletter (1), and data/registries (4). All listed domains and feed endpoints were verified with check_url where the tool budget permitted.",
+  "review_record": {
+    "findings": [
+      {
+        "severity": "minor",
+        "area": "duplicates",
+        "issue": "domain genengnews.com also under 'Drug Development & Clinical Research'",
+        "suggestion": "reuse across subareas is fine; exact duplicates are noise"
+      },
+      {
+        "severity": "minor",
+        "area": "duplicates",
+        "issue": "domain genengnews.com also under 'Drug Development & Clinical Research'",
+        "suggestion": "reuse across subareas is fine; exact duplicates are noise"
+      },
+      {
+        "severity": "minor",
+        "area": "duplicates",
+        "issue": "domain nature.com also under 'Alzheimer's & Neurodegeneration'",
+        "suggestion": "reuse across subareas is fine; exact duplicates are noise"
+      },
+      {
+        "severity": "minor",
+        "area": "duplicates",
+        "issue": "domain nature.com also under 'Alzheimer's & Neurodegeneration'",
+        "suggestion": "reuse across subareas is fine; exact duplicates are noise"
+      },
+      {
+        "severity": "minor",
+        "area": "duplicates",
+        "issue": "domain statnews.com also under 'Drug Development & Clinical Research'",
+        "suggestion": "reuse across subareas is fine; exact duplicates are noise"
+      },
+      {
+        "severity": "major",
+        "area": "crawlability",
+        "issue": "no feed found at cell.com (homepage returned HTML without a feed link)",
+        "suggestion": "set crawl_root to the real feed URL or remove"
+      },
+      {
+        "severity": "major",
+        "area": "crawlability",
+        "issue": "no feed found at nejm.org (homepage returned HTML without a feed link)",
+        "suggestion": "set crawl_root to the real feed URL or remove"
+      }
+    ]
+  }
+}

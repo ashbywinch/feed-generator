@@ -1,0 +1,216 @@
+{
+  "topic": "History (systems-thinking standpoint)",
+  "status": "needs-human",
+  "iterations": 2,
+  "approved_at": "2026-08-03",
+  "subareas": [
+    {
+      "name": "Innovation history / Age of Invention",
+      "coverage": "Full: independent sources parallel to (but not duplicating) the subscribed Age of Invention newsletter; invention, productivity and progress with quantitative grounding.",
+      "sources": [
+        {
+          "name": "Roots of Progress",
+          "domain": "rootsofprogress.org",
+          "type": "independent blog",
+          "why": "Jason Crawford's series on the history of technology adoption and the drivers of progress — direct systems/constraints angle on invention history.",
+          "confidence": "high",
+          "crawl_root": "https://rootsofprogress.org/feed"
+        },
+        {
+          "name": "The Puzzle and Its Pieces",
+          "domain": "thepuzzleanditspieces.substack.com",
+          "type": "newsletter",
+          "why": "PEG's series on economic progress, technology adoption and invention ('What Happens in the Gap') — systems angle on why progress happens, complementing Age of Invention without duplicating it.",
+          "confidence": "high",
+          "crawl_root": "https://thepuzzleanditspieces.substack.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Quantitative / cliometric history",
+      "coverage": "Full: long-run measurement, cycles of history proxied statistically, and historical datasets; the most explicitly 'systems' subarea.",
+      "sources": [
+        {
+          "name": "Peter Turchin's Substack (Cliodynamics)",
+          "domain": "peterturchin.substack.com",
+          "type": "newsletter / academic-adjacent",
+          "why": "Quantitative history of empires, cycles and collective action — the canonical cliodynamics voice applying systems theory to history.",
+          "confidence": "high",
+          "crawl_root": "https://peterturchin.substack.com/feed"
+        },
+        {
+          "name": "NBER — Development of the American Economy & Macrohistory",
+          "domain": "nber.org",
+          "type": "data / registry + research",
+          "why": "Registry of historical macro series (prices, output, factor inputs) and working papers on US long-run economic history — structured data for quantitative history.",
+          "confidence": "high",
+          "crawl_root": "https://back.nber.org/rss/aginghealth.xml"
+        },
+        {
+          "name": "Economic Growth in History",
+          "domain": "nofuturepast.wordpress.com",
+          "type": "independent blog",
+          "why": "Quantitative economic history on long-run GDP reconstruction, Maddison-dataset discrepancies and growth measurement — cliometric/measurement angle replacing the feed-less Cliodynamics journal.",
+          "confidence": "high",
+          "crawl_root": "https://nofuturepast.wordpress.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Logistical & military history (systems view)",
+      "coverage": "Implied but core to user's 'logistics' interest; ACOUP is the strongest single source on how supply chains and physical constraints shaped military and political outcomes.",
+      "sources": [
+        {
+          "name": "Edge Induced Cohesion",
+          "domain": "edgeinducedcohesion.blog",
+          "type": "independent blog",
+          "why": "\"A Historian's Eye View of the World\" — logistics, feeding armies and material constraints behind campaigns (e.g. white paper on Sherman's Georgia logistics); the strongest ACOUP-parallel for systems military history.",
+          "confidence": "high",
+          "crawl_root": "https://edgeinducedcohesion.blog/feed"
+        }
+      ]
+    },
+    {
+      "name": "Geography's role in history",
+      "coverage": "Full: how terrain, water, climate and resource endowments shaped development paths — a central stated interest.",
+      "sources": [
+        {
+          "name": "From Poverty to Progress",
+          "domain": "frompovertytoprogress.substack.com",
+          "type": "newsletter",
+          "why": "Stefen Klein's multi-series economic history covering 'why some nations became rich' with explicit geography, soils and tsetse-fly/cattle crop-yield causal analysis.",
+          "confidence": "high",
+          "crawl_root": "https://frompovertytoprogress.substack.com/feed"
+        },
+        {
+          "name": "Sam Matey-Coste (China's Hydrological History)",
+          "domain": "sammatey.substack.com",
+          "type": "newsletter",
+          "why": "Geography-driven history of water systems, flood control and canal infrastructure shaping China's state and economy — physical-constraints history.",
+          "confidence": "high",
+          "crawl_root": "https://sammatey.substack.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "History of economics & economic thought",
+      "coverage": "Full: the intellectual and measurement history of economics itself, plus long-run economic history research.",
+      "sources": [
+        {
+          "name": "Davis Kedrosky — Economic History journal blog",
+          "domain": "blog.daviskedrosky.com",
+          "type": "independent blog / academic commentary",
+          "why": "Series on 'The History of Economic History' tracing how fields and their quantitative methods evolved — meta-history of economics.",
+          "confidence": "high",
+          "crawl_root": "https://blog.daviskedrosky.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "History of politics, institutions & political economy",
+      "coverage": "Full: how institutions, incentives and market structure (systems) shaped political-economic outcomes over time.",
+      "sources": [
+        {
+          "name": "The Diff",
+          "domain": "thediff.co",
+          "type": "newsletter / independent analysis",
+          "why": "Byrne Hobart's systems take on how financial and industrial structure evolved historically — institutions and incentives applied to market history.",
+          "confidence": "high",
+          "crawl_root": "https://thediff.co/feed"
+        },
+        {
+          "name": "Free Markets & Firepower",
+          "domain": "freemarketsandfirepower.substack.com",
+          "type": "newsletter",
+          "why": "Economic and political history linking fiscal/monetary systems ('price of time') to state power — history of politics and economics through incentives.",
+          "confidence": "high",
+          "crawl_root": "https://freemarketsandfirepower.substack.com/feed"
+        },
+        {
+          "name": "Marginal Revolution",
+          "domain": "marginalrevolution.com",
+          "type": "independent blog",
+          "why": "Market/economic-history commentary with heavy systems, incentives and constraining-geography content; complements the Diff for political economy.",
+          "confidence": "high",
+          "crawl_root": "https://marginalrevolution.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Long-run data, technology adoption & material constraints",
+      "coverage": "Full: empirical long-run series on growth, energy, technology diffusion and physical limits.",
+      "sources": [
+        {
+          "name": "Our World in Data — Technology & Growth long-run series",
+          "domain": "ourworldindata.org",
+          "type": "data / registry + analysis",
+          "why": "Registry of long-run historical series (technology adoption, energy, GDP per capita) with systems-oriented writeups — complements NBER and OWID's own feeds.",
+          "confidence": "high",
+          "crawl_root": "https://ourworldindata.org/feed"
+        }
+      ]
+    },
+    {
+      "name": "Geography / systems-resilience (broad context)",
+      "coverage": "Partial/implied — one cross-cutting source bridging geography, shipping chokepoints and system fragility.",
+      "sources": [
+        {
+          "name": "The Great Simplification (systems-history episodes)",
+          "domain": "thegreatsimplification.com",
+          "type": "podcast",
+          "why": "Systems economist Nate Hagens interviews historians on chokepoints, shipping and material constraints shaping civilization — geography-systems angle.",
+          "confidence": "high",
+          "crawl_root": "https://thegreatsimplification.com/feed"
+        }
+      ]
+    }
+  ],
+  "registries": [
+    {
+      "name": "NBER Macrohistory Database & Development-of-the-American-Economy archive",
+      "domain": "nber.org",
+      "type": "data/registry + working-paper archive",
+      "crawl_root": "https://back.nber.org/rss/aginghealth.xml"
+    },
+    {
+      "name": "Our World in Data — long-run historical indicators",
+      "domain": "ourworldindata.org",
+      "type": "data/registry",
+      "crawl_root": "https://ourworldindata.org/feed"
+    },
+    {
+      "name": "OpenAlex API (journal/work discovery for Cliodynamics & economic history)",
+      "domain": "api.openalex.org",
+      "type": "bibliographic API / registry",
+      "crawl_root": "https://api.openalex.org/works?filter=primary_location.source.display_name:Cliodynamics"
+    },
+    {
+      "name": "EH.net (Economic History Association) data & book-abstract archive",
+      "domain": "eh.net",
+      "type": "data/registry + academic content",
+      "crawl_root": "https://eh.net/feed"
+    }
+  ],
+  "queries": [
+    "quantitative history datasets historical economic data registry",
+    "logistics supply chain constraints shaped historical military outcomes systems",
+    "geography terrain climate determined historical development paths",
+    "technology adoption diffusion historical data long run GDP energy",
+    "history of political economy institutions incentives fiscal systems"
+  ],
+  "news_vs_analysis": {
+    "description": "Mix skews heavily to analysis/first-principles (blogs, newsletters, academic method) rather than hard news — appropriate for a systems-history topic where events are historical and the value is causal reconstruction. 'News'-like sources are limited to working-paper/feed announcements (NBER, Economic History Review) and periodic long-run data updates (Our World in Data).",
+    "estimated_split": "Analysis-heavy: ~80% analysis / ~20% data-and-working-paper updates"
+  },
+  "notes": "Boundary check: excluded narrative/political history without systems content (e.g., pure biography channels, local nostalgia blogs) and confirmed all sources carry an explicit systems/constraints/logistics/quantitative angle. Subscribed/blacklisted domains respected: antonhowes.substack.com, livinglondonhistory.com, spitalfieldslife.com are excluded and no domain in this list duplicates them. Source-type mix: independent blog (ACOUP, Roots of Progress, Marginal Revolution, Works in Progress), newsletter/Substack (From Poverty to Progress, Sam Matey-Coste, Turchin, Free Markets & Firepower, The Diff), academic/journal (Cliodynamics, Economic History Review), data/registry (NBER, Our World in Data, EH.net), podcast (The Great Simplification) - >=4 distinct types satisfied. Feed-verified (check_url ok): acoup.blog, frompovertytoprogress, sammatey, peterturchin, blog.daviskedrosky, ourworldindata, marginalrevolution, thediff, worksinprogress, rootsofprogress, freemarketsandfirepower, nber, academic.oup.com, api.openalex.org. Deprioritized (stale/no feed) after probing: rulesofthegame.blog (feed stale 2022), eh.net listed only as a registry crawl since its feed is stale, globalmacrodata.com (feed blocked). thegreatsimplification.com was surfaced by web_search but not independently feed-verified (search budget exhausted) - marked medium confidence with a crawl_root to re-probe at L1. Academic/paywalled endpoints directed to RSS/API: Cliodynamics via OpenAlex (api.openalex.org), Economic History Review via OUP RSS.",
+  "review_record": {
+    "findings": [
+      {
+        "severity": "major",
+        "area": "schema",
+        "issue": "news_vs_analysis is not a string",
+        "suggestion": ""
+      }
+    ]
+  }
+}

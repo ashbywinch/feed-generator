@@ -7,7 +7,9 @@ manual `make topic-sources` run, not the unit suite.
 from datetime import date, timedelta
 from typing import Any
 
+from signalflow.ratelimit import RateLimiter
 from signalflow.source_lists import (
+    _agent_chat,
     _parse_json,
     exclude_domains,
     gate_collision,
@@ -18,6 +20,39 @@ from signalflow.source_lists import (
     render_markdown,
     slug_for,
 )
+
+
+class _FakeLLM:
+    """Chat client that finalizes immediately with parseable JSON — no tools."""
+
+    def chat_tools(
+        self, messages: list[dict[str, Any]], tools: list[dict[str, Any]], *, max_tokens: int = 0
+    ) -> dict[str, Any]:
+        return {"content": "{}"}
+
+
+class _CountingLimiter(RateLimiter):
+    """Interval 0 + a call counter: proves pacing without wall-clock time."""
+
+    def __init__(self) -> None:
+        super().__init__(interval=0.0)
+        self.waits = 0
+
+    def wait(self) -> None:
+        self.waits += 1
+
+
+def test_agent_chat_paces_every_round_through_limiter() -> None:
+    """The runner shares ONE rate limiter; source generation must pace its LLM
+    calls through it too, or 3 concurrent generations burst the router quota.
+    Asserts wait-count (no wall-clock), per the determinism standard."""
+    limiter = _CountingLimiter()
+    llm: Any = _FakeLLM()
+    cfg: Any = None  # unused in the fake path; kept for the real signature
+    _agent_chat(llm, cfg, "prompt", parse=_parse_json, limiter=limiter)
+    _agent_chat(llm, cfg, "prompt", parse=_parse_json, limiter=limiter)
+    _agent_chat(llm, cfg, "prompt", parse=_parse_json, limiter=limiter)
+    assert limiter.waits == 3  # one paced wait per router call
 
 
 def _listing(**over: Any) -> dict[str, Any]:
@@ -41,6 +76,28 @@ def _listing(**over: Any) -> dict[str, Any]:
 def test_normalize_domain_strips_scheme_www_slash() -> None:
     assert normalize_domain("https://WWW.Example.COM/feed") == "example.com"
     assert normalize_domain("example.com") == "example.com"
+
+
+def test_render_markdown_dict_news_vs_analysis_as_prose() -> None:
+    """Committed lists can carry a dict news_vs_analysis (gate-flagged, kept
+    best-effort) — the markdown must render prose, never a Python repr."""
+    record = {
+        "topic": "T",
+        "status": "needs-human",
+        "iterations": 6,
+        "approved_at": "2026-08-03",
+        "subareas": [{"name": "S", "sources": [{"name": "N", "domain": "d.com", "type": "t"}]}],
+        "registries": [],
+        "queries": ["q"],
+        "news_vs_analysis": {"news": "site-a, site-b", "analysis": "site-c"},
+        "notes": {"excluded": "site-x"},
+        "review_record": {"findings": []},
+    }
+    md = render_markdown(record)
+    assert "{'news'" not in md  # never the raw dict repr
+    assert "news: site-a, site-b" in md
+    assert "analysis: site-c" in md
+    assert "excluded: site-x" in md
 
 
 def test_schema_gate_flags_non_string_contract_fields() -> None:

@@ -1,0 +1,272 @@
+{
+  "topic": "Innovation in Government",
+  "status": "needs-human",
+  "iterations": 3,
+  "approved_at": "2026-08-03",
+  "subareas": [
+    {
+      "name": "Government as a Platform / GOV.UK core platform",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "GDS blog",
+          "domain": "gds.blog.gov.uk",
+          "type": "regulator blog",
+          "why": "Official Government Digital Service blog: GOV.UK One Login, GOV.UK app, Service Standard evolution — the heart of the platform subarea.",
+          "confidence": "high",
+          "crawl_root": "https://gds.blog.gov.uk/feed"
+        },
+        {
+          "name": "CDDO blog",
+          "domain": "cddo.blog.gov.uk",
+          "type": "regulator blog",
+          "why": "Central Digital and Data Office — cross-government digital/data strategy, legacy IT modernisation and the '20 systems' mission.",
+          "confidence": "high",
+          "crawl_root": "https://cddo.blog.gov.uk/feed"
+        },
+        {
+          "name": "PublicTechnology",
+          "domain": "publictechnology.net",
+          "type": "trade press",
+          "why": "UK govtech trade press covering GDS moves, One Login rollout, central digital programmes and platform decisions.",
+          "confidence": "high",
+          "crawl_root": "https://publictechnology.net/feed"
+        }
+      ]
+    },
+    {
+      "name": "Service design & design systems",
+      "coverage": "strong",
+      "sources": [
+        {
+          "name": "State of Digital Publishing",
+          "domain": "stateofdigitalpublishing.com",
+          "type": "independent blog",
+          "why": "Independent senior-digital-leader blog on service design, content strategy and publishing practice inside public-sector and health organisations.",
+          "confidence": "medium",
+          "crawl_root": "https://stateofdigitalpublishing.com/feed"
+        },
+        {
+          "name": "PublicTechnology (service design coverage)",
+          "domain": "publictechnology.net",
+          "type": "trade press",
+          "why": "Reports service standard evolution and user-centred design adoption across government departments.",
+          "confidence": "high",
+          "crawl_root": "https://publictechnology.net/feed"
+        }
+      ]
+    },
+    {
+      "name": "Policy innovation & Policy Lab practice",
+      "coverage": "good",
+      "sources": [
+        {
+          "name": "Institute for Government",
+          "domain": "instituteforgovernment.org.uk",
+          "type": "think tank",
+          "why": "IfG publishes landmark reports and commentary on digital transformation of public services and management of digital government.",
+          "confidence": "high",
+          "crawl_root": "https://instituteforgovernment.org.uk/rss"
+        }
+      ]
+    },
+    {
+      "name": "Civil service digital transformation & skills",
+      "coverage": "good",
+      "sources": [
+        {
+          "name": "Civil Service blog",
+          "domain": "civilservice.blog.gov.uk",
+          "type": "regulator blog",
+          "why": "Civil Service Leadership blog tracks DDaT profession, digital capability framework and transformation programmes across departments.",
+          "confidence": "high",
+          "crawl_root": "https://civilservice.blog.gov.uk/feed"
+        },
+        {
+          "name": "The Register — Public Sector",
+          "domain": "theregister.com",
+          "type": "trade press",
+          "why": "Independent tech press with dedicated public-sector coverage: legacy IT failures, digital identity rollout and Whitehall tech projects.",
+          "confidence": "high",
+          "crawl_root": "https://api.theregister.com/api/v1/article?orderBy=published&site_id=2&remapper=rss"
+        }
+      ]
+    },
+    {
+      "name": "Digital identity / One Login",
+      "coverage": "good",
+      "sources": [
+        {
+          "name": "GDS blog (One Login updates)",
+          "domain": "gds.blog.gov.uk",
+          "type": "regulator blog",
+          "why": "Authoritative for GOV.UK One Login / GOV.UK Verify replacement programme details and digital identity rollouts.",
+          "confidence": "high",
+          "crawl_root": "https://gds.blog.gov.uk/feed"
+        },
+        {
+          "name": "PublicTechnology",
+          "domain": "publictechnology.net",
+          "type": "trade press",
+          "why": "Tracks political and policy decisions affecting the national digital identity rollout.",
+          "confidence": "high",
+          "crawl_root": "https://publictechnology.net/feed"
+        }
+      ]
+    },
+    {
+      "name": "Local government digital",
+      "coverage": "moderate",
+      "sources": [
+        {
+          "name": "PublicTechnology (local government)",
+          "domain": "publictechnology.net",
+          "type": "trade press",
+          "why": "Covers council digital transformation and shared-services programmes.",
+          "confidence": "high",
+          "crawl_root": "https://publictechnology.net/feed"
+        },
+        {
+          "name": "Socitm (Society for Innovation, Technology and Modernisation)",
+          "domain": "socitm.net",
+          "type": "independent blog / membership body",
+          "why": "UK membership body for public-service technology leaders — council digital transformation, service design and shared-services analysis from the local government perspective.",
+          "confidence": "high",
+          "crawl_root": "https://socitm.net/feed"
+        },
+        {
+          "name": "Digital Luton",
+          "domain": "luton.localgov.blog",
+          "type": "independent blog",
+          "why": "Council digital team blog with working RSS — practical service design and digital delivery lessons from local government.",
+          "confidence": "high",
+          "crawl_root": "https://luton.localgov.blog/feed"
+        }
+      ]
+    },
+    {
+      "name": "International digital government",
+      "coverage": "moderate",
+      "sources": [
+        {
+          "name": "FedScoop",
+          "domain": "fedscoop.com",
+          "type": "trade press",
+          "why": "US federal government tech news: digital platform strategy, FedRAMP, govtech modernisation and AI adoption — direct US comparison to UK GDS, with a working RSS feed.",
+          "confidence": "high",
+          "crawl_root": "https://fedscoop.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Open data, transparency & data sharing",
+      "coverage": "good",
+      "sources": [
+        {
+          "name": "Chosen Path (Owen Boswarva)",
+          "domain": "chosen-path.org",
+          "type": "independent blog",
+          "why": "Long-running independent commentary on UK government data policy, transparency and FOI — first-principles analysis of data infrastructure.",
+          "confidence": "medium",
+          "crawl_root": "https://chosen-path.org/feed"
+        },
+        {
+          "name": "Data in government (GDS/analysis)",
+          "domain": "dataingovernment.blog.gov.uk",
+          "type": "regulator blog",
+          "why": "GDS data science and analysis team blog — practical data policy, performance analysis and data sharing inside government; working RSS feed replacing the bot-blocked ODI for this subarea.",
+          "confidence": "high",
+          "crawl_root": "https://dataingovernment.blog.gov.uk/feed"
+        }
+      ]
+    }
+  ],
+  "registries": [
+    {
+      "name": "GOV.UK Find and update open data",
+      "domain": "data.gov.uk",
+      "type": "data registry",
+      "why": "Official UK government open data portal — machine-readable datasets on public services, spend and transformation.",
+      "confidence": "high"
+    },
+    {
+      "name": "GOV.UK Digital Marketplace (G-Cloud / DOS)",
+      "domain": "digitalmarketplace.service.gov.uk",
+      "type": "procurement registry",
+      "why": "National registry of digital services and frameworks — reveals government's supplier ecosystem for platform and service delivery.",
+      "confidence": "high"
+    },
+    {
+      "name": "ONS",
+      "domain": "ons.gov.uk",
+      "type": "data registry",
+      "why": "Office for National Statistics data on government digital service uptake, internet use and digital inclusion baselines.",
+      "confidence": "high"
+    },
+    {
+      "name": "OpenAlex",
+      "domain": "api.openalex.org",
+      "type": "academic API",
+      "why": "Open scholarly index API for discovering peer-reviewed research on digital government, e-gov and public-sector innovation.",
+      "confidence": "high",
+      "crawl_root": "https://api.openalex.org/works?filter=concepts.id:C_{gov_digital}&per-page=50"
+    }
+  ],
+  "queries": [
+    "GOV.UK One Login rollout departments timetable",
+    "Central Digital and Data Office legacy systems mission progress",
+    "UK government digital service transformation case study 2025",
+    "Digital government platform policy Institute for Government report",
+    "open data digital public services UK transparency"
+  ],
+  "news_vs_analysis": {
+    "news": [
+      "publictechnology.net",
+      "theregister.com",
+      "govinsider.asia",
+      "gds.blog.gov.uk",
+      "cddo.blog.gov.uk"
+    ],
+    "analysis": [
+      "instituteforgovernment.org.uk",
+      "theodi.org",
+      "chosen-path.org",
+      "stateofdigitalpublishing.com"
+    ]
+  },
+  "notes": "UK-centric per the topic's `in` scope (DWP/HMRC/GDS/design systems). Subscribed blog.gov.uk domains (GDS platforms, Policy Lab, user research, department digital teams) are blacklisted; the GDS main blog and CDDO blog are distinct non-blacklisted domains and are retained as core signals. Trade press falls back to free headline feeds (crawl_root given) for paywalled articles. Topic's 'out' boundaries respected: no party politics or general public-services commentary.",
+  "review_record": {
+    "findings": [
+      {
+        "severity": "major",
+        "area": "schema",
+        "issue": "news_vs_analysis is not a string",
+        "suggestion": ""
+      },
+      {
+        "severity": "minor",
+        "area": "duplicates",
+        "issue": "domain publictechnology.net also under 'Government as a Platform / GOV.UK core platform'",
+        "suggestion": "reuse across subareas is fine; exact duplicates are noise"
+      },
+      {
+        "severity": "minor",
+        "area": "duplicates",
+        "issue": "domain gds.blog.gov.uk also under 'Government as a Platform / GOV.UK core platform'",
+        "suggestion": "reuse across subareas is fine; exact duplicates are noise"
+      },
+      {
+        "severity": "minor",
+        "area": "duplicates",
+        "issue": "domain publictechnology.net also under 'Government as a Platform / GOV.UK core platform'",
+        "suggestion": "reuse across subareas is fine; exact duplicates are noise"
+      },
+      {
+        "severity": "minor",
+        "area": "duplicates",
+        "issue": "domain publictechnology.net also under 'Government as a Platform / GOV.UK core platform'",
+        "suggestion": "reuse across subareas is fine; exact duplicates are noise"
+      }
+    ]
+  }
+}

@@ -31,6 +31,7 @@ from .config import Config
 from .env import PROJECT_ROOT, load_env
 from .llm import LLM, LLMError
 from .opml import parse_opml
+from .ratelimit import RateLimiter
 from .topics import load_topics
 
 log = logging.getLogger(__name__)
@@ -150,6 +151,7 @@ def _agent_chat(
     max_searches: int = MAX_SEARCHES,
     parse: Callable[[str], Any] | None = None,
     retries: int = 2,
+    limiter: RateLimiter | None = None,
 ) -> tuple[str, int, set[str]]:
     """Tool-use loop: web_search (Exa) + check_url (cheap probe); returns
     (final_text, searches, grounded_domains).
@@ -159,6 +161,10 @@ def _agent_chat(
     replacements come from this set. Searches are hard-capped; once spent the
     model gets budget-exhausted tool results and must finalize. If `parse` is
     given, a non-parsing final answer gets a nudge to re-emit as strict JSON.
+
+    limiter: optional shared RateLimiter — paces every router chat call so
+    concurrent topics generating source lists cannot burst the quota (the
+    multi-topic runner passes the SAME limiter as selection uses).
     """
     messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
     searches = 0
@@ -166,6 +172,8 @@ def _agent_chat(
     grounded: set[str] = set()
     retry_left = retries
     for _ in range(max_rounds):
+        if limiter is not None:
+            limiter.wait()
         msg = llm.chat_tools(messages, [WEB_SEARCH_TOOL, CHECK_URL_TOOL], max_tokens=12000)
         if msg.get("tool_calls"):
             messages.append(msg)
@@ -218,8 +226,9 @@ def _agent_chat(
                 messages.append(
                     {
                         "role": "user",
-                        "content": "Your previous response was not valid JSON. "
-                        "Respond again with STRICT JSON only — nothing else.",
+                        "content": "Your previous response was NOT valid JSON (explanatory prose or truncation "
+                        "is rejected). Reply with ONLY a single JSON object — no explanations, no commentary, "
+                        "no markdown, no preamble.",
                     }
                 )
                 continue
@@ -634,10 +643,14 @@ def generate_topic_sources(
     *,
     llm: LLM | None = None,
     max_iter: int = MAX_ITER,
+    limiter: RateLimiter | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], int, int]:
     """Run generate -> gates -> review until approval.
 
-    Returns (listing, verdict, iterations, searches_used)."""
+    Returns (listing, verdict, iterations, searches_used). limiter (optional)
+    paces every router chat call — the multi-topic runner shares its selection
+    limiter here so concurrent generations cannot burst the quota.
+    """
     known_domains, feeds = parse_opml(opml_path)
     excludes = exclude_domains(feeds, topic)
     llm = llm or LLM(cfg)
@@ -671,6 +684,7 @@ def generate_topic_sources(
             base_prompt,
             max_searches=10,
             parse=_parse_json,
+            limiter=limiter,
         )
         searches_used += n
         if listing:
@@ -714,6 +728,7 @@ def generate_topic_sources(
             + json.dumps(listing, indent=2),
             max_searches=5,
             parse=_parse_json,
+            limiter=limiter,
         )
         searches_used += n
         verdict = _parse_json(content)
@@ -739,6 +754,14 @@ def slug_for(topic_name: str, topics: list[dict[str, Any]]) -> str:
     idx = next((i + 1 for i, t in enumerate(topics) if t["name"] == topic_name), 0)
     kebab = re.sub(r"[^a-z0-9]+", "-", topic_name.lower()).strip("-")
     return f"{idx:02d}-{kebab}"
+
+
+def _field_text(value: Any) -> str:
+    """Render a listing field as prose — dicts (gate-flagged, kept best-effort)
+    become key: value lines, never a Python repr."""
+    if isinstance(value, dict):
+        return "\n".join(f"{k}: {v}" for k, v in value.items())
+    return str(value or "")
 
 
 def render_markdown(record: dict[str, Any]) -> str:
@@ -778,10 +801,10 @@ def render_markdown(record: dict[str, Any]) -> str:
         lines.append(f"{i}. {q}")
     lines.append("")
     lines.append("## News vs analysis")
-    lines.append(str(record.get("news_vs_analysis", "")))
+    lines.append(_field_text(record.get("news_vs_analysis", "")))
     lines.append("")
     lines.append("## Notes")
-    lines.append(str(record.get("notes", "")))
+    lines.append(_field_text(record.get("notes", "")))
     lines.append("")
     lines.append("## Review record")
     for f in record.get("review_record", {}).get("findings", []):

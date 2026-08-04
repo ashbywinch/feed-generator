@@ -1,5 +1,5 @@
 # Makefile for feed-generator (SignalFlow)
-.PHONY: help setup run smoke topics spike spike-bg spike-logs spike-stop spike-weekly spike-weekly-bg spike-weekly-logs spike-weekly-stop eval-story eval-queries refresh-queries topic-sources topic-sources-bg topic-sources-logs topic-sources-stop lint lint-github typecheck test coverage format clean
+.PHONY: help setup run smoke topics spike spike-bg spike-logs spike-stop spike-weekly spike-weekly-bg spike-weekly-logs spike-weekly-stop spike-weekly-all spike-weekly-all-bg spike-weekly-all-logs spike-weekly-all-stop feeds deploy eval-story eval-queries refresh-queries topic-sources topic-sources-bg topic-sources-logs topic-sources-stop lint lint-github typecheck test coverage format clean
 
 PYTHON := .venv/bin/python
 UV := $(shell command -v uv 2>/dev/null || echo $(HOME)/.local/bin/uv)
@@ -26,6 +26,12 @@ help:
 	@echo "  ${GREEN}make spike-weekly-bg${NC} Run weekly spike in background; log to spikes/state/weekly.log"
 	@echo "  ${GREEN}make spike-weekly-logs${NC} Tail the background weekly spike log"
 	@echo "  ${GREEN}make spike-weekly-stop${NC} Stop the background weekly spike"
+	@echo "  ${GREEN}make spike-weekly-all${NC} Regenerate all stale topics (3 at a time, WEEKLY_WORKERS)"
+	@echo "  ${GREEN}make spike-weekly-all-bg${NC} Run it in background; log to spikes/state/weekly_all.log"
+	@echo "  ${GREEN}make spike-weekly-all-logs${NC} Tail the background weekly-all log"
+	@echo "  ${GREEN}make spike-weekly-all-stop${NC} Stop the background weekly-all spike"
+	@echo "  ${GREEN}make feeds${NC}        Build per-topic RSS feeds + story pages into spikes/output/site/"
+	@echo "  ${GREEN}make deploy${NC}       Deploy the site to Netlify (skipped until DEPLOY_TOKEN + NETLIFY_SITE_ID)"
 	@echo "  ${GREEN}make eval-story${NC}   Eval: can the story contextualize fresh articles"
 	@echo "  ${GREEN}make eval-queries${NC}  Eval: are discovery queries global + well-formed"
 	@echo "  ${GREEN}make refresh-queries${NC} Regenerate discovery queries via prompt (eval-gated, persists)"
@@ -98,6 +104,28 @@ spike-weekly-logs:
 
 spike-weekly-stop:
 	@if [ -f spikes/state/weekly.pid ]; then kill $$(cat spikes/state/weekly.pid) 2>/dev/null && rm spikes/state/weekly.pid && echo "weekly spike stopped"; else echo "no pid file — not running?"; fi
+
+spike-weekly-all: setup
+	@$(UV) run --env-file .env python spikes/weekly_all.py
+
+spike-weekly-all-bg: setup
+	mkdir -p spikes/state
+	@nohup $(UV) run --env-file .env python -u spikes/weekly_all.py >> spikes/state/weekly_all.log 2>&1 & echo $$! > spikes/state/weekly_all.pid
+	@echo "weekly-all spike running in background (pid $$(cat spikes/state/weekly_all.pid))"
+	@echo "  monitor: make spike-weekly-all-logs"
+	@echo "  stop:    make spike-weekly-all-stop"
+
+spike-weekly-all-logs:
+	tail -f spikes/state/weekly_all.log
+
+spike-weekly-all-stop:
+	@if [ -f spikes/state/weekly_all.pid ]; then kill $$(cat spikes/state/weekly_all.pid) 2>/dev/null && rm spikes/state/weekly_all.pid && echo "weekly-all spike stopped"; else echo "no pid file — not running?"; fi
+
+feeds: setup
+	@$(UV) run --env-file .env python spikes/build_feeds.py
+
+deploy: setup
+	@$(UV) run --env-file .env python spikes/deploy_site.py
 
 eval-story: setup
 	@$(UV) run --env-file .env python spikes/eval_story.py

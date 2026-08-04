@@ -1,0 +1,273 @@
+{
+  "topic": "AI Tooling for Development & Business",
+  "status": "needs-human",
+  "iterations": 4,
+  "approved_at": "2026-08-03",
+  "subareas": [
+    {
+      "name": "AI Coding Assistants",
+      "coverage": "Cursor, Claude Code, GitHub Copilot, Windsurf, and related coding agent tools — product landscape, capabilities, adoption, practical usage patterns.",
+      "sources": [
+        {
+          "name": "GitHub Blog",
+          "domain": "github.blog",
+          "type": "vendor blog",
+          "why": "Primary source for GitHub Copilot, Copilot Workspace, and GitHub's AI agent releases — direct vendor announcements and adoption metrics.",
+          "confidence": "high",
+          "crawl_root": "https://github.blog/feed"
+        },
+        {
+          "name": "MIT Technology Review AI",
+          "domain": "www.technologyreview.com",
+          "type": "trade press",
+          "why": "Covers AI coding tool adoption in enterprises and emerging developer-tool trends with editorial depth.",
+          "crawl_root": "https://technologyreview.com/feed"
+        },
+        {
+          "name": "The New Stack",
+          "domain": "thenewstack.io",
+          "type": "trade press",
+          "why": "Technical coverage of AI coding assistants, agent architecture, and developer tooling in production environments.",
+          "confidence": "high",
+          "crawl_root": "https://thenewstack.io/feed"
+        }
+      ]
+    },
+    {
+      "name": "AI Agents for Business",
+      "coverage": "Autonomous AI agents applied to business workflows — agent orchestration, Copilot Studio, enterprise agent platforms, vertical agent tools.",
+      "sources": [
+        {
+          "name": "Swyx / Latent Space",
+          "domain": "swyx.io",
+          "type": "independent blog",
+          "why": "Swyx tracks the AI agent ecosystem closely — agent tools, frameworks, and developer-agent landscape; Latent Space podcast covers frontier agent tooling.",
+          "confidence": "high",
+          "crawl_root": "https://swyx.io/feed"
+        },
+        {
+          "name": "Latent Space (podcast)",
+          "domain": "latent.space",
+          "type": "podcast",
+          "why": "Deep technical podcast on AI agents and tooling, interviewing tool builders and practitioners.",
+          "confidence": "high",
+          "crawl_root": "https://latent.space/feed"
+        },
+        {
+          "name": "Addy Osmani",
+          "domain": "addyo.substack.com",
+          "type": "independent blog",
+          "why": "Engineering leader writing on AI-assisted development practices and business-facing AI workflows.",
+          "confidence": "high",
+          "crawl_root": "https://addyo.substack.com/feed"
+        },
+        {
+          "name": "AI Supremacy",
+          "domain": "aisupremacy.substack.com",
+          "type": "newsletter",
+          "why": "Expert commentary on enterprise AI agent adoption, tooling, and business workflow transformation.",
+          "confidence": "medium",
+          "crawl_root": "https://www.ai-supremacy.com/feed"
+        }
+      ]
+    },
+    {
+      "name": "Tool Landscape & Practical Adoption",
+      "coverage": "Market-wide data on which tools developers and businesses actually use — surveys, adoption statistics, comparison benchmarks, enterprise rollouts.",
+      "sources": [
+        {
+          "name": "Artificial Analysis",
+          "domain": "artificialanalysis.ai",
+          "type": "data/registry",
+          "why": "Independent benchmarking and market data on LLM providers and tooling — price/perf/capability tracking across AI tools.",
+          "confidence": "high",
+          "crawl_root": "https://artificialanalysis.ai"
+        },
+        {
+          "name": "Stack Overflow Blog",
+          "domain": "stackoverflow.blog",
+          "type": "trade press",
+          "why": "Publishes the annual Stack Overflow Developer Survey with the most-cited data on which AI coding tools developers actually use and adoption rates — direct fit for tool-landscape adoption statistics and enterprise rollout analysis.",
+          "confidence": "high",
+          "crawl_root": "https://stackoverflow.blog/feed"
+        },
+        {
+          "name": "Andrej Karpathy (via LessWrong)",
+          "domain": "lesswrong.com",
+          "type": "independent blog",
+          "why": "High-signal AI tooling commentary and links — Karpathy's insights on tool landscapes often surface here.",
+          "confidence": "medium",
+          "crawl_root": "https://www.lesswrong.com/feed.xml"
+        }
+      ]
+    },
+    {
+      "name": "Open-Source Tools & Open-Weights Models",
+      "coverage": "Open-source AI developer tools, locally runnable open-weights models, Hugging Face ecosystem, llama.cpp, vLLM, open agent frameworks.",
+      "sources": [
+        {
+          "name": "Hugging Face Blog",
+          "domain": "huggingface.co/blog",
+          "type": "vendor blog",
+          "why": "Primary publisher of open-weights model releases, open-source tooling tutorials, and ecosystem announcements.",
+          "confidence": "high",
+          "crawl_root": "https://huggingface.co/blog/feed.xml"
+        },
+        {
+          "name": "Huyen Chip",
+          "domain": "huyenchip.com",
+          "type": "independent blog",
+          "why": "Pragmatic engineering essays on LLM tooling patterns, deployment of open models, and AI engineering best practices.",
+          "confidence": "high",
+          "crawl_root": "https://huyenchip.com/feed"
+        },
+        {
+          "name": "Matt Rickard",
+          "domain": "matt-rickard.com",
+          "type": "independent blog",
+          "why": "Technical essays on AI infrastructure and open-source tooling — deep dives on model serving, agents, and open toolchains.",
+          "confidence": "high",
+          "crawl_root": "https://mattrickard.com/rss"
+        }
+      ]
+    },
+    {
+      "name": "Frontier AI Tooling",
+      "coverage": "Latest frontier model capabilities applied to tools — new agent APIs, model tool calling, frontier SDK releases, tool-use research.",
+      "sources": [
+        {
+          "name": "Sebastian Raschka",
+          "domain": "sebastianraschka.com",
+          "type": "independent blog",
+          "why": "Frontier model and tooling expert writing on the latest LLM techniques and their practical tooling implications.",
+          "confidence": "high",
+          "crawl_root": "https://sebastianraschka.com/rss_feed.xml"
+        },
+        {
+          "name": "Lilian Weng",
+          "domain": "lilianweng.github.io",
+          "type": "independent blog",
+          "why": "Deep technical blog on frontier AI capabilities, agent design, and tool-use research from OpenAI's AI Safety lead.",
+          "confidence": "high",
+          "crawl_root": "https://lilianweng.github.io/index.xml"
+        },
+        {
+          "name": "Platformer (Casey Newton)",
+          "domain": "platformer.news",
+          "type": "newsletter",
+          "why": "Fast-moving coverage of what frontier models enable in real products — useful for spotting tool-adjacent shifts.",
+          "confidence": "high",
+          "crawl_root": "https://platformer.news/feed"
+        }
+      ]
+    },
+    {
+      "name": "AI Developer Infrastructure",
+      "coverage": "SDKs, APIs, frameworks, orchestration platforms that power AI tooling — LangChain, LangGraph, agent SDKs, vector databases, evals infrastructure.",
+      "sources": [
+        {
+          "name": "InfoQ",
+          "domain": "infoq.com",
+          "type": "trade press",
+          "why": "Enterprise-grade coverage of AI development infrastructure — frameworks, orchestration, and production case studies.",
+          "confidence": "high",
+          "crawl_root": "https://feed.infoq.com"
+        },
+        {
+          "name": "Towards Data Science",
+          "domain": "towardsdatascience.com",
+          "type": "independent blog",
+          "why": "Practitioner essays on AI tooling stacks, agent frameworks, and production MLOps/AI engineering patterns.",
+          "confidence": "medium",
+          "crawl_root": "https://towardsdatascience.com/feed"
+        },
+        {
+          "name": "Eugene Yan",
+          "domain": "eugeneyan.com",
+          "type": "independent blog",
+          "why": "Evidence-based essays on building AI products — evaluating, deploying, and operating tooling stacks at scale.",
+          "confidence": "high",
+          "crawl_root": "https://eugeneyan.com/rss"
+        }
+      ]
+    },
+    {
+      "name": "AI in Software Engineering Practice",
+      "coverage": "How development teams really adopt AI tooling — workflow changes, productivity measurement, code review with AI, pair-programming with agents.",
+      "sources": [
+        {
+          "name": "The Pragmatic Engineer",
+          "domain": "newsletter.pragmaticengineer.com",
+          "type": "independent blog",
+          "why": "Gergely Orosz's evidence-driven reporting on how real dev teams adopt AI tooling — workflow changes, productivity measurement, code review with AI, and pair-programming with agents.",
+          "confidence": "high",
+          "crawl_root": "https://newsletter.pragmaticengineer.com/feed"
+        },
+        {
+          "name": "Software Engineering Daily",
+          "domain": "softwareengineeringdaily.com",
+          "type": "podcast",
+          "why": "Daily technical podcast covering AI pair programming, agent-assisted development, and software-engineering practice in production — strong fresh feed for the AI-in-SE-practice angle.",
+          "confidence": "high",
+          "crawl_root": "https://softwareengineeringdaily.com/feed"
+        }
+      ]
+    }
+  ],
+  "registries": [
+    {
+      "name": "arXiv (cs.AI, cs.SE, cs.CL)",
+      "domain": "arxiv.org",
+      "type": "academic/registry",
+      "why": "Preprint server for AI tooling research — tool-use, agent design, LLM-integrated development tooling papers.",
+      "confidence": "high",
+      "crawl_root": "https://arxiv.org/rss/cs.AI"
+    },
+    {
+      "name": "OpenAlex API",
+      "domain": "api.openalex.org",
+      "type": "data/registry",
+      "why": "Open academic index for sourcing papers on AI tooling, agents, and software engineering AI — API endpoint for programmatic crawl.",
+      "confidence": "high",
+      "crawl_root": "https://api.openalex.org/works?filter=concepts.id:C2779217235"
+    },
+    {
+      "name": "GitHub",
+      "domain": "github.com",
+      "type": "data/registry",
+      "why": "Source of truth for open-source AI tooling repos, releases, and trending projects — crawl via API for star/release data.",
+      "confidence": "high",
+      "crawl_root": "https://api.github.com"
+    },
+    {
+      "name": "DeepLearning.AI",
+      "domain": "deeplearning.ai",
+      "type": "academic",
+      "why": "Andrew Ng's platform for AI courses and tooling commentary — The Batch newsletter summarizes tool landscape shifts.",
+      "confidence": "medium",
+      "crawl_root": "https://www.deeplearning.ai"
+    }
+  ],
+  "queries": [
+    "AI coding assistant tools landscape adoption",
+    "open-source AI developer tools release",
+    "AI agents business workflow automation enterprise",
+    "LLM tool calling agent orchestration framework",
+    "AI pair programming productivity measurement"
+  ],
+  "news_vs_analysis": {
+    "news": "github.blog, thenewstack.io, infoq.com, future.a16z.com, platformer.news",
+    "analysis": "simonwillison.net, latent.space, huyenchip.com, lilianweng.github.io, eugeneyan.com, matt-rickard.com, sebastianraschka.com, stratechery.com"
+  },
+  "notes": "Sources cover all 7 subareas identified: coding assistants, business agents, tool landscape/adoption, open-source/open-weights, frontier tooling, dev infrastructure, and AI-in-SE practice. All domains verified to resolve and serve feeds (or have crawl_root endpoints noted for bot-protected/vendor sites). Policy-like sources map to vendor/think-tank commentary for this fast-moving space. Excluded as subscribed: ghuntley.com and zoltanbourne.substack.com. OpenAlex API and GitHub API are used as crawl endpoints for academic and OSS discovery respectively. For bot-protected vendor domains (openai.com, anthropic docs, ai.google.dev), the engine should rely on feed-verified secondary sources.",
+  "review_record": {
+    "findings": [
+      {
+        "severity": "major",
+        "area": "schema",
+        "issue": "news_vs_analysis is not a string",
+        "suggestion": ""
+      }
+    ]
+  }
+}

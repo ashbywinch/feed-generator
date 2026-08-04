@@ -62,9 +62,13 @@ class Config:
     weekly_feed_cap_bytes: int = 300_000  # feed body cap; truncation flagged, never silent
     weekly_junk_title_markers: tuple[str, ...] = ("factsheet", "fact sheet")  # boilerplate docs filtered pre-LLM
     llm_max_tokens: int = 8192
+    # Multi-topic weekly runner (spike-weekly-all): concurrent topics, site layout
+    weekly_workers: int = 3  # topics regenerated at a time (3 threads)
+    site_base_url: str = "https://signalflow.local"  # placeholder until hosting decided (OQ-3)
     # Publishing
     publish_target: str = "netlify"
     deploy_token: str = ""
+    netlify_site_id: str = ""
 
     @classmethod
     def from_env(cls) -> Config:
@@ -128,6 +132,9 @@ class Config:
                 m.strip() for m in os.environ.get("JUNK_TITLE_MARKERS", "factsheet,fact sheet").split(",") if m.strip()
             ),
             llm_max_tokens=int(os.environ.get("LLM_MAX_TOKENS", "8192")),
+            weekly_workers=int(os.environ.get("WEEKLY_WORKERS", "3")),
+            site_base_url=os.environ.get("SITE_BASE_URL", "https://signalflow.local"),
             publish_target=os.environ.get("PUBLISH_TARGET", "netlify"),
             deploy_token=os.environ.get("DEPLOY_TOKEN", ""),
+            netlify_site_id=os.environ.get("NETLIFY_SITE_ID", ""),
         )
