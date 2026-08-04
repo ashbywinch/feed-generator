@@ -18,6 +18,7 @@ from __future__ import annotations
 import html
 import json
 import re
+import string
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -27,7 +28,7 @@ from feedgen.feed import FeedGenerator
 SNIPPET_LIMIT = 400  # preview snippet cap (chars); the clickable article preview
 
 RADAR_SVG = (
-    '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" '
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" '
     'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
     '<path d="M2 12a10 10 0 0 1 20 0"/><path d="M6 12a6 6 0 0 1 12 0"/>'
     '<path d="M10 12a2 2 0 0 1 4 0"/><circle cx="12" cy="12" r=".5" fill="currentColor" stroke="none"/>'
@@ -45,6 +46,25 @@ FAVICON_URI = (
 )
 
 _TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _tooltip_js() -> str:
+    """Login-aware toolbar JS: fetches /admin/auth/status and swaps login/user dropdown."""
+    return (
+        "<script>"
+        "(async function(){"
+        "const r=await fetch('/admin/auth/status');"
+        "const d=await r.json();"
+        "const a=document.getElementById('login-area');"
+        "if(d.logged_in){"
+        "a.innerHTML='<details class=dropdown><summary>'+"
+        "d.email.replace(/&/g,'&amp;').replace(/</g,'&lt;')+' ▾</summary>"
+        '<ul><li><a href="/admin/">Admin</a></li>'
+        '<li><a href="/admin/auth/logout">Logout</a></li></ul></details>'
+        "}else{"
+        "a.innerHTML='<a href=\"/admin/auth/login\">Login</a>'"
+        "}})()</script>"
+    )
 
 
 def strip_html(text: str) -> str:
@@ -233,6 +253,17 @@ def _site_urls(base_url: str, slug: str) -> tuple[str, str]:
     return f"{root}/feeds/{slug}.xml", f"{root}/topics/{slug}/"
 
 
+TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
+_index_template_cache: str | None = None
+
+
+def _load_index_template() -> str:
+    global _index_template_cache
+    if _index_template_cache is None:
+        _index_template_cache = (TEMPLATE_DIR / "index.html.tmpl").read_text(encoding="utf-8")
+    return _index_template_cache
+
+
 def render_index(
     *,
     picks_dir: Path,
@@ -286,58 +317,11 @@ def render_index(
             f"</article>"
         )
     cards_html = "\n".join(cards) if cards else "<p>No topics yet — the nightly pipeline hasn't run.</p>"
-    tooltip_js = (
-        "<script>"
-        "(async function(){"
-        "const r=await fetch('/admin/auth/status');"
-        "const d=await r.json();"
-        "const a=document.getElementById('login-area');"
-        "if(d.logged_in){"
-        "a.innerHTML='<details class=dropdown><summary>'+"
-        "d.email.replace(/&/g,'&amp;').replace(/</g,'&lt;')+' ▾</summary>"
-        '<ul><li><a href="/admin/">Admin</a></li>'
-        '<li><a href="/admin/auth/logout">Logout</a></li></ul></details>'
-        "}else{"
-        "a.innerHTML='<a href=\"/admin/auth/login\">Login</a>'"
-        "}})()</script>"
-    )
-    return (
-        "<!doctype html>"
-        '<html lang="en"><head><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        "<title>SignalFlow — Outside Discovery</title>"
-        f'<link rel="icon" href="{FAVICON_URI}">'
-        '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">'
-        "<style>"
-        "body>header nav{display:flex;align-items:center;justify-content:space-between}"
-        "body>header nav svg{display:block;vertical-align:middle}"
-        "body>header nav a[aria-label=Home]{font-size:1.3rem;text-decoration:none;line-height:0}"
-        "#login-area{display:flex;align-items:center;gap:.5rem}"
-        "#login-area details[open] ul{position:absolute;right:0;min-width:10rem;"
-        "background:var(--pico-card-background-color);"
-        "border:1px solid var(--pico-muted-border-color);"
-        "border-radius:var(--pico-border-radius);padding:.25rem 0;z-index:10}"
-        "#login-area details[open] ul li{padding:0;margin:0}"
-        "#login-area details[open] ul li a{display:block;padding:.35rem .75rem;text-decoration:none}"
-        "main article{margin-bottom:2rem}"
-        ".topic-links{display:flex;gap:1rem;font-size:.85rem;margin:.5rem 0 1rem}"
-        "article .pick-reason{color:var(--pico-muted-color);font-size:.9rem;margin:.1rem 0 0}"
-        "article .pick-source{color:var(--pico-muted-color);font-size:.8rem}"
-        "article .pick-title{font-weight:600}"
-        "article ul{list-style:none;padding:0;margin-top:.5rem}"
-        "article ul li{margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid var(--pico-muted-border-color)}"
-        "article ul li:last-child{border-bottom:none}"
-        "</style></head><body>"
-        '<header><nav class="container">'
-        f'<a href="/" aria-label="Home">{RADAR_SVG}</a>'
-        '<div id="login-area"><a href="/admin/auth/login">Login</a></div>'
-        "</nav></header>"
-        '<main class="container"><h1>SignalFlow</h1>'
-        '<p class="site-subtitle">Outside discovery — weekly curated commentary from the frontiers.</p>'
-        f"{cards_html}</main>"
-        "<footer class='container'><p>Powered by SignalFlow · "
-        '<a href="/admin/">Admin</a></p></footer>'
-        f"{tooltip_js}</body></html>"
+    return string.Template(_load_index_template()).safe_substitute(
+        FAVICON_URI=FAVICON_URI,
+        RADAR=RADAR_SVG,
+        CARDS=cards_html,
+        TOOLTIP_JS=_tooltip_js(),
     )
 
 
