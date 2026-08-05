@@ -46,11 +46,52 @@ def test_digest_relative_path_branch(cfg, tmp_path, monkeypatch):
     assert out.exists()
 
 
-def test_publish_skipped_without_token(cfg, tmp_path, capsys):
+def test_publish_skipped_without_credentials(cfg, tmp_path, capsys):
     publish(cfg, tmp_path / "signalflow_digest.xml")
-    assert "skipped (no DEPLOY_TOKEN)" in capsys.readouterr().out
+    assert "skipped (no CF_API_TOKEN / CF_ACCOUNT_ID / CF_PROJECT)" in capsys.readouterr().out
 
 
-def test_publish_token_branch(cfg, tmp_path, capsys):
-    publish(replace(cfg, deploy_token="t-secret"), tmp_path / "signalflow_digest.xml")
-    assert "not yet wired to Netlify site 't-secret'" in capsys.readouterr().out
+def test_publish_copies_digest_into_site_and_deploys(cfg, tmp_path, capsys):
+    """FR-7 publish: the digest lands in the site directory and the site is
+    deployed through the CF adapter (fake deploy_fn records the call)."""
+    digest = tmp_path / "signalflow_digest.xml"
+    digest.write_text("<digest/>", encoding="utf-8")
+    site_dir = tmp_path / "site"
+    seen: dict[str, object] = {}
+
+    def fake_deploy(cfg_, site):
+        seen["cfg"] = cfg_
+        seen["site_dir"] = site
+        return {"url": "https://signalflow.pages.dev"}
+
+    publish(
+        replace(cfg, cf_api_token="t", cf_account_id="a", cf_project="p"),
+        digest,
+        site_dir=site_dir,
+        deploy_fn=fake_deploy,
+    )
+
+    assert seen["site_dir"] == site_dir
+    assert (site_dir / "signalflow_digest.xml").read_text(encoding="utf-8") == "<digest/>"
+    assert "live at https://signalflow.pages.dev" in capsys.readouterr().out
+
+
+def test_publish_creates_site_dir_and_leaves_no_temp(cfg, tmp_path):
+    """A first-ever publish has no site dir yet — it is created; the copy is
+    atomic (no .tmp left behind), and a deploy refusal (e.g. placeholder URL)
+    is not a crash."""
+    digest = tmp_path / "signalflow_digest.xml"
+    digest.write_text("<digest/>", encoding="utf-8")
+    site_dir = tmp_path / "site"
+
+    def fake_deploy(cfg_, site):
+        return None  # deploy adapter refused (placeholder SITE_BASE_URL)
+
+    publish(
+        replace(cfg, cf_api_token="t", cf_account_id="a", cf_project="p"),
+        digest,
+        site_dir=site_dir,
+        deploy_fn=fake_deploy,
+    )
+    assert (site_dir / "signalflow_digest.xml").read_text(encoding="utf-8") == "<digest/>"
+    assert not (site_dir / "signalflow_digest.xml.tmp").exists()

@@ -114,7 +114,7 @@ def test_cli_csv_format(monkeypatch: Any, capsys: Any) -> None:
     monkeypatch.setattr(tr, "load_topics", lambda: [{"name": n} for n in TOPICS])
     assert tr.main(["--date", MON.isoformat(), "--csv"]) == 0
     out = capsys.readouterr().out.strip()
-    assert out == ",".join(tr.rotation_for(MON, TOPICS))
+    assert out == "|".join(tr.rotation_for(MON, TOPICS))
 
 
 def test_cli_bad_date_exits_nonzero(monkeypatch: Any, capsys: Any) -> None:

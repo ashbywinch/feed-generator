@@ -1,5 +1,5 @@
 # Makefile for feed-generator (SignalFlow)
-.PHONY: help setup run smoke topics spike spike-bg spike-logs spike-stop spike-weekly spike-weekly-bg spike-weekly-logs spike-weekly-stop spike-weekly-all spike-weekly-all-bg spike-weekly-all-logs spike-weekly-all-stop feeds deploy eval-story eval-queries refresh-queries topic-sources topic-sources-bg topic-sources-logs topic-sources-stop lint lint-github typecheck test coverage format clean
+.PHONY: help setup run smoke topics spike spike-bg spike-logs spike-stop spike-weekly spike-weekly-bg spike-weekly-logs spike-weekly-stop spike-weekly-all spike-weekly-all-bg spike-weekly-all-logs spike-weekly-all-stop feeds admin rotation state-pull state-push feedly-opml deploy eval-story eval-queries refresh-queries topic-sources topic-sources-bg topic-sources-logs topic-sources-stop lint lint-github typecheck test coverage format clean
 
 PYTHON := .venv/bin/python
 UV := $(shell command -v uv 2>/dev/null || echo $(HOME)/.local/bin/uv)
@@ -31,7 +31,12 @@ help:
 	@echo "  ${GREEN}make spike-weekly-all-logs${NC} Tail the background weekly-all log"
 	@echo "  ${GREEN}make spike-weekly-all-stop${NC} Stop the background weekly-all spike"
 	@echo "  ${GREEN}make feeds${NC}        Build per-topic RSS feeds + story pages into spikes/output/site/"
-	@echo "  ${GREEN}make deploy${NC}       Deploy the site to Netlify (skipped until DEPLOY_TOKEN + NETLIFY_SITE_ID)"
+	@echo "  ${GREEN}make admin${NC}        Render the admin status page (Google-OAuth gated) into spikes/output/site/"
+	@echo "  ${GREEN}make rotation${NC}     Print tonight's rotation topics (csv, for the nightly workflow)"
+	@echo "  ${GREEN}make state-pull${NC}   Pull spikes/state from the R2 bucket (skipped without R2 creds)"
+	@echo "  ${GREEN}make state-push${NC}   Push spikes/state to the R2 bucket (skipped without R2 creds)"
+	@echo "  ${GREEN}make feedly-opml${NC}  Decode FEEDLY_OPML_B64 into feedly.opml (CI only)"
+	@echo "  ${GREEN}make deploy${NC}       Deploy the site to Cloudflare Pages (skipped until CF creds; run feeds+admin first)"
 	@echo "  ${GREEN}make eval-story${NC}   Eval: can the story contextualize fresh articles"
 	@echo "  ${GREEN}make eval-queries${NC}  Eval: are discovery queries global + well-formed"
 	@echo "  ${GREEN}make refresh-queries${NC} Regenerate discovery queries via prompt (eval-gated, persists)"
@@ -123,6 +128,22 @@ spike-weekly-all-stop:
 
 feeds: setup
 	@$(UV) run --env-file .env python spikes/build_feeds.py
+
+admin: setup
+	@$(UV) run --env-file .env python spikes/build_admin.py
+
+rotation: setup
+	@$(UV) run --env-file .env python spikes/topic_rotation.py --csv
+
+state-pull: setup
+	@$(UV) run --env-file .env python spikes/state_sync.py pull
+
+state-push: setup
+	@$(UV) run --env-file .env python spikes/state_sync.py push
+
+feedly-opml:
+	@test -n "$$FEEDLY_OPML_B64" || { echo "      feedly-opml: FEEDLY_OPML_B64 not set — skipping"; exit 0; }; \
+	echo "$$FEEDLY_OPML_B64" | base64 -d | gunzip > feedly.opml
 
 deploy: setup
 	@$(UV) run --env-file .env python spikes/deploy_site.py

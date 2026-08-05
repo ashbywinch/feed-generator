@@ -18,6 +18,7 @@ from __future__ import annotations
 import html
 import json
 import re
+import string
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -26,12 +27,60 @@ from feedgen.feed import FeedGenerator
 
 SNIPPET_LIMIT = 400  # preview snippet cap (chars); the clickable article preview
 
+RADAR_SVG = (
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" '
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    '<path d="M2 12a10 10 0 0 1 20 0"/><path d="M6 12a6 6 0 0 1 12 0"/>'
+    '<path d="M10 12a2 2 0 0 1 4 0"/><circle cx="12" cy="12" r=".5" fill="currentColor" stroke="none"/>'
+    "</svg>"
+)
+
+# SVG favicon data URI (URL-encoded; raw <>/# in href breaks parsing)
+FAVICON_URI = (
+    "data:image/svg+xml,"
+    "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000'"
+    "%20stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E"
+    "%3Cpath d='M2 12a10 10 0 0 1 20 0'/%3E%3Cpath d='M6 12a6 6 0 0 1 12 0'/%3E"
+    "%3Cpath d='M10 12a2 2 0 0 1 4 0'/%3E%3Ccircle cx='12' cy='12' r='.5' fill='%23000' stroke='none'/%3E"
+    "%3C/svg%3E"
+)
+
 _TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _tooltip_js() -> str:
+    """Login-aware toolbar JS: fetches /admin/auth/status and swaps login/user dropdown."""
+    return (
+        "<script>"
+        "(async function(){"
+        "const r=await fetch('/admin/auth/status');"
+        "const d=await r.json();"
+        "const a=document.getElementById('login-area');"
+        "if(d.logged_in){"
+        "a.innerHTML='<details class=dropdown><summary>'+"
+        "d.email.replace(/&/g,'&amp;').replace(/</g,'&lt;')+' ▾</summary>"
+        '<ul><li><a href="/admin/">Admin</a></li>'
+        '<li><a href="/admin/auth/logout">Logout</a></li></ul></details>'
+        "}else{"
+        "a.innerHTML='<a href=\"/admin/auth/login\">Login</a>'"
+        "}})()</script>"
+    )
 
 
 def strip_html(text: str) -> str:
     """Tags removed, whitespace collapsed — the plain text of an item summary."""
     return re.sub(r"\s+", " ", _TAG_RE.sub("", text or "")).strip()
+
+
+def _format_date(iso: str | None) -> str:
+    """ISO datetime -> compact human date like 'Aug 3, 2026' or '—' if absent."""
+    if not iso:
+        return "—"
+    try:
+        dt = datetime.fromisoformat(iso)
+    except (ValueError, TypeError):
+        return "—"
+    return dt.strftime("%b %-d, %Y")
 
 
 def why_summary(pick: dict[str, Any]) -> str:
@@ -204,6 +253,78 @@ def _site_urls(base_url: str, slug: str) -> tuple[str, str]:
     return f"{root}/feeds/{slug}.xml", f"{root}/topics/{slug}/"
 
 
+TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
+_index_template_cache: str | None = None
+
+
+def _load_index_template() -> str:
+    global _index_template_cache
+    if _index_template_cache is None:
+        _index_template_cache = (TEMPLATE_DIR / "index.html.tmpl").read_text(encoding="utf-8")
+    return _index_template_cache
+
+
+def render_index(
+    *,
+    picks_dir: Path,
+    stories_dir: Path,
+    site_dir: Path,
+    base_url: str,
+    built_topics: list[tuple[str, int]],
+) -> str:
+    """Render the site's landing page (index.html) — blog-like topic cards.
+
+    Each topic with picks + a story gets a card: the story overview as a
+    blurb, the latest picks with why-relevant notes, and links to the
+    background page and RSS feed. The page includes a toolbar with a home
+    icon and a login/user-dropdown area populated by JS.
+    """
+    esc = html.escape
+    cards: list[str] = []
+    for slug, _count in built_topics:
+        picks_path = picks_dir / f"{slug}.json"
+        story_path = stories_dir / f"{slug}.json"
+        try:
+            payload = json.loads(picks_path.read_text(encoding="utf-8"))
+            story = json.loads(story_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        topic_name = str(payload.get("topic") or slug)
+        picks = payload.get("picks") or []
+        blurb = (story.get("overview") or "")[:400]
+        if len(blurb) >= 400:
+            last_space = blurb.rfind(" ")
+            blurb = blurb[:last_space] + " …" if last_space > 300 else blurb + " …"
+        feed_url, story_url = _site_urls(base_url, slug)
+        pick_items = "".join(
+            f'<li><a class="pick-title" href="{esc(p.get("url", ""))}">'
+            f"{esc(p.get('title', ''))}</a>"
+            f'<span class="pick-source"> — {esc(p.get("source") or p.get("domain") or "")}'
+            f" ({_format_date(p.get('published'))})</span>"
+            f'<p class="pick-reason">{esc(p.get("reason", ""))}</p></li>'
+            for p in picks[:5]
+            if p.get("url")
+        )
+        cards.append(
+            f"<article>"
+            f"<hgroup><h2>{esc(topic_name)}</h2>"
+            f'<p class="topic-blurb">{esc(blurb)}</p></hgroup>'
+            f'<div class="topic-links">'
+            f'<a href="{esc(story_url)}">Read the background →</a>'
+            f'<a href="{esc(feed_url)}">RSS feed →</a>'
+            f"</div>"
+            f"<ul>{pick_items}</ul>"
+            f"</article>"
+        )
+    cards_html = "\n".join(cards) if cards else "<p>No topics yet — the nightly pipeline hasn't run.</p>"
+    return string.Template(_load_index_template()).safe_substitute(
+        FAVICON_URI=FAVICON_URI,
+        RADAR=RADAR_SVG,
+        CARDS=cards_html,
+        TOOLTIP_JS=_tooltip_js(),
+    )
+
+
 def build_site(
     *,
     picks_dir: Path,
@@ -265,4 +386,19 @@ def build_site(
         page_tmp.write_text(render_story_html(story, topic_name), encoding="utf-8")
         page_tmp.replace(page_out)  # atomic, same as the feed: never publish a truncated page
         built.append((slug, n))
+
+    # Render the landing page index.html from the topics just built
+    index_html = render_index(
+        picks_dir=picks_dir,
+        stories_dir=stories_dir,
+        site_dir=site_dir,
+        base_url=base_url,
+        built_topics=built,
+    )
+    index_out = site_dir / "index.html"
+    site_dir.mkdir(parents=True, exist_ok=True)
+    index_tmp = index_out.with_suffix(".html.tmp")
+    index_tmp.write_text(index_html, encoding="utf-8")
+    index_tmp.replace(index_out)
+    print(f"      index -> site/index.html ({len(built)} topics)")
     return built

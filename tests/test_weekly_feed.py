@@ -33,10 +33,12 @@ def _pick(
     reason: str = "Why it matters now",
     thesis: str = "Systemic thesis",
     event: str = "Observed event one",
+    published: str = "2026-08-03T12:00:00+00:00",
 ) -> dict[str, Any]:
     return {
         "url": url,
         "title": title,
+        "published": published,
         "source": "Fake Feed",
         "domain": "a.example",
         "subarea": "Capex",
@@ -291,7 +293,8 @@ def test_build_site_skips_missing_story_or_empty_picks(tmp_path: Path, capsys) -
         base_url="https://signalflow.local",
     )
     assert built == []  # nothing buildable: story missing -> feed body would dangle
-    assert not site.exists()
+    assert site.exists()  # index page (fallback) is always rendered
+    assert (site / "index.html").exists()
     out = capsys.readouterr().out
     assert "no story" in out  # picks WITHOUT a story is a state error — surfaced, not silent
 
@@ -302,11 +305,29 @@ def test_build_site_skips_missing_story_or_empty_picks(tmp_path: Path, capsys) -
         json.dumps({"generated_at": NOW.isoformat(), "topic": "X", "slug": "03-x", "picks": []}),
         encoding="utf-8",
     )
+    site3 = tmp_path / "site3"
     build_site(
         picks_dir=orphan,
         stories_dir=tmp_path / "stories2",
         feeds_path=tmp_path / "no-feeds.jsonl",
-        site_dir=tmp_path / "site3",
+        site_dir=site3,
         base_url="https://signalflow.local",
     )
     assert "no story" not in capsys.readouterr().out
+
+
+def test_render_index_shows_date_and_source(tmp_path: Path) -> None:
+    """The landing page shows the published date and source attribution per pick."""
+    picks_dir, stories_dir, feeds = _site_fixture(tmp_path)
+    site = tmp_path / "site"
+    _ = build_site(
+        picks_dir=picks_dir,
+        stories_dir=stories_dir,
+        feeds_path=feeds,
+        site_dir=site,
+        base_url="https://signalflow.local",
+    )
+    html = (site / "index.html").read_text(encoding="utf-8")
+    assert "Aug 3, 2026" in html  # _pick's published date formatted
+    assert "Fake Feed" in html  # source attribution
+    assert "pick-source" in html

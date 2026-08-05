@@ -85,6 +85,7 @@ class RunResult:
     picked: int = 0
     generated_sources: bool = False
     sources_approved: bool = False
+    traceback: str = ""  # redacted excerpt (admin run records); "" when ok
 
 
 # --- freshness --------------------------------------------------------------
@@ -327,7 +328,13 @@ def run_all(
                     tb = tb.replace(secret, "***")
                     message = message.replace(secret, "***")  # any key can appear in exception text
             print(f"      TRACEBACK for {spec.topic['name']}:\n{tb}")
-            return RunResult(slug=spec.slug, topic=spec.topic["name"], ok=False, error=message[:300])
+            return RunResult(
+                slug=spec.slug,
+                topic=spec.topic["name"],
+                ok=False,
+                error=message[:300],
+                traceback=tb[:2000],  # admin run records: why it failed
+            )
 
     with ThreadPoolExecutor(max_workers=workers) as ex:
         futures = [ex.submit(worker, spec) for spec in plan.to_run]
@@ -335,6 +342,129 @@ def run_all(
             results.append(fut.result())
     results.sort(key=lambda r: r.slug)
     return results
+
+
+# --- run records (admin page source) ----------------------------------------
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    """Atomic write: a crash mid-write never leaves a partial record."""
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(content, encoding="utf-8")
+    tmp.replace(path)
+
+
+def _story_version(stories_dir: Path, slug: str) -> int:
+    """The topic story's version (0 when absent/malformed) — shown on admin."""
+    path = stories_dir / f"{slug}.json"
+    if not path.exists():
+        return 0
+    try:
+        return int((json.loads(path.read_text(encoding="utf-8")) or {}).get("version", 0))
+    except (json.JSONDecodeError, OSError, TypeError, ValueError):
+        return 0  # corrupt story file: show the run, not the error
+
+
+def _verdict_counts(verdicts_path: Path, slugs: list[str]) -> dict[str, int]:
+    """Per-topic verdict counts from the shared cache — one scan, not one per topic."""
+    counts = {slug: 0 for slug in slugs}
+    if not verdicts_path.exists():
+        return counts
+    try:
+        for line in verdicts_path.read_text(encoding="utf-8").splitlines():
+            try:
+                slug = json.loads(line).get("slug")
+            except json.JSONDecodeError:
+                continue
+            if slug in counts:
+                counts[slug] += 1
+    except OSError:
+        pass
+    return counts
+
+
+def _list_status(discovery_dir: Path, slug: str, generated: bool) -> str:
+    if generated:
+        return "generated"
+    return "present" if (discovery_dir / f"{slug}.json").exists() else "missing"
+
+
+def _picked_items(picks_dir: Path, slug: str) -> list[dict[str, Any]]:
+    """This run's picked items (title/url/reason) for the admin record.
+
+    The picks file holds the full verdict objects; the record keeps the
+    operator-facing slice — what was surfaced and why.
+    """
+    payload = _load_payload(picks_dir / f"{slug}.json")
+    items: list[dict[str, Any]] = []
+    for pick in (payload or {}).get("picks", []) or []:
+        if not isinstance(pick, dict) or not pick.get("url"):
+            continue
+        items.append(
+            {
+                "title": str(pick.get("title", ""))[:200],
+                "url": str(pick.get("url", "")),
+                "reason": str(pick.get("reason", ""))[:300],
+            }
+        )
+    return items
+
+
+def write_run_record(
+    runs_dir: Path,
+    results: list[RunResult],
+    *,
+    now: datetime,
+    weekly_topics: list[str] | None,
+    fresh: list[tuple[str, str]],
+    picks_dir: Path,
+    stories_dir: Path,
+    discovery_dir: Path,
+    verdicts_path: Path,
+) -> Path:
+    """Write spikes/state/runs/{ts}.json + latest.json for the admin page.
+
+    Machine-readable per-topic status (ok/failed, picks, story version, verdict
+    count, source-list status, error + redacted traceback excerpt) plus the
+    night's rotation subset and the fresh skips. latest.json mirrors the newest
+    record so a local `make admin` renders the same history as the deployed
+    page. Returns the timestamped run file.
+    """
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    counts = _verdict_counts(verdicts_path, [r.slug for r in results])
+    record = {
+        "ts": now.isoformat(timespec="seconds"),
+        "weekly_topics": weekly_topics,
+        "fresh": [{"topic": name, "slug": slug} for name, slug in fresh],
+        "results": [
+            {
+                "slug": r.slug,
+                "topic": r.topic,
+                "ok": r.ok,
+                "picked": r.picked,
+                "picks": _picked_items(picks_dir, r.slug),
+                "generated_sources": r.generated_sources,
+                "sources_approved": r.sources_approved,
+                "story_version": _story_version(stories_dir, r.slug),
+                "verdicts": counts.get(r.slug, 0),
+                "list": _list_status(discovery_dir, r.slug, r.generated_sources),
+                "error": r.error,
+                "traceback": r.traceback,
+            }
+            for r in results
+        ],
+        "summary": {
+            "total": len(results),
+            "ok": sum(1 for r in results if r.ok),
+            "failed": sum(1 for r in results if not r.ok),
+        },
+    }
+    content = json.dumps(record, indent=2, ensure_ascii=False) + "\n"
+    ts_stamp = now.isoformat(timespec="seconds")
+    run_path = runs_dir / f"{ts_stamp.replace(':', '-')}.json"
+    _atomic_write(run_path, content)
+    _atomic_write(runs_dir / "latest.json", content)
+    return run_path
 
 
 # --- CLI --------------------------------------------------------------------
@@ -350,7 +480,7 @@ def main(argv: list[str] | None = None) -> int:
 
     topics = load_topics()
     now = datetime.now(UTC)
-    weekly_topics = [t.strip() for t in os.environ.get("WEEKLY_TOPICS", "").split(",") if t.strip()] or None
+    weekly_topics = [t.strip() for t in os.environ.get("WEEKLY_TOPICS", "").split("|") if t.strip()] or None
     plan = plan_runs(
         topics,
         discovery_dir=DISCOVERY_DIR,
@@ -392,6 +522,18 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(f"      {r.topic} ({r.slug}): FAILED — {r.error}")
     failed = [r for r in results if not r.ok]
+    run_path = write_run_record(
+        STATE_DIR / "runs",
+        results,
+        now=now,
+        weekly_topics=weekly_topics,
+        fresh=plan.fresh,
+        picks_dir=PICKS_DIR,
+        stories_dir=ws.STORY_DIR,
+        discovery_dir=DISCOVERY_DIR,
+        verdicts_path=ws.VERDICTS_PATH,
+    )
+    print(f"      run record -> {run_path.relative_to(ROOT)} (+ latest.json)")
     print(f"done: {len(results) - len(failed)}/{len(results)} topics regenerated")
     return 1 if failed else 0
 
