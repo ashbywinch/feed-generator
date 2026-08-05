@@ -65,6 +65,30 @@ DI over patching. Inject the dependency (service, output path, fake) — never
 refactor the code to accept a dependency. Fakes subclass the real protocol so
 the type checker still holds at edit time.
 
+**Write code to be DI-conducive from the start.** A collaborator constructed
+inside a function (or at import time) is a seam you must add later — the
+moment a test needs a fake, the code needs a refactor. Default parameter
+values keep production behavior identical while opening the seam. A
+constructor (class or factory) passed as a defaulted parameter is the
+lightweight pattern for "new up a collaborator":
+
+```python
+# Bad — hard-constructed collaborator: tests cannot inject a fake without
+# patching, and a fake needs the whole import chain to work.
+def run_topic(topic, sources, ...):
+    llm = LLM(CFG)          # network-bound, key-requiring — untestable
+    verdicts = evaluate(topic, llm)
+
+# Good — injectable factory, real one as the default: production unchanged,
+# tests pass `llm_factory=lambda cfg: FakeLLM()`.
+def run_topic(topic, sources, ..., llm_factory=LLM):
+    llm = llm_factory(CFG)
+    verdicts = evaluate(topic, llm)
+```
+
+Same for I/O paths: a hard-coded `Path`/filename inside a function is a seam;
+take the path as a defaulted parameter so tests point at a tmp dir.
+
 ## Testing
 
 - Tests mirror module paths; deterministic (no wall-clock, network, or order

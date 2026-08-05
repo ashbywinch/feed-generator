@@ -1089,6 +1089,7 @@ def run_topic(
     fold_story_fn: Callable[..., Any] = fold_story,
     fetch_feed_fn: Callable[..., Any] = fetch_feed,
     evaluate_source_fn: Callable[..., Any] = evaluate_source,
+    llm_factory: Callable[..., Any] = LLM,
 ) -> dict[str, Any]:
     """Run the weekly selection pipeline for ONE topic, writing per-topic outputs.
 
@@ -1118,7 +1119,7 @@ def run_topic(
 
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     story = load_story_fn(slug)
-    llm = LLM(CFG)
+    llm = llm_factory(CFG)
     if not story.get("angles"):
         # No story yet: generate the initial BIG-PICTURE story from the topic
         # boundary + subareas ONLY (no article/feed input — the story must not

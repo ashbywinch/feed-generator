@@ -34,6 +34,7 @@ def _pick(
     thesis: str = "Systemic thesis",
     event: str = "Observed event one",
     published: str = "2026-08-03T12:00:00+00:00",
+    picked_at: str | None = None,
 ) -> dict[str, Any]:
     return {
         "url": url,
@@ -45,7 +46,7 @@ def _pick(
         "reason": reason,
         "thesis": thesis,
         "empirical_event": event,
-        "picked_at": (NOW - timedelta(hours=1)).isoformat(),
+        "picked_at": picked_at if picked_at is not None else (NOW - timedelta(hours=1)).isoformat(),
     }
 
 
@@ -314,6 +315,17 @@ def test_build_site_skips_missing_story_or_empty_picks(tmp_path: Path, capsys) -
         base_url="https://signalflow.local",
     )
     assert "no story" not in capsys.readouterr().out
+
+
+def test_feed_orders_newest_pick_first(tmp_path: Path) -> None:
+    """New articles appear ABOVE old ones: the accumulated picks file holds
+    batch 1 (older) before batch 2 (newer), but the feed must render
+    newest-first (by pick time, the entry pubDate)."""
+    old = _pick(url="https://a.example/1", title="Old article", picked_at="2026-08-01T00:00:00+00:00")
+    new = _pick(url="https://a.example/2", title="New article", picked_at="2026-08-05T00:00:00+00:00")
+    out = _build(tmp_path, [old, new])  # merge_picks order: previous batch first
+    parsed = feedparser.parse(str(out))
+    assert [e.title for e in parsed.entries] == ["New article", "Old article"]
 
 
 def test_render_index_shows_date_and_source(tmp_path: Path) -> None:

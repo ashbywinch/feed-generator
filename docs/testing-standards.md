@@ -17,6 +17,13 @@
 - **Assert behavior, not implementation.** Test observable contracts
   (acceptance criteria), not internal call sequences. Use DI fakes over
   `unittest.mock.patch`.
+- **If code isn't amenable to fakes/DI, refactor it before testing.** A test
+  that needs `monkeypatch`/`patch` to reach a hard-constructed collaborator
+  (`LLM(CFG)` inside `run_topic`, a hard-coded file path) is a smell — the
+  seam is missing, not the test. Refactor the code to accept the collaborator
+  as a defaulted parameter (factory or path), then write the test with a fake.
+  See `docs/coding-standards.md` §Dependency injection for the pattern and
+  example.
 - **Real errors, real boundaries.** Test transitions, thresholds, precedence,
   and failures — not plumbing or incidental defaults.
 - **Exercise the real code path.** A test must call the production function it

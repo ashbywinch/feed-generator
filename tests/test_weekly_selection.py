@@ -10,6 +10,7 @@ deduped by URL.
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -80,3 +81,109 @@ def test_merge_picks_does_not_mutate_inputs() -> None:
     _ = ws.merge_picks(batch1, batch2)
     assert [p["url"] for p in batch1] == ["https://a/1"]
     assert [p["url"] for p in batch2] == ["https://b/1"]
+
+
+# --- run_topic with an injected fake LLM (llm_factory seam) ------------------
+
+
+class _FakeLLM:
+    """chat_json returns canned responses in call order — no network, no keys."""
+
+    def __init__(self, responses: list[dict[str, Any]]) -> None:
+        self._responses = list(responses)
+        self.calls = 0
+
+    def chat_json(self, prompt: str, max_tokens: int | None = None) -> dict[str, Any]:
+        self.calls += 1
+        assert self._responses, f"unexpected LLM call: {prompt[:80]}"
+        return self._responses.pop(0)
+
+
+class _NoopLimiter:
+    def wait(self) -> None:
+        pass
+
+
+def _topic(name: str = "Test Topic") -> dict[str, Any]:
+    return {"name": name, "description": "d", "in": "i", "out": "o", "sources": []}
+
+
+def _story() -> dict[str, Any]:
+    return {
+        "version": 2,
+        "updated_at": "2026-08-03T00:00:00+00:00",
+        "overview": "o",
+        "angles": {"Capex": ["background"]},
+        "open_questions": [],
+        "pending": [],
+    }
+
+
+def _source(items: list[dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "name": "Fake Feed",
+        "domain": "a.example",
+        "crawl_root": "https://a.example/feed",
+        "subarea": "Capex",
+        "items": items,
+        "cached": {"items": items, "fetched_at": "2026-08-05T00:00:00+00:00"},
+    }
+
+
+def _item(url: str, title: str) -> dict[str, Any]:
+    return {"url": url, "title": title, "summary": "s", "published": "2026-08-05T00:00:00+00:00", "undated": False}
+
+
+def _verdicts(*urls: str) -> dict[str, Any]:
+    return {
+        "verdicts": [{"url": u, "approved": True, "reason": "why", "thesis": "t", "empirical_event": "e"} for u in urls]
+    }
+
+
+def test_run_topic_second_run_accumulates_picks_with_fake_llm(tmp_path: Path) -> None:
+    """Real run_topic + fake LLM (llm_factory seam): running twice on the same
+    topic keeps batch 1 in the picks file alongside batch 2 — additive feeds,
+    no network."""
+    out = ws.TopicOut(
+        picks_path=tmp_path / "picks.json",
+        report_path=tmp_path / "report.md",
+        story_md_path=tmp_path / "story.md",
+    )
+    batches = iter(
+        [
+            _source([_item("https://a/1", "First batch story")]),
+            _source([_item("https://b/1", "Second batch story")]),
+        ]
+    )
+    llm = _FakeLLM([_verdicts("https://a/1"), _verdicts("https://b/1")])
+
+    def fake_fetch(source):
+        batch = next(batches)
+        source.clear()
+        source.update(batch)  # real fetch_feed mutates in place — the sources list holds the same object
+        return source
+
+    for _ in range(2):
+        ws.run_topic(
+            _topic(),
+            {"subareas": []},
+            [_source([])],  # real items come from the fake fetch_feed_fn
+            slug="02-test",
+            out=out,
+            limiter=_NoopLimiter(),
+            feeds_path=tmp_path / "feeds.jsonl",
+            verdicts_path=tmp_path / "verdicts.jsonl",
+            picks_history_path=tmp_path / "history.jsonl",
+            load_feeds_fn=lambda: {},
+            load_verdicts_fn=lambda *a, **k: {},
+            load_picked_urls_fn=lambda: set(),
+            load_story_fn=lambda slug: _story(),  # pre-seeded: no story-seed LLM call
+            save_story_fn=lambda slug, story: None,
+            fold_story_fn=lambda *a, **k: False,
+            fetch_feed_fn=fake_fetch,
+            llm_factory=lambda cfg: llm,
+        )
+
+    payload = json.loads(out.picks_path.read_text(encoding="utf-8"))
+    assert [p["title"] for p in payload["picks"]] == ["First batch story", "Second batch story"]
+    assert llm.calls == 2  # exactly one evaluation per run — the seam kept the network out
