@@ -1037,6 +1037,36 @@ class TopicOut:
     legacy_picks_path: Path | None = None
 
 
+def merge_picks(previous: list[dict[str, Any]] | None, new: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Accumulate a topic's picks across runs (additive feed contract).
+
+    A second run on a topic must EXTEND the feed, never replace it: the
+    previous batch stays first (in order), the new batch is appended, and the
+    result is deduped by URL (the earlier pick wins — a URL is never surfaced
+    twice). Inputs are not mutated.
+    """
+    seen: set[str] = set()
+    merged: list[dict[str, Any]] = []
+    for pick in list(previous or []) + list(new):
+        url = str(pick.get("url", ""))
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        merged.append(pick)
+    return merged
+
+
+def _load_previous_picks(path: Path | None) -> list[dict[str, Any]] | None:
+    """The per-topic picks payload's picks list, or None when absent/corrupt."""
+    if path is None or not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    return data.get("picks") if isinstance(data, dict) else None
+
+
 def run_topic(
     topic: dict[str, Any],
     listing: dict[str, Any],
@@ -1417,6 +1447,13 @@ def run_topic(
     # never the exclusion).
     if picks:
         save_story_fn(slug, story)
+
+    # Accumulate into the per-topic picks file (the feed's source): previous
+    # batch + this run's picks, deduped by URL. A topic's feed GROWS across
+    # runs — a second batch adds to the first, and a zero-pick run keeps the
+    # existing feed instead of blanking it. (History append above stays
+    # this-run-only: it is the exclusion store, not the feed source.)
+    picks = merge_picks(_load_previous_picks(out.picks_path), picks)
 
     payload = json.dumps(
         {"generated_at": summary["generated_at"], "topic": topic["name"], "slug": slug, "picks": picks},
