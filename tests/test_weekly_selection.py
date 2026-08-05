@@ -31,7 +31,7 @@ def _load_spike(name: str) -> Any:
 ws = _load_spike("weekly_selection")
 
 
-def _pick(url: str, title: str) -> dict[str, Any]:
+def _pick(url: str, title: str, picked_at: str = "2026-08-03T00:00:00+00:00") -> dict[str, Any]:
     return {
         "url": url,
         "title": title,
@@ -41,26 +41,39 @@ def _pick(url: str, title: str) -> dict[str, Any]:
         "reason": "why relevant",
         "thesis": "thesis",
         "empirical_event": "event",
-        "picked_at": "2026-08-03T00:00:00+00:00",
+        "picked_at": picked_at,
     }
 
 
-def test_merge_picks_keeps_first_batch_when_second_batch_added() -> None:
-    """A second run's picks extend the feed — the first batch is preserved."""
-    batch1 = [_pick("https://a/1", "First batch story"), _pick("https://a/2", "Another first batch")]
-    batch2 = [_pick("https://b/1", "Second batch story")]
+def test_merge_picks_orders_newest_batch_first() -> None:
+    """The accumulated list is newest-first: a second run's picks appear ABOVE
+    the first run's (new articles surface at the top of the feed + front page)."""
+    batch1 = [
+        _pick("https://a/1", "First batch story", picked_at="2026-08-03T00:00:00+00:00"),
+        _pick("https://a/2", "Another first batch", picked_at="2026-08-03T00:00:00+00:00"),
+    ]
+    batch2 = [_pick("https://b/1", "Second batch story", picked_at="2026-08-05T00:00:00+00:00")]
     merged = ws.merge_picks(batch1, batch2)
-    assert [p["url"] for p in merged] == ["https://a/1", "https://a/2", "https://b/1"]
-    assert merged[0]["title"] == "First batch story"  # first batch intact, in order
+    assert [p["url"] for p in merged] == ["https://b/1", "https://a/1", "https://a/2"]  # newest first
+    assert merged[0]["title"] == "Second batch story"
+    assert {p["title"] for p in merged} == {
+        "First batch story",
+        "Another first batch",
+        "Second batch story",
+    }  # nothing dropped
 
 
-def test_merge_picks_dedups_by_url_keeping_first() -> None:
-    """A URL appearing in both batches is kept once — the earlier pick wins."""
-    batch1 = [_pick("https://a/1", "Original title")]
-    batch2 = [_pick("https://a/1", "Re-picked title"), _pick("https://b/2", "Brand new")]
+def test_merge_picks_dedups_by_url_newer_wins() -> None:
+    """A URL in both batches appears once — the newer pick (first in the
+    newest-first order) wins."""
+    batch1 = [_pick("https://a/1", "Original title", picked_at="2026-08-03T00:00:00+00:00")]
+    batch2 = [
+        _pick("https://a/1", "Re-picked title", picked_at="2026-08-05T00:00:00+00:00"),
+        _pick("https://b/2", "Brand new", picked_at="2026-08-05T00:00:00+00:00"),
+    ]
     merged = ws.merge_picks(batch1, batch2)
     assert [p["url"] for p in merged] == ["https://a/1", "https://b/2"]
-    assert merged[0]["title"] == "Original title"
+    assert merged[0]["title"] == "Re-picked title"  # newer pick wins
 
 
 def test_merge_picks_first_run_no_previous() -> None:
@@ -185,5 +198,5 @@ def test_run_topic_second_run_accumulates_picks_with_fake_llm(tmp_path: Path) ->
         )
 
     payload = json.loads(out.picks_path.read_text(encoding="utf-8"))
-    assert [p["title"] for p in payload["picks"]] == ["First batch story", "Second batch story"]
+    assert [p["title"] for p in payload["picks"]] == ["Second batch story", "First batch story"]  # newest first
     assert llm.calls == 2  # exactly one evaluation per run — the seam kept the network out

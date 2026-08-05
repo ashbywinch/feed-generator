@@ -1040,20 +1040,24 @@ class TopicOut:
 def merge_picks(previous: list[dict[str, Any]] | None, new: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Accumulate a topic's picks across runs (additive feed contract).
 
-    A second run on a topic must EXTEND the feed, never replace it: the
-    previous batch stays first (in order), the new batch is appended, and the
-    result is deduped by URL (the earlier pick wins — a URL is never surfaced
-    twice). Inputs are not mutated.
+    This function is the SINGLE source of ordering truth for a topic's picks:
+    the result is NEWEST-FIRST by pick time (picked_at desc; picks without a
+    date sort last; batch-internal order preserved for ties). A second run's
+    picks therefore appear ABOVE the first run's, so new articles surface at
+    the top of the feed and the front page — every consumer (feed builder,
+    index cards, admin) inherits the order from this list and never sorts
+    itself. Deduped by URL (the newer pick — first in newest-first order —
+    wins). Inputs are not mutated.
     """
     seen: set[str] = set()
     merged: list[dict[str, Any]] = []
-    for pick in list(previous or []) + list(new):
+    for pick in list(new) + list(previous or []):  # newest batch first
         url = str(pick.get("url", ""))
         if not url or url in seen:
             continue
         seen.add(url)
         merged.append(pick)
-    return merged
+    return sorted(merged, key=lambda p: str(p.get("picked_at") or ""), reverse=True)
 
 
 def _load_previous_picks(path: Path | None) -> list[dict[str, Any]] | None:

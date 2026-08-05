@@ -328,6 +328,36 @@ def test_feed_orders_newest_pick_first(tmp_path: Path) -> None:
     assert [e.title for e in parsed.entries] == ["New article", "Old article"]
 
 
+def test_index_shows_newest_pick_first(tmp_path: Path) -> None:
+    """The front page card lists the topic's picks newest-first — the order
+    merge_picks writes to the accumulated file (single ordering source)."""
+    picks_dir, stories_dir, feeds = _site_fixture(tmp_path)
+    picks_dir.joinpath("02-test.json").write_text(
+        json.dumps(
+            {
+                "generated_at": NOW.isoformat(),
+                "topic": "Test Topic",
+                "slug": "02-test",
+                "picks": [
+                    _pick(url="https://a.example/2", title="New article", picked_at="2026-08-05T00:00:00+00:00"),
+                    _pick(url="https://a.example/1", title="Old article", picked_at="2026-08-01T00:00:00+00:00"),
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    site = tmp_path / "site"
+    _ = build_site(
+        picks_dir=picks_dir,
+        stories_dir=stories_dir,
+        feeds_path=feeds,
+        site_dir=site,
+        base_url="https://signalflow.local",
+    )
+    html = (site / "index.html").read_text(encoding="utf-8")
+    assert html.index("New article") < html.index("Old article")
+
+
 def test_render_index_shows_date_and_source(tmp_path: Path) -> None:
     """The landing page shows the published date and source attribution per pick."""
     picks_dir, stories_dir, feeds = _site_fixture(tmp_path)
