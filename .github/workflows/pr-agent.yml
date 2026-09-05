@@ -11,7 +11,7 @@ jobs:
       issues: write
     steps:
       - uses: actions/checkout@v4
-      - uses: the-pr-agent/pr-agent@v0.41.1
+      - uses: the-pr-agent/pr-agent@v0.44.0
         id: pr-agent
         env:
           OPENAI_KEY: ${{ secrets.FEED_GENERATOR_API_KEY }}
