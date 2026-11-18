@@ -12,6 +12,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -144,7 +145,8 @@ def _source(items: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _item(url: str, title: str) -> dict[str, Any]:
-    return {"url": url, "title": title, "summary": "s", "published": "2026-08-05T00:00:00+00:00", "undated": False}
+    published = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
+    return {"url": url, "title": title, "summary": "s", "published": published, "undated": False}
 
 
 def _verdicts(*urls: str) -> dict[str, Any]:
