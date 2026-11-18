@@ -21,15 +21,19 @@ jobs:
           # its own .pr_agent.toml (api_base + the key) to the reviewer.
           PR_AGENT_CONFIG_BRANCH: pr-agent-config
       # Fail loud: fail the PR when no "PR Reviewer Guide" comment covers the
-      # head commit. Match the FULL and SHORT sha (the bot posts the short
-      # one), token-bounded so unrelated hex strings can't false-positive.
+      # head commit. A guide counts when it names the commit (a review update)
+      # or was posted after this run started — the first review on a PR carries
+      # no SHA marker, so the SHA alone would fail every new PR.
       - name: Fail loud if no review covers the head commit
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           SHA="${{ github.event.pull_request.head.sha }}"
-          if ! gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
-              --jq '.[].body' | grep -qE "(^|[^0-9a-f])($SHA|${SHA:0:7})([^0-9a-f]|$)"; then
+          SHORT_SHA="${SHA:0:7}"
+          RUN_STARTED=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}" --jq '.created_at')
+          COVERED=$(gh api "repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments" \
+            --jq "[.[] | select(.user.login == \"github-actions[bot]\" and (.body | contains(\"PR Reviewer Guide\")) and ((.body | contains(\"$SHORT_SHA\")) or (.created_at >= \"$RUN_STARTED\")))] | length")
+          if [ "${COVERED:-0}" -eq 0 ]; then
             echo "::error::AI review did not post for commit $SHA — the review may have failed silently."
             exit 1
           fi
