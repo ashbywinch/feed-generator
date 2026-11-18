@@ -1,9 +1,9 @@
 [openai]
 custom_llm_provider = "openai"
-api_base = "https://opencode.ai/zen/go/v1"
+api_base = "https://gateway.ai.cloudflare.com/v1/e21a5be58ac1e8f7d5619539feb2dc3d/default/compat"
 
 [config]
-model = "openai/deepseek-v4-flash"
+model = "openai/dynamic/fallback2"
 custom_model_max_tokens = 128000
 max_model_tokens = 128000
 ai_timeout = 1800
@@ -25,4 +25,6 @@ extra_instructions = "Check the PR against each file in repo_context_files. Add 
 
 [github_action_config]
 handle_push_trigger = true
+# Bot pushes get a review too: every commit in this repo is authored by omp-harness.
+push_trigger_ignore_bot_commits = false
 push_commands = ["/review", "/improve"]

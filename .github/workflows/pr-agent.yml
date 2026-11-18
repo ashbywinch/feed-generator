@@ -14,8 +14,8 @@ jobs:
       - uses: the-pr-agent/pr-agent@v0.41.1
         id: pr-agent
         env:
-          OPENAI_KEY: ${{ secrets.FEED_GENERATOR_API_KEY }}
-          OPENAI_BASE_URL: https://opencode.ai/zen/go/v1
+          OPENAI_KEY: ${{ secrets.CLOUDFLARE_AIGATEWAY_TOKEN }}
+          OPENAI_BASE_URL: https://gateway.ai.cloudflare.com/v1/e21a5be58ac1e8f7d5619539feb2dc3d/default/compat
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       # Fail loud: fail the PR when no "PR Reviewer Guide" comment covers the
       # head commit. Match the FULL and SHORT sha (the bot posts the short
